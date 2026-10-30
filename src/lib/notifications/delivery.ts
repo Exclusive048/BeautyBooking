@@ -9,15 +9,7 @@ import { filterUsersWithMarketingConsent } from "@/lib/legal/consent";
 import { isMarketingNotificationType } from "@/lib/notifications/marketing-types";
 import { sendPushToUser } from "@/lib/notifications/push/send";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
-import { prisma } from "@/lib/prisma";
-import { sendEmail, isEmailConfigured } from "@/lib/email/sender";
-import {
-  buildNotificationEmailHeaders,
-  buildNotificationEmailHtml,
-  buildNotificationEmailText,
-} from "@/lib/email/templates/notification";
-import { resolvePublicAppUrl } from "@/lib/app-url";
-import { toExternalSafeLink } from "@/lib/notifications/external-link";
+import { enqueueEmailNotification } from "@/lib/notifications/email-send";
 import { enqueueVkNotification } from "@/lib/vk/notify";
 
 type DeliveryInput = {
@@ -74,69 +66,6 @@ async function enqueueTelegramMessage(userId: string, text: string): Promise<voi
 }
 
 /**
- * EMAIL-ADDRESS-OCCUPATION: сервисная почта уходит ТОЛЬКО на ПОДТВЕРЖДЁННЫЙ
- * адрес.
- *
- * Пока проверки `emailVerifiedAt` не было, вторая половина squat'а была не про
- * доступность, а про ПДн: держатель заявки на чужой адрес получал письма о
- * СВОИХ записях в ЧУЖОЙ ящик — то есть имя, услугу и время визита третьего
- * лица уезжали постороннему человеку. Частичный уникальный индекс это НЕ
- * закрывает: он про уникальность владения, а не про доставку.
- *
- * Вынесено отдельным предикатом, а не оставлено условием в теле, чтобы
- * проверялось поведение, а не строка исходника.
- */
-type ServiceEmailRecipient = {
-  email: string | null;
-  emailNotificationsEnabled: boolean;
-  emailVerifiedAt: Date | null;
-};
-
-export function canDeliverServiceEmail(
-  user: ServiceEmailRecipient | null,
-): user is ServiceEmailRecipient & { email: string } {
-  if (!user) return false;
-  if (!user.email) return false;
-  if (!user.emailNotificationsEnabled) return false;
-  return user.emailVerifiedAt !== null;
-}
-
-async function deliverEmailNotification(
-  userId: string,
-  title: string,
-  body: string,
-  ctaUrl?: string
-): Promise<void> {
-  if (!isEmailConfigured()) return;
-
-  const user = await prisma.userProfile.findUnique({
-    where: { id: userId },
-    select: { email: true, emailNotificationsEnabled: true, emailVerifiedAt: true },
-  });
-
-  if (!canDeliverServiceEmail(user)) return;
-
-  const baseUrl = resolvePublicAppUrl() ?? "";
-  const unsubscribeUrl = `${baseUrl}/cabinet/settings`;
-  // EXTERNAL-LINK-NO-IDS: письмо хранят почтовые сервисы — в ссылке только раздел.
-  const resolvedCtaUrl = toExternalSafeLink(ctaUrl) ?? undefined;
-
-  await sendEmail({
-    to: user.email,
-    subject: title,
-    html: buildNotificationEmailHtml({
-      title,
-      body,
-      ctaUrl: resolvedCtaUrl,
-      ctaLabel: "Посмотреть",
-      unsubscribeUrl,
-    }),
-    text: buildNotificationEmailText({ title, body, ctaUrl: resolvedCtaUrl }),
-    headers: buildNotificationEmailHeaders({ unsubscribeUrl }),
-  });
-}
-
-/**
  * PUSH-COVERAGE-01 — внешние каналы (push + почта + ВКонтакте) для УЖЕ созданной и
  * закоммиченной in-app записи. Единственное место, где решается, куда ещё
  * уходит уведомление, кроме центра: `deliverNotification` зовёт его сам, а
@@ -156,8 +85,12 @@ export function deliverExternalChannels(
     type: NotificationType;
     title: string;
     body: string;
-    /** MOBILE-B2: id и payload записи — приложению (id сущностей, «прочитано» по нажатию). */
-    id?: string;
+    /**
+     * id записи центра уведомлений: приложению (MOBILE-B2 — id сущностей,
+     * «прочитано» по нажатию) и задаче письма (NOTIFICATION-EMAIL-QUEUE —
+     * воркер перечитывает по нему текст и получателя).
+     */
+    id: string;
     payloadJson?: unknown;
   },
   urls: { pushUrl?: string; emailCtaUrl?: string; pushTag?: string } = {},
@@ -176,7 +109,7 @@ export function deliverExternalChannels(
     },
     // MOBILE-B2: тот же push в нативное приложение — общий текст по типу из
     // таблицы `native-push/payload.ts`, а не `title`/`body` записи (в них ПДн).
-    { native: { type: record.type, notificationId: record.id ?? null, payloadJson: record.payloadJson } },
+    { native: { type: record.type, notificationId: record.id, payloadJson: record.payloadJson } },
   ).catch((error) => {
     logError("Push notification delivery failed", {
       userId: record.userId,
@@ -185,14 +118,16 @@ export function deliverExternalChannels(
     });
   });
 
-  // Email channel — silent fail, only for important notification types
+  // Почта — только для важных типов. NOTIFICATION-EMAIL-QUEUE (A-06): задачей
+  // очереди `email.send` с повторами временных отказов SMTP, а не отправкой из
+  // процесса запроса, где сбой SMTP или рестарт контейнера терял письмо.
   if (IMPORTANT_NOTIFICATION_TYPES.has(record.type)) {
-    void deliverEmailNotification(
-      record.userId,
-      record.title,
-      record.body,
-      urls.emailCtaUrl ?? urls.pushUrl
-    ).catch((error) => {
+    void enqueueEmailNotification({
+      notificationId: record.id,
+      userId: record.userId,
+      type: record.type,
+      url: urls.emailCtaUrl ?? urls.pushUrl,
+    }).catch((error) => {
       logError("Email notification delivery failed", {
         userId: record.userId,
         type: record.type,

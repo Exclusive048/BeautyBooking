@@ -68,32 +68,34 @@ export type VkProfile = {
   avatarUrl: string | null;
 };
 
-function buildRedirectUri(base: string, mode: "auth" | "integrations"): string {
+const VK_AUTH_CALLBACK_PATH = "/api/auth/vk/callback";
+/**
+ * VK-INTEGRATIONS-ROUTES-ORPHANED (2026-10-30): второй колбэк VK —
+ * `/api/integrations/vk/callback` — удалён вместе со своим стартом. Если
+ * `VK_REDIRECT_URI` в env по старой памяти указывает на него, адрес всё равно
+ * сводится к единственному колбэку входа: иначе VK вернул бы браузер на 404.
+ */
+const VK_LEGACY_INTEGRATIONS_CALLBACK_PATH = "/api/integrations/vk/callback";
+
+function buildRedirectUri(base: string): string {
   const trimmed = base.trim();
-  if (trimmed.includes("/api/auth/vk/callback")) {
-    return mode === "auth"
-      ? trimmed
-      : trimmed.replace("/api/auth/vk/callback", "/api/integrations/vk/callback");
+  if (trimmed.includes(VK_AUTH_CALLBACK_PATH)) return trimmed;
+  if (trimmed.includes(VK_LEGACY_INTEGRATIONS_CALLBACK_PATH)) {
+    return trimmed.replace(VK_LEGACY_INTEGRATIONS_CALLBACK_PATH, VK_AUTH_CALLBACK_PATH);
   }
-
-  if (trimmed.includes("/api/integrations/vk/callback")) {
-    return mode === "integrations"
-      ? trimmed
-      : trimmed.replace("/api/integrations/vk/callback", "/api/auth/vk/callback");
-  }
-
-  const normalized = trimmed.replace(/\/$/, "");
-  return mode === "auth"
-    ? `${normalized}/api/auth/vk/callback`
-    : `${normalized}/api/integrations/vk/callback`;
+  return `${trimmed.replace(/\/$/, "")}${VK_AUTH_CALLBACK_PATH}`;
 }
 
-export function requireVkRedirectUri(mode: "auth" | "integrations"): string {
+/**
+ * Колбэк у VK один — вход (`/api/auth/vk/callback`). Второго режима
+ * («интеграция», параметр `mode`) с VK-INTEGRATIONS-ROUTES-ORPHANED нет.
+ */
+export function requireVkRedirectUri(): string {
   const redirectUri = getVkRedirectUri();
   if (!redirectUri) {
     throw new AppError("Вход через VK сейчас недоступен. Войдите другим способом.", 500, "VK_ID_REDIRECT_URI_MISSING");
   }
-  return buildRedirectUri(redirectUri, mode);
+  return buildRedirectUri(redirectUri);
 }
 
 export function buildVkAuthorizeUrl(input: {

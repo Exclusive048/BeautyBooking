@@ -6,7 +6,7 @@ import { toAppError } from "@/lib/api/errors";
 import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { logError } from "@/lib/logging/logger";
-import { parseBody } from "@/lib/validation";
+import { parseBody, parseOptionalBody } from "@/lib/validation";
 import {
   decideContentReport,
   type ContentReportDecision,
@@ -28,13 +28,6 @@ const dismissBodySchema = z.object({
 });
 
 const reportIdSchema = z.string().trim().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/);
-
-/** «Отклонить» без пометки можно прислать и вовсе без тела. */
-async function parseOptionalBody<T>(req: Request, schema: z.ZodType<T>): Promise<T> {
-  const text = await req.clone().text();
-  if (!text.trim()) return schema.parse({});
-  return parseBody(req, schema);
-}
 
 /**
  * MOBILE-POLISH — общий обработчик `POST /api/admin/reports/{id}/resolve` и

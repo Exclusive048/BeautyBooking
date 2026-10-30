@@ -284,6 +284,17 @@ const envSchema = z.object({
   // ── Monitoring ────────────────────────────────────────────────────────────
   MONITORING_TELEGRAM_BOT_TOKEN: z.string().optional(),
   MONITORING_TELEGRAM_CHAT_ID: z.string().optional(),
+  // ALERT-EMAIL-CHANNEL: тот же алерт ещё и письмом — адреса через запятую
+  // (ящик команды, куда падают ошибки). Пусто — писем нет. Уходит с общего
+  // SMTP (SMTP_*), с которого идут и коды входа, поэтому писем-алертов не
+  // больше потолка `ALERT_EMAIL_BUDGET` (`monitoring/alert-email.ts`).
+  MONITORING_ALERT_EMAIL_TO: z
+    .string()
+    .optional()
+    .refine(
+      (value) => splitEnvList(value).every((item) => isLoginEmail(item)),
+      "must be comma-separated email addresses",
+    ),
 
   // ── Error tracking — GlitchTip (OBSERVABILITY-GLITCHTIP-01) ───────────────
   // GlitchTip is a self-hosted, Sentry-ingest-compatible backend. Self-hosting

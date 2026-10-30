@@ -175,6 +175,12 @@ export const adminPanel = {
           SETTINGS_APP_SETTING_UPDATED: "Изменил настройку",
           CONTENT_REPORT_RESOLVED: "Принял меры по жалобе",
           CONTENT_REPORT_DISMISSED: "Отклонил жалобу",
+          CATEGORY_CREATED: "Добавил категорию",
+          HOT_SLOTS_RUN: "Запустил расчёт горящих окошек",
+          MEDIA_CLEANUP_RUN: "Запустил очистку медиа",
+          QUEUE_JOB_RETRIED: "Повторил задачу очереди",
+          QUEUE_JOB_DELETED: "Удалил задачу очереди",
+          VISUAL_SEARCH_REINDEX_REQUESTED: "Запустил переиндексацию поиска по фото",
         },
       },
       details: {
@@ -249,6 +255,7 @@ export const adminPanel = {
         redis: "Redis",
         process: "Процесс приложения",
         queuePending: "Очередь задач",
+        queueDelayed: "Отложенные задачи",
         queueProcessing: "Задачи в работе",
         queueDead: "Мёртвые задачи",
         realtime: "Уведомления в реальном времени",
@@ -294,8 +301,10 @@ export const adminPanel = {
       aiSpendHint: (meters: string) => `По потолкам: ${meters}. Счётчик сбрасывается в 00:00 UTC`,
       aiSpendOff: "ИИ не подключён",
       queuePendingSuffix: "ждёт",
-      queuePendingHint:
-        "Задачи в очереди Redis, включая отложенные напоминания с временем запуска в будущем",
+      queuePendingHint: "Задачи, готовые к работе и ждущие воркера. Отложенные считаются отдельно",
+      queuePendingOldest: (ago: string) => `Первая в очереди стала готовой ${ago}`,
+      queueDelayedHint:
+        "Напоминания и повторы, время запуска которых ещё не пришло. В перегрузку очереди не входят",
       metricUnavailable: "—",
       metricUnavailableHint: "Метрика появится после подключения мониторинга",
       noDataYetHint: "Данных ещё нет: появятся через минуту после старта приложения",
@@ -550,6 +559,8 @@ export const adminPanel = {
     filters: {
       roleAll: "Все роли",
       planAll: "Все тарифы",
+      statusAll: "Все статусы",
+      statusBlocked: "Заблокированные",
       searchPlaceholder: "Имя, email, телефон",
     },
     columns: {
@@ -559,6 +570,34 @@ export const adminPanel = {
       plan: "Тариф",
       city: "Город",
       created: "Зарегистрирован",
+      access: "Доступ",
+    },
+    // USER-BLOCKING-01 — блокировка аккаунта администратором.
+    block: {
+      badge: "Заблокирован",
+      reasonEmpty: "Причина не указана",
+      action: "Заблокировать",
+      unblockAction: "Разблокировать",
+      actionAria: (name: string) => `Заблокировать: ${name}`,
+      unblockActionAria: (name: string) => `Разблокировать: ${name}`,
+      dialog: {
+        title: "Блокировка пользователя",
+        userLabel: "Пользователь",
+        consequences:
+          "Пользователь сразу выйдет из всех сессий и не сможет войти снова. Push-уведомления перестанут приходить. Записи, отзывы и переписка сохранятся.",
+        reasonLabel: "Причина",
+        reasonPlaceholder: "Например: мошенничество с записями",
+        reasonHint: "Сохраняется в журнал действий администраторов. Пользователь её не видит.",
+        reasonRequired: "Укажите причину блокировки.",
+        cancel: "Отмена",
+        submit: "Заблокировать",
+      },
+      unblockConfirm: {
+        title: "Снять блокировку?",
+        message: (name: string) =>
+          `${name} снова сможет входить в аккаунт. Прежние сессии не восстановятся — потребуется войти заново.`,
+        confirm: "Разблокировать",
+      },
     },
     roleBadge: {
       client: "Клиент",
@@ -618,6 +657,10 @@ export const adminPanel = {
     },
     toasts: {
       planChanged: "Тариф изменён",
+      blocked: "Пользователь заблокирован",
+      unblocked: "Блокировка снята",
+      blockFailed: "Не удалось заблокировать пользователя. Попробуйте ещё раз.",
+      unblockFailed: "Не удалось разблокировать пользователя. Попробуйте ещё раз.",
       errorGeneric: "Не удалось выполнить действие. Попробуйте ещё раз.",
     },
   },
@@ -1085,6 +1128,7 @@ export const adminPanel = {
         refreshingLabel: "Обновляем…",
         tiles: {
           pending: "В очереди",
+          delayed: "Отложено",
           processing: "Обрабатывается",
           dead: "Мёртвых задач",
         },

@@ -556,6 +556,9 @@ const REVIEW_REPORT_REASONS = UI_TEXT.adminPanel.reviews.reportReasons;
  * старым, строго после курсора `after`.
  */
 export async function getAdminEvents(opts: FetchOpts = {}): Promise<AdminEventsResponse> {
+  // До первого чтения: всё, что записано раньше этого момента и уже видно
+  // базе, страница либо вернула, либо обрезала по `limit` (тогда `nextCursor`).
+  const asOfMs = Date.now();
   const limit = Math.min(Math.max(opts.limit ?? 30, 1), ADMIN_EVENTS_MAX_PAGE);
   const take = limit + 1;
   const window: Window = {
@@ -889,6 +892,9 @@ export async function getAdminEvents(opts: FetchOpts = {}): Promise<AdminEventsR
 
   // RKN-FIX-10: лента несёт полные имена клиентов и мастеров — массовое
   // чтение ПДн. Опрос новых (`sinceMs`) следа не пишет: см. `admin.events.list`.
+  // Узость опроса (без курсора, не старше часа) держит роут — ADMIN-EVENTS-
+  // SINCE-TRAIL; здесь её нет, потому что выгрузка зовёт сервис с `sinceMs` +
+  // `after` без `actor` и пишет свой след.
   if (opts.actor && !opts.sinceMs) {
     await recordPdAccess({
       surface: "admin.events.list",
@@ -906,6 +912,7 @@ export async function getAdminEvents(opts: FetchOpts = {}): Promise<AdminEventsR
 
   return {
     items: page.map((entry) => entry.item),
+    asOfMs,
     nextCursor:
       ranked.length > limit && last
         ? encodeAdminEventsCursor({ ms: last.item.timeMs, rank: last.rank, id: last.entityId })

@@ -26,6 +26,16 @@ export const ADMIN_DASHBOARD_EVENTS = 10;
 /** Страница «Истории событий»: первая загрузка и «Показать ещё». */
 export const ADMIN_EVENTS_HISTORY_PAGE = 50;
 
+/**
+ * ADMIN-EVENTS-SINCE-TRAIL — насколько далеко в прошлое смотрит опрос новых
+ * (`?since=`): не дальше часа от «сейчас» сервера. Опрос следа чтения ПДн не
+ * пишет (RKN-FIX-10), и это оправдано, только пока он структурно узкий: без
+ * этой границы `since=1` превращал опрос в листание всей истории без следа.
+ * Роут отвечает 400 на более старый `since` и на `since` вместе с курсором;
+ * клиент держит свой `since` в окне сам (`events-poll-plan.ts`).
+ */
+export const ADMIN_EVENTS_POLL_WINDOW_MS = 60 * 60 * 1000;
+
 /** Вкладки фильтра → источники. «Все» — все источники. */
 export const ADMIN_EVENT_CATEGORY_TYPES: Record<
   Exclude<AdminEventCategory, "all">,

@@ -169,7 +169,7 @@ export async function GET(
     // предыдущей услуги (`?after=`).
     const flushAfter = resolveFlushAfterParam(url.searchParams.get("after"));
 
-    const bookable = await listBookableSlots({
+    const slotsInput: Parameters<typeof listBookableSlots>[0] = {
       provider,
       serviceId,
       durationMinutes: windowMinutes,
@@ -190,10 +190,24 @@ export async function GET(
         operatorProvider !== null && provider.studioId && serviceOwner?.provider
           ? stricterBookingWindow(serviceOwner.provider, provider)
           : undefined,
-    });
-    if (!bookable.ok) return fail(bookable.message, bookable.status, bookable.code);
+    };
 
-    return ok({ slots: bookable.slots, meta: bookable.meta });
+    // MANUAL-SLOTS-ALL (2026-10-30, решение владельца): ручная запись видит те
+    // же окошки, что клиент (`slots`), а остальные свободные времена — время,
+    // оставляющее промежуток, который не заполнит ни одна услуга, — приходят
+    // отдельным списком `otherSlots` для ссылки «Показать все свободные
+    // времена»: клиент по телефону может попросить именно такое время.
+    const [bookable, allStarts] = await Promise.all([
+      listBookableSlots(slotsInput),
+      operatorProvider !== null ? listBookableSlots({ ...slotsInput, allStarts: true }) : null,
+    ]);
+    if (!bookable.ok) return fail(bookable.message, bookable.status, bookable.code);
+    if (allStarts && !allStarts.ok) return fail(allStarts.message, allStarts.status, allStarts.code);
+
+    if (!allStarts) return ok({ slots: bookable.slots, meta: bookable.meta });
+    const shown = new Set(bookable.slots.map((slot) => new Date(slot.startAtUtc).getTime()));
+    const otherSlots = allStarts.slots.filter((slot) => !shown.has(new Date(slot.startAtUtc).getTime()));
+    return ok({ slots: bookable.slots, otherSlots, meta: bookable.meta });
   } catch (error) {
     const appError = toAppError(error);
     const requestId = getRequestId(req);

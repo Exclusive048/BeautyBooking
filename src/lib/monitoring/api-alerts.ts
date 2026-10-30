@@ -1,5 +1,7 @@
 import { trackError } from "@/lib/monitoring/alerts";
 import { sendAlertWithCooldown } from "@/lib/monitoring/alert-cooldown";
+import { logInfo } from "@/lib/logging/logger";
+import { maskEmail, maskPhone } from "@/lib/logging/masking";
 
 /**
  * Ops-события: каждое — ОДНО сообщение в Telegram с паузой по ключу.
@@ -74,13 +76,18 @@ export function alertOtpRateLimitTriggered(
   ip: string | null,
   phone?: string
 ): void {
+  // ALERT-CONTEXT-ALLOWLIST (D-02): адрес источника и начало номера в ops-чат
+  // (Telegram — иностранный сервис) больше не идут — `sendAlert` их отбросит.
+  // Чтобы IP перебора было где найти, он пишется сюда, в structured log, на
+  // каждое срабатывание, а не раз в паузу алерта.
+  logInfo("otp.rate-limit.triggered", {
+    ip: ip ?? "unknown",
+    identity: phone ? (phone.includes("@") ? maskEmail(phone) : maskPhone(phone)) : "unknown",
+  });
   void sendAlertWithCooldown(
     "warning",
     "OTP rate limit triggered — возможный bruteforce",
-    {
-      ip: ip ?? "unknown",
-      phone: phone ? `${phone.slice(0, 4)}****` : "unknown",
-    },
+    undefined,
     { key: OTP_RATE_LIMIT_ALERT_KEY, cooldownMs: OTP_RATE_LIMIT_COOLDOWN_MS }
   );
 }

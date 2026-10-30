@@ -4,12 +4,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * MOBILE-POLISH — `POST /api/studio/schedule/requests/{id}/reject`: комментарий
  * обязателен и не длиннее 500 символов (уходит мастеру в уведомлении). Отказ —
  * 400 `VALIDATION_ERROR` с русским текстом и `error.fieldErrors.comment`.
+ *
+ * SCHEDULE-REQUEST-ATOMIC — статус меняется только у открытой заявки
+ * (`updateMany` с условием `status: PENDING`); уже обработанная, в том числе
+ * одобренная другим администратором между проверкой и записью, — 409.
+ * Конкурентный прогон с одобрением — `lib/schedule/schedule-request-atomic.test.ts`.
  */
 
 const getSessionUser = vi.hoisted(() => vi.fn());
 const resolveCurrentStudioAccess = vi.hoisted(() => vi.fn());
 const prisma = vi.hoisted(() => ({
-  scheduleChangeRequest: { findFirst: vi.fn(), update: vi.fn() },
+  scheduleChangeRequest: { findFirst: vi.fn(), updateMany: vi.fn() },
 }));
 const loadScheduleRequestWithRelations = vi.hoisted(() => vi.fn());
 const notifyScheduleRequestRejected = vi.hoisted(() => vi.fn());
@@ -48,7 +53,7 @@ beforeEach(() => {
   getSessionUser.mockResolvedValue({ id: "user-1" });
   resolveCurrentStudioAccess.mockResolvedValue({ studioId: "studio-1", roles: ["ADMIN"] });
   prisma.scheduleChangeRequest.findFirst.mockResolvedValue({ id: "req-1", status: "PENDING" });
-  prisma.scheduleChangeRequest.update.mockResolvedValue({});
+  prisma.scheduleChangeRequest.updateMany.mockResolvedValue({ count: 1 });
   loadScheduleRequestWithRelations.mockResolvedValue(null);
 });
 
@@ -75,7 +80,7 @@ describe("POST /api/studio/schedule/requests/{id}/reject", () => {
       message: "Комментарий обязателен.",
       fieldErrors: { comment: "Комментарий обязателен." },
     });
-    expect(prisma.scheduleChangeRequest.update).not.toHaveBeenCalled();
+    expect(prisma.scheduleChangeRequest.updateMany).not.toHaveBeenCalled();
   });
 
   it("длиннее 500 символов — 400 с текстом и fieldErrors.comment", async () => {
@@ -86,7 +91,7 @@ describe("POST /api/studio/schedule/requests/{id}/reject", () => {
       message: "Комментарий — не длиннее 500 символов.",
       fieldErrors: { comment: "Комментарий — не длиннее 500 символов." },
     });
-    expect(prisma.scheduleChangeRequest.update).not.toHaveBeenCalled();
+    expect(prisma.scheduleChangeRequest.updateMany).not.toHaveBeenCalled();
   });
 
   it("ровно 500 символов (с пробелами по краям) — отклоняем, комментарий обрезан", async () => {
@@ -94,8 +99,8 @@ describe("POST /api/studio/schedule/requests/{id}/reject", () => {
     const { status, body } = await reject({ comment: `  ${comment}  ` });
     expect(status).toBe(200);
     expect(body.data).toEqual({ id: "req-1", status: "REJECTED" });
-    expect(prisma.scheduleChangeRequest.update).toHaveBeenCalledWith({
-      where: { id: "req-1" },
+    expect(prisma.scheduleChangeRequest.updateMany).toHaveBeenCalledWith({
+      where: { id: "req-1", status: "PENDING" },
       data: { status: "REJECTED", comment },
     });
   });
@@ -109,10 +114,20 @@ describe("POST /api/studio/schedule/requests/{id}/reject", () => {
     });
   });
 
-  it("уже обработана — 400", async () => {
+  it("уже обработана — 409, статус не трогаем", async () => {
     prisma.scheduleChangeRequest.findFirst.mockResolvedValue({ id: "req-1", status: "APPROVED" });
     const { status, body } = await reject({ comment: "Нет" });
-    expect(status).toBe(400);
-    expect(body.error?.message).toBe("Запрос уже обработан.");
+    expect(status).toBe(409);
+    expect(body.error).toMatchObject({ code: "CONFLICT", message: "Заявка уже обработана. Обновите страницу." });
+    expect(prisma.scheduleChangeRequest.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("одобрили между проверкой и записью — 409, мастеру «отклонено» не уходит", async () => {
+    prisma.scheduleChangeRequest.updateMany.mockResolvedValue({ count: 0 });
+    loadScheduleRequestWithRelations.mockResolvedValue({ id: "req-1" });
+    const { status, body } = await reject({ comment: "Нет" });
+    expect(status).toBe(409);
+    expect(body.error).toMatchObject({ code: "CONFLICT", message: "Заявка уже обработана. Обновите страницу." });
+    expect(notifyScheduleRequestRejected).not.toHaveBeenCalled();
   });
 });

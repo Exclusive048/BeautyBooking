@@ -1,12 +1,8 @@
 import { AppError, toAppError } from "@/lib/api/errors";
 import { isRetryableOAuthCallbackFailure } from "@/lib/auth/oauth-callback-error";
-import {
-  linkOAuthIdentity,
-  resolveOAuthLogin,
-  type OAuthIdentity,
-} from "@/lib/auth/oauth-login";
+import { resolveOAuthLogin, type OAuthIdentity } from "@/lib/auth/oauth-login";
 import type { MobileOAuthFlow } from "@/lib/auth/mobile-oauth-flow";
-import { issueMobileOAuthCode } from "@/lib/auth/mobile-oauth-store";
+import { issueMobileOAuthCode, issueMobileOAuthLinkCode } from "@/lib/auth/mobile-oauth-store";
 import type { OAuthLoginProvider } from "@/lib/auth/oauth-providers";
 import { extractClientIp } from "@/lib/http/ip";
 import type { ConsentFlags } from "@/lib/legal/consent-flags";
@@ -17,7 +13,6 @@ import {
 } from "@/lib/mobile/app-redirect";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
 import { scrubRecord } from "@/lib/observability/scrub";
-import { prisma } from "@/lib/prisma";
 
 /**
  * MOBILE-AUTH-A2 — мобильная ветка общего OAuth-колбэка.
@@ -28,8 +23,21 @@ import { prisma } from "@/lib/prisma";
  *
  *  · **вход** — тот же `resolveOAuthLogin`, что у веба, затем одноразовый код
  *    (60 с, под PKCE-челлендж приложения) и `masterryadom://auth/callback?code=…`;
- *  · **привязка** (`linkUserId` из link-intent) — тот же `linkOAuthIdentity`,
- *    затем `?linked=<provider>`: приложение уже вошло, кода не нужно.
+ *  · **привязка** (`linkUserId` из link-intent) — НИЧЕГО не пишет в БД: личность
+ *    провайдера уходит в одноразовый код привязки (60 с, тот же PKCE-челлендж)
+ *    и `?code=…&link=<provider>`, а связку пишет шаг приложения
+ *    `POST /api/mobile/v1/auth/oauth/link/complete` — Bearer владельца intent
+ *    + verifier (MOBILE-OAUTH-LINK-COMPLETE).
+ *
+ * Почему привязка не завершается здесь (C-01). link-intent — предъявительский
+ * токен: владелец может отправить по нему ЧУЖОЙ браузер. Тот честно проходит
+ * state, человек подтверждает вход у VK/Яндекса — и колбэк, звавший
+ * `linkOAuthIdentity`, привязывал его аккаунт провайдера к владельцу ссылки,
+ * а следом засчитывал тому его номер и переносил его гостевые записи. PKCE
+ * этого не закрывает: челлендж выбирает тот же владелец ссылки. Закрывает то,
+ * что код оседает на устройстве того, кто открыл браузер, а завершение
+ * требует Bearer владельца intent: у жертвы нет первого, у владельца ссылки —
+ * второго.
  *
  * Сессию браузера эта ветка не читает НИКОГДА: Android Custom Tabs делят куки
  * с Chrome, и в браузере может жить веб-сессия совсем другого аккаунта. Цель
@@ -124,30 +132,30 @@ export async function completeMobileOAuthCallback(
 
   try {
     const identity = await input.obtainIdentity();
+
+    if (flow.linkUserId) {
+      // C-01: ни связки, ни номера, ни переноса записей — только код. Живость
+      // владельца intent проверит его сессия на шаге приложения; согласия едут
+      // в записи, IP и User-Agent доказательства возьмёт тот же шаг.
+      const linkCode = await issueMobileOAuthLinkCode({
+        linkUserId: flow.linkUserId,
+        codeChallenge: flow.codeChallenge,
+        identity,
+        consentFlags: input.consentFlags,
+      });
+      logInfo("Mobile OAuth link: one-time code issued", { provider, userProfileId: flow.linkUserId });
+      return mobileAuthCallbackRedirect({ linkCode, provider });
+    }
+
     const consent = {
       flags: input.consentFlags,
       ipAddress: extractClientIp(req),
       userAgent: req.headers.get("user-agent"),
     };
-
-    if (flow.linkUserId) {
-      // Владелец intent мог удалить аккаунт за 10 минут флоу — привязывать
-      // провайдера к удалённому профилю нельзя.
-      const owner = await prisma.userProfile.findFirst({
-        where: { id: flow.linkUserId, isDeleted: false },
-        select: { id: true, roles: true },
-      });
-      if (!owner) {
-        throw new AppError("Не удалось привязать аккаунт. Попробуйте ещё раз.", 401, "UNAUTHORIZED");
-      }
-      await linkOAuthIdentity({ identity, user: owner, consent });
-      logInfo("Mobile OAuth link completed", { provider, userProfileId: owner.id });
-      return mobileAuthCallbackRedirect({ linked: provider });
-    }
-
     const resolution = await resolveOAuthLogin({ identity, consent });
     if (!resolution.ok) {
-      return mobileAuthCallbackRedirect({ error: "consent_required" });
+      // Ключ исхода совпадает с причиной: `consent_required` / `account_blocked`.
+      return mobileAuthCallbackRedirect({ error: resolution.reason });
     }
 
     const code = await issueMobileOAuthCode({

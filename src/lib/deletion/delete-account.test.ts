@@ -31,7 +31,8 @@ const tx = vi.hoisted(() => ({
   review: { deleteMany: vi.fn() },
   clientCard: { deleteMany: vi.fn() },
   clientNote: { deleteMany: vi.fn() },
-  mediaAsset: { deleteMany: vi.fn(), updateMany: vi.fn() },
+  mediaAsset: { deleteMany: vi.fn(), updateMany: vi.fn(async () => ({ count: 0 })) },
+  mediaAssetEmbedding: { deleteMany: vi.fn(async () => ({ count: 0 })) },
   userConsent: { deleteMany: vi.fn() },
   adminAuditLog: { deleteMany: vi.fn() },
   studioInvite: { deleteMany: vi.fn(async () => ({ count: 0 })) },
@@ -50,7 +51,8 @@ const prismaMock = vi.hoisted(() => ({
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/logging/logger", () => ({ logInfo: vi.fn(), logError: vi.fn() }));
 // DELETION-02: постановка задачи на удаление медиа — отдельный модуль, здесь не проверяется.
-vi.mock("@/lib/deletion/enqueue-media-purge", () => ({ enqueueMediaPurge: vi.fn() }));
+const purge = vi.hoisted(() => ({ enqueueMediaPurge: vi.fn() }));
+vi.mock("@/lib/deletion/enqueue-media-purge", () => purge);
 vi.mock("@/lib/monitoring", () => ({ alertWarning: vi.fn() }));
 // 29.09 доработки · 26: приглашения на контакты удаляемого.
 const invites = vi.hoisted(() => ({
@@ -206,6 +208,41 @@ describe("deleteUserAccount — preserved behaviour", () => {
     });
     await deleteUserAccount(USER_ID);
     expect(tx.otpCode.deleteMany).not.toHaveBeenCalled();
+  });
+
+  /**
+   * MEDIA-PURGE-MARK-DELETED — аватар удаляемого человека помечается удалённым
+   * В ТРАНЗАКЦИИ удаления (и перестаёт отдаваться с коммитом), а задача на байты
+   * ставится уже после неё с тем же снимком.
+   *
+   * @probe 2026-10-30 — вызов `markAssetsDeletedTx` удалён из транзакции
+   *        `deleteUserAccount`: красный этот кейс. Возвращено — зелёный.
+   */
+  it("MEDIA-PURGE-MARK-DELETED: снимок медиа помечен удалённым внутри транзакции, задача — после", async () => {
+    const assets = [{ id: "av1", storageKey: "user/user-1/avatar-1.jpg" }];
+    prismaMock.mediaAsset.findMany.mockResolvedValueOnce(assets as never);
+    const order: string[] = [];
+    tx.mediaAsset.updateMany.mockImplementationOnce(async () => {
+      order.push("mark");
+      return { count: 1 };
+    });
+    tx.userProfile.update.mockImplementationOnce(async () => {
+      order.push("anonymize");
+      return {};
+    });
+    purge.enqueueMediaPurge.mockImplementationOnce(async () => {
+      order.push("enqueue");
+    });
+
+    await deleteUserAccount(USER_ID);
+
+    expect(tx.mediaAsset.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ["av1"] }, deletedAt: null },
+      data: expect.objectContaining({ deletedAt: expect.any(Date), visualDescription: null }),
+    });
+    expect(tx.mediaAssetEmbedding.deleteMany).toHaveBeenCalledWith({ where: { assetId: { in: ["av1"] } } });
+    expect(order).toEqual(["mark", "anonymize", "enqueue"]);
+    expect(purge.enqueueMediaPurge).toHaveBeenCalledWith(assets, "account-deletion", USER_ID);
   });
 
   it("404s for a missing user", async () => {

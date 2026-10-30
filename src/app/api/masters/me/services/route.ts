@@ -8,6 +8,7 @@ import {
   updateProviderService,
 } from "@/lib/providers/services";
 import { resolveGlobalMasterProvider } from "@/lib/masters/services";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 const createSchema = z.object({
   name: z.string().trim().min(1),
@@ -51,6 +52,8 @@ export async function POST(req: Request) {
     return fail(provider.message, provider.status, provider.code);
   }
 
+  const nonJson = nonJsonBodyRefusal(req);
+  if (nonJson) return nonJson;
   const body = await req.json().catch(() => null);
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
@@ -70,6 +73,8 @@ export async function PUT(req: Request) {
     return fail(provider.message, provider.status, provider.code);
   }
 
+  const nonJson = nonJsonBodyRefusal(req);
+  if (nonJson) return nonJson;
   const body = await req.json().catch(() => null);
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
@@ -90,6 +95,8 @@ export async function PATCH(req: Request) {
     return fail(provider.message, provider.status, provider.code);
   }
 
+  const nonJson = nonJsonBodyRefusal(req);
+  if (nonJson) return nonJson;
   const body = await req.json().catch(() => null);
   const parsed = toggleSchema.safeParse(body);
   if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");

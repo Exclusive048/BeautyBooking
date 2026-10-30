@@ -14,6 +14,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * @probe  в `verifyEmailOtpLogin` заменить `appReview ? null : findFirst` на
  *         `findFirst` и `!otp && !appReviewCodeOk` на `!otp` → красный
  *         «верный постоянный код — вход без кода в базе».
+ *
+ * APP-REVIEW-LOGIN-CAP — потолок неверных кодов с любого IP: здесь только то,
+ * как он виден снаружи (сам счётчик и окно — `app-review-login-cap.test.ts`).
+ *
+ * @probe 2026-10-30 (по одной оси; тексты падений — наблюдавшиеся):
+ *   1. `appReviewOpen && matchesAppReviewLoginCode` заменено на
+ *      `appReview && matchesAppReviewLoginCode` (проверка выполнена, но не
+ *      применена) → красные «режим закрыт: верный код — тот же 401…»
+ *      («expected true to be false» — вход прошёл) и «режим закрыт: попытка
+ *      идёт в оба счётчика…».
+ *   2. Закрытый режим отвечает своим отказом — `return { ok: false, response:
+ *      fail(…, 429, "RATE_LIMITED") }` до сравнения кода (форма «честно скажем,
+ *      что закрыто») → красный «режим закрыт: верный код — тот же 401…»
+ *      («expected { status: 429, … } to deeply equal { status: 401, … }»).
+ *   3. Убран `if (appReview) await registerAppReviewLoginFailure(…)` → красные
+ *      «неверный код считается в потолке…» («called 1 times, but got 0 times»)
+ *      и «режим закрыт: попытка идёт в оба счётчика…».
+ *   Возвращено — зелёные.
  */
 
 const state = vi.hoisted(() => ({
@@ -32,6 +50,8 @@ const spies = vi.hoisted(() => ({
   checkVerifyLock: vi.fn(async () => ({ ok: true }) as unknown),
   registerVerifyFailure: vi.fn(async () => ({ ok: true }) as unknown),
   clearVerifyFailures: vi.fn(async () => undefined),
+  appReviewOpen: vi.fn(async () => true),
+  registerAppReviewFailure: vi.fn(async () => undefined),
   findVerifiedEmailProfile: vi.fn(async () => ({ id: "review-user", roles: ["CLIENT"], phone: null }) as unknown),
   resolveEmailLoginProfile: vi.fn(async () => ({ id: "review-user", roles: ["CLIENT"], phone: null })),
   logInfo: vi.fn(),
@@ -53,6 +73,8 @@ vi.mock("@/lib/auth/otp-rate-limit", () => ({
   checkOtpEmailVerifyLock: spies.checkVerifyLock,
   registerOtpEmailVerifyFailure: spies.registerVerifyFailure,
   clearOtpEmailVerifyFailures: spies.clearVerifyFailures,
+  isAppReviewLoginOpen: spies.appReviewOpen,
+  registerAppReviewLoginFailure: spies.registerAppReviewFailure,
   checkOtpVerifyLock: vi.fn(),
   clearOtpVerifyFailures: vi.fn(),
   registerOtpVerifyFailure: vi.fn(),
@@ -123,6 +145,7 @@ beforeEach(() => {
   spies.checkRequestLimit.mockResolvedValue({ ok: true });
   spies.checkVerifyLock.mockResolvedValue({ ok: true });
   spies.registerVerifyFailure.mockResolvedValue({ ok: true });
+  spies.appReviewOpen.mockResolvedValue(true);
 });
 
 describe("настройка", () => {
@@ -248,5 +271,60 @@ describe("вход", () => {
     const result = await verify(REVIEW_EMAIL, REVIEW_CODE);
     expect(result.ok).toBe(false);
     expect(spies.otpFindFirst).toHaveBeenCalled();
+  });
+});
+
+describe("потолок неверных кодов (APP-REVIEW-LOGIN-CAP)", () => {
+  async function body(result: Awaited<ReturnType<typeof verify>>) {
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    return { status: result.response.status, json: await result.response.json() };
+  }
+
+  it("режим закрыт: верный код — тот же 401 CODE_NOT_FOUND, что неверный, и входа нет", async () => {
+    enable();
+    const wrong = await body(await verify(REVIEW_EMAIL, "111111"));
+
+    spies.appReviewOpen.mockResolvedValue(false);
+    const locked = await body(await verify(REVIEW_EMAIL, REVIEW_CODE));
+
+    expect(locked).toEqual(wrong);
+    expect(locked.status).toBe(401);
+    expect(locked.json).toMatchObject({ error: { code: "CODE_NOT_FOUND", message: "Код не найден или истёк." } });
+    expect(spies.findVerifiedEmailProfile).not.toHaveBeenCalled();
+    expect(spies.resolveEmailLoginProfile).not.toHaveBeenCalled();
+    expect(spies.clearVerifyFailures).not.toHaveBeenCalled();
+    expect(spies.logInfo).toHaveBeenCalledWith("auth.app-review-login", { stage: "verify", outcome: "locked" });
+  });
+
+  it("режим закрыт: попытка идёт в оба счётчика — потолок и (почта, IP), блокировка по IP действует как у неверного кода", async () => {
+    enable();
+    spies.appReviewOpen.mockResolvedValue(false);
+    await verify(REVIEW_EMAIL, REVIEW_CODE);
+    expect(spies.registerAppReviewFailure).toHaveBeenCalledWith(REVIEW_EMAIL);
+    expect(spies.registerVerifyFailure).toHaveBeenCalledTimes(1);
+
+    spies.registerVerifyFailure.mockResolvedValue({ ok: false, status: 429, error: "OTP_LOCKED", retryAfterSec: 900 });
+    const lockedByIp = await body(await verify(REVIEW_EMAIL, REVIEW_CODE));
+    expect(lockedByIp.status).toBe(429);
+  });
+
+  it("неверный код считается в потолке, верный — нет", async () => {
+    enable();
+    await verify(REVIEW_EMAIL, "111111");
+    expect(spies.registerAppReviewFailure).toHaveBeenCalledTimes(1);
+    expect(spies.registerAppReviewFailure).toHaveBeenCalledWith(REVIEW_EMAIL);
+
+    spies.registerAppReviewFailure.mockClear();
+    const ok = await verify(REVIEW_EMAIL, REVIEW_CODE);
+    expect(ok.ok).toBe(true);
+    expect(spies.registerAppReviewFailure).not.toHaveBeenCalled();
+  });
+
+  it("обычный адрес потолка не касается — ни проверки, ни счёта", async () => {
+    enable();
+    await verify("client@example.com", "111111");
+    expect(spies.appReviewOpen).not.toHaveBeenCalled();
+    expect(spies.registerAppReviewFailure).not.toHaveBeenCalled();
   });
 });

@@ -15,6 +15,7 @@ import { sendTelegramMessage } from "@/lib/telegram/client";
 import { getTelegramEnabled } from "@/lib/telegram/feature";
 import { processVkSendPayload } from "@/lib/vk/notify";
 import { processNativePushPayload } from "@/lib/notifications/native-push/send";
+import { runEmailSendJob } from "@/lib/notifications/email-send";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { alertCritical } from "@/lib/monitoring";
 import { sendTelegramAlert } from "@/lib/monitoring/alerts";
@@ -25,11 +26,13 @@ import { initServerObservability } from "@/lib/observability/server";
 import { flushReports, reportError } from "@/lib/observability/report";
 import { processBookingReminder, reconcileBookingReminders } from "@/lib/bookings/reminders";
 import { detectPdAccessAnomalies } from "@/lib/audit/pd-access-anomaly";
+import { decideRetry } from "@/lib/queue/retry-policy";
+import { recordJobFate, settleFailedJob } from "@/lib/queue/failed-job";
 import type { Job } from "@/lib/queue/types";
 import {
   AVAILABLE_TODAY_RECOMPUTE_JOB_TYPE,
   BOOKING_REMINDER_JOB_TYPE,
-  DEFAULT_JOB_MAX_ATTEMPTS,
+  EMAIL_SEND_JOB_TYPE,
   MEDIA_CLEANUP_JOB_TYPE,
   MEDIA_PURGE_JOB_TYPE,
   MRR_SNAPSHOT_DAILY_JOB_TYPE,
@@ -59,6 +62,8 @@ import {
 import { ensureVisualSearchStartupConfig, getVisualSearchConfig } from "@/lib/visual-search/config";
 import { requeueAfterPipelineChangeOnce } from "@/lib/visual-search/reindex";
 import { processYookassaWebhookPayload } from "@/lib/payments/yookassa/webhook-processor";
+import { sweepPendingYookassaPayments } from "@/lib/payments/yookassa/pending-sweep";
+import { createNoOverlapRunner } from "@/lib/queue/no-overlap";
 import { runMediaCleanupJob } from "@/lib/media/cleanup";
 import { runMediaPurge } from "@/lib/media/purge";
 import { processSlotFreed } from "@/lib/hot-slots/slot-freed";
@@ -131,7 +136,6 @@ const QUEUE_STATS_CHECK_EVERY_JOBS = 100;
 const QUEUE_PENDING_OVERLOAD_THRESHOLD = 1000;
 const QUEUE_DEAD_THRESHOLD = 10;
 const QUEUE_PROCESSING_THRESHOLD = 50;
-const WORKER_RETRY_MAX_ATTEMPTS = 3;
 
 process.on("uncaughtException", (error) => {
   logError("Worker uncaughtException", {
@@ -180,10 +184,20 @@ function startPeriodicJobs() {
   // once at startup (fresh values immediately post-deploy, not all-`false`
   // until the first tick) + every 30 min. The sweep is engine-safe (a pure
   // read + a column write; slot-gen untouched).
+  //
+  // AVAILABLE-TODAY-SWEEP-WRITE (B-06): проходы не накладываются. Свип считает
+  // каждому провайдеру ещё и снимок `freeSlotKeys` на 30 дней — самая тяжёлая
+  // часть прохода; при медленной базе он может идти дольше интервала, и второй
+  // проход рядом удвоил бы нагрузку и писал бы поверх первого.
+  const availableTodaySweep = createNoOverlapRunner(() => recomputeAvailableToday());
   const runAvailableTodaySweep = () => {
-    void recomputeAvailableToday()
-      .then((summary) => {
-        logInfo("availableToday.recompute.done", summary);
+    void availableTodaySweep()
+      .then((result) => {
+        if (!result.ran) {
+          logInfo("availableToday.recompute.skipped", { reason: "previous-sweep-running" });
+          return;
+        }
+        logInfo("availableToday.recompute.done", result.value);
       })
       .catch((error) => {
         logError("availableToday.recompute.failed", {
@@ -380,6 +394,34 @@ function startPeriodicJobs() {
       });
   }, mrrBackstopIntervalMs);
 
+  // YOOKASSA-PENDING-SWEEP (A-02): платежи, оставшиеся PENDING дольше 15 минут
+  // (уведомление ЮКассы потерялось или задача вебхука не справилась), —
+  // перечитываются тем же путём, что и вебхук. При старте и раз в 10 минут; без
+  // наложения проходов — при деградации API ЮКассы проход может идти дольше
+  // интервала. Почему отказы по платежам не алертят — в `pending-sweep.ts`.
+  const pendingPaymentsSweep = createNoOverlapRunner(() => sweepPendingYookassaPayments());
+  const runPendingPaymentsSweepSafe = () => {
+    void pendingPaymentsSweep()
+      .then((result) => {
+        if (!result.ran) {
+          logInfo("billing.yookassa.pendingSweep.skipped", { reason: "previous pass still running" });
+          return;
+        }
+        const summary = result.value;
+        if (summary.succeeded > 0 || summary.canceled > 0) {
+          logInfo("billing.yookassa.pendingSweep.done", summary);
+        }
+      })
+      .catch((error) => {
+        logError("YooKassa pending payments sweep failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        reportWorkerFailure("billing.yookassa.pendingSweep", error);
+      });
+  };
+  runPendingPaymentsSweepSafe();
+  setInterval(runPendingPaymentsSweepSafe, 10 * 60 * 1000);
+
   const mediaCleanupIntervalMs = 60 * 60 * 1000;
   setInterval(() => {
     void enqueue(createMediaCleanupJob()).catch((error) => {
@@ -411,14 +453,37 @@ function startPeriodicJobs() {
   }, 60 * 60 * 1000);
 }
 
-function getRetryDelaySeconds(attempts: number): number {
-  return Math.min(60, 2 ** attempts);
+/**
+ * Отказ, который обработчик признал временным (`telegram.send`, `vk.send`,
+ * `push.native.send`): повтор по таблице типа либо мёртвые задачи. Обработчики,
+ * которые бросают, идут тем же решением из общего `catch` в `processJob`.
+ */
+async function retryOrDeadLetter(job: Job): Promise<void> {
+  const decision = decideRetry(job);
+  if (decision.kind === "retry") {
+    await enqueueRetry({ ...job, attempts: decision.attempts }, decision.delayMs);
+    return;
+  }
+
+  await moveToDeadQueue({ ...job, attempts: decision.attempts });
+  logError("Worker dead letter job", {
+    jobId: job.id,
+    type: job.type,
+    attempts: decision.attempts,
+    __skipAlert: true,
+  });
 }
 
+/**
+ * WORKER-CATCH-REDIS-SAFE (A-08): отказ Redis при постановке повтора — не отказ
+ * обработчика. `recordJobFate` заворачивает его в `QueueBookkeepingError`, и
+ * общий `catch` оставляет задачу в processing вместо второй записи в тот же
+ * молчащий Redis (`lib/queue/failed-job.ts`).
+ */
 async function enqueueRetry(job: Job, delayMs: number): Promise<void> {
   const retryJob = { ...job };
   delete retryJob._processingStartedAt;
-  await enqueue(normalizeJobMeta(retryJob), { delayMs });
+  await recordJobFate("retry", () => enqueue(normalizeJobMeta(retryJob), { delayMs }));
 }
 
 async function ensureWorkerRedisReady(): Promise<void> {
@@ -473,17 +538,15 @@ function getJobAttempts(job: Job): number {
   return job.attempts ?? 0;
 }
 
-function getJobMaxAttempts(job: Job): number {
-  return job.maxAttempts ?? DEFAULT_JOB_MAX_ATTEMPTS;
-}
-
 function getJobScheduleAt(job: Job): number | null {
   const scheduleAt = job.scheduledAt ?? job.runAt;
   return typeof scheduleAt === "number" ? scheduleAt : null;
 }
 
 async function moveToDeadQueue(job: Job, error?: unknown): Promise<void> {
-  await enqueueDeadJob(normalizeJobMeta(job));
+  // WORKER-CATCH-REDIS-SAFE (A-08): алерт и отчёт — только после того, как
+  // задача действительно легла в мёртвые; не легла — она остаётся в processing.
+  await recordJobFate("dead-letter", () => enqueueDeadJob(normalizeJobMeta(job)));
   alertDeadJobs(1);
   // OBSERVABILITY-GLITCHTIP-01: a job that exhausted its retries is a permanent
   // silent failure — an unsent reminder, an unprocessed YooKassa webhook, an
@@ -514,27 +577,7 @@ async function processTelegramSend(
   const ok = await sendTelegramMessage(job.payload.chatId, job.payload.text);
   if (ok) return;
 
-  const nextAttempts = getJobAttempts(job) + 1;
-  if (nextAttempts < getJobMaxAttempts(job)) {
-    const delaySeconds = getRetryDelaySeconds(nextAttempts);
-    await enqueueRetry(
-      {
-        ...job,
-        attempts: nextAttempts,
-      },
-      delaySeconds * 1000
-    );
-    return;
-  }
-
-  await moveToDeadQueue({ ...job, attempts: nextAttempts });
-  logError("Worker dead letter job", {
-    jobId: job.id,
-    type: job.type,
-    attempts: nextAttempts,
-    maxAttempts: getJobMaxAttempts(job),
-    __skipAlert: true,
-  });
+  await retryOrDeadLetter(job);
 }
 
 async function processBookingReminderJob(
@@ -549,27 +592,21 @@ async function processBookingReminderJob(
   try {
     await processBookingReminder(job.payload);
   } catch (error) {
-    const attempts = getJobAttempts(job);
-    if (attempts < WORKER_RETRY_MAX_ATTEMPTS) {
+    const decision = decideRetry(job);
+    if (decision.kind === "retry") {
       logError("Reminder job failed, will retry", {
         jobId: job.id,
-        attempts,
+        attempts: decision.attempts,
         error: error instanceof Error ? error.message : String(error),
       });
-      await enqueueRetry(
-        {
-          ...job,
-          attempts: attempts + 1,
-        },
-        60_000 * (attempts + 1)
-      );
+      await enqueueRetry({ ...job, attempts: decision.attempts }, decision.delayMs);
       return;
     }
 
-    await moveToDeadQueue({ ...job, attempts }, error);
-    logError("Reminder job permanently failed after 3 attempts", {
+    await moveToDeadQueue({ ...job, attempts: decision.attempts }, error);
+    logError("Reminder job permanently failed", {
       jobId: job.id,
-      attempts,
+      attempts: decision.attempts,
       error: error instanceof Error ? error.message : String(error),
       __skipAlert: true,
     });
@@ -607,26 +644,18 @@ async function processVisualSearchIndexJob(
       return;
     }
 
-    const nextAttempts = getJobAttempts(job) + 1;
-    if (isVisualSearchRetryableError(error) && nextAttempts < getJobMaxAttempts(job)) {
-      const delaySeconds = getRetryDelaySeconds(nextAttempts);
-      await enqueueRetry(
-        {
-          ...job,
-          attempts: nextAttempts,
-        },
-        delaySeconds * 1000
-      );
+    const decision = decideRetry(job);
+    if (isVisualSearchRetryableError(error) && decision.kind === "retry") {
+      await enqueueRetry({ ...job, attempts: decision.attempts }, decision.delayMs);
       return;
     }
 
-    await moveToDeadQueue({ ...job, attempts: nextAttempts }, error);
+    await moveToDeadQueue({ ...job, attempts: decision.attempts }, error);
     logError("Worker visual search job failed", {
       jobId: job.id,
       type: job.type,
       assetId: job.payload.assetId,
-      attempts: nextAttempts,
-      maxAttempts: getJobMaxAttempts(job),
+      attempts: decision.attempts,
       error: error instanceof Error ? error.message : String(error),
       __skipAlert: true,
     });
@@ -688,8 +717,10 @@ async function processMediaCleanupJob(
  * DELETION-02 — удаление медиа из хранилища при удалении аккаунта/кабинета.
  *
  * Намеренно НЕ глотает ошибку: `runMediaPurge` бросает, если хоть один объект
- * не удалился, и это поднимает штатные ретраи очереди (до 3 попыток → dead
- * letter). Недоудалённая ПДн обязана быть заметной — в отличие от
+ * не удалился, и это поднимает штатные ретраи очереди — для этого типа часами
+ * (QUEUE-RETRY-POLICY-PER-TYPE, ≈24 ч, затем dead letter: хранилище, лежащее
+ * дольше шести минут прежнего расписания, — норма, а не исключение). Недоудалённая
+ * ПДн обязана быть заметной — в отличие от
  * `media.cleanup`, где речь о мусорных PENDING-загрузках и best-effort уместен.
  */
 async function processMediaPurgeJob(
@@ -778,20 +809,7 @@ async function processVkSend(
   const outcome = await processVkSendPayload(job.payload);
   if (outcome !== "retry") return;
 
-  const nextAttempts = getJobAttempts(job) + 1;
-  if (nextAttempts < getJobMaxAttempts(job)) {
-    await enqueueRetry({ ...job, attempts: nextAttempts }, getRetryDelaySeconds(nextAttempts) * 1000);
-    return;
-  }
-
-  await moveToDeadQueue({ ...job, attempts: nextAttempts });
-  logError("Worker dead letter job", {
-    jobId: job.id,
-    type: job.type,
-    attempts: nextAttempts,
-    maxAttempts: getJobMaxAttempts(job),
-    __skipAlert: true,
-  });
+  await retryOrDeadLetter(job);
 }
 
 /**
@@ -811,21 +829,24 @@ async function processNativePushSend(
   const result = await processNativePushPayload(job.payload);
   if (result.status !== "done" || result.retryDeviceIds.length === 0) return;
 
-  const nextAttempts = getJobAttempts(job) + 1;
-  const retryJob = { ...job, attempts: nextAttempts, payload: { ...job.payload, deviceIds: result.retryDeviceIds } };
-  if (nextAttempts < getJobMaxAttempts(job)) {
-    await enqueueRetry(retryJob, getRetryDelaySeconds(nextAttempts) * 1000);
+  await retryOrDeadLetter({ ...job, payload: { ...job.payload, deviceIds: result.retryDeviceIds } });
+}
+
+/**
+ * NOTIFICATION-EMAIL-QUEUE (A-06): письмо-уведомление. Временный отказ SMTP
+ * (4xx, сеть, таймаут) — повтор по таблице типа, постоянный (5xx) и исход
+ * повторов — строка ошибки и задача закрыта (`lib/notifications/email-send.ts`).
+ */
+async function processEmailSend(
+  job: Extract<Job, { type: typeof EMAIL_SEND_JOB_TYPE }>
+): Promise<void> {
+  const scheduleAt = getJobScheduleAt(job);
+  if (typeof scheduleAt === "number" && scheduleAt > Date.now()) {
+    await enqueueRetry(job, scheduleAt - Date.now());
     return;
   }
 
-  await moveToDeadQueue(retryJob);
-  logError("Worker dead letter job", {
-    jobId: job.id,
-    type: job.type,
-    attempts: nextAttempts,
-    maxAttempts: getJobMaxAttempts(job),
-    __skipAlert: true,
-  });
+  await runEmailSendJob(job, { retry: enqueueRetry });
 }
 
 async function processJob(job: Job): Promise<void> {
@@ -836,6 +857,8 @@ async function processJob(job: Job): Promise<void> {
       await processVkSend(job);
     } else if (job.type === NATIVE_PUSH_SEND_JOB_TYPE) {
       await processNativePushSend(job);
+    } else if (job.type === EMAIL_SEND_JOB_TYPE) {
+      await processEmailSend(job);
     } else if (job.type === BOOKING_REMINDER_JOB_TYPE) {
       await processBookingReminderJob(job);
     } else if (job.type === VISUAL_SEARCH_INDEX_JOB_TYPE) {
@@ -863,27 +886,15 @@ async function processJob(job: Job): Promise<void> {
       });
     }
   } catch (error) {
-    logError("Worker job processing failed", {
-      jobId: job.id,
-      type: job.type,
-      error: error instanceof Error ? error.message : String(error),
+    // WORKER-CATCH-REDIS-SAFE (A-08): повтор или мёртвые — по таблице типа
+    // (QUEUE-RETRY-POLICY-PER-TYPE), но подтверждаем задачу, только если её
+    // судьба записана. Не записана (Redis молчит) — задача остаётся в
+    // processing до `recoverStuckJobs`, а процесс не падает.
+    const settled = await settleFailedJob(job, error, {
+      retry: enqueueRetry,
+      deadLetter: moveToDeadQueue,
     });
-
-    const attempts = getJobAttempts(job);
-    if (attempts < WORKER_RETRY_MAX_ATTEMPTS) {
-      const nextAttempts = attempts + 1;
-      const retryDelayMs = 60_000 * nextAttempts;
-      await enqueue(
-        normalizeJobMeta({
-          ...job,
-          attempts: nextAttempts,
-          scheduledAt: Date.now() + retryDelayMs,
-          runAt: Date.now() + retryDelayMs,
-        })
-      );
-    } else {
-      await moveToDeadQueue({ ...job, attempts }, error);
-    }
+    if (!settled) return;
   }
 
   await acknowledge(job);

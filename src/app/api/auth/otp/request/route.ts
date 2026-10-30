@@ -12,6 +12,7 @@ import { isPhoneAuthEnabled, isProduction } from "@/lib/env";
 import { sendOtpSms } from "@/lib/sms";
 import { extractClientIp } from "@/lib/http/ip";
 import { observeAuthClientIp } from "@/lib/http/proxy-trust";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 export async function POST(req: Request) {
   return withRequestContext(req, async () => {
@@ -27,6 +28,8 @@ export async function POST(req: Request) {
       return fail("Вход по телефону временно недоступен.", 503, "SYSTEM_FEATURE_DISABLED");
     }
 
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = await req.json().catch(() => null);
     const parsed = otpRequestSchema.safeParse(body);
     if (!parsed.success) {

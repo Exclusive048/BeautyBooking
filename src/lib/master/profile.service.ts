@@ -415,9 +415,9 @@ export async function updateMasterProfile(
     timezone?: string;
   }
 ): Promise<{ id: string }> {
-  // Проверка существования (404 MASTER_NOT_FOUND). Сами поля контекста здесь
-  // больше не нужны: их читал только снятый гейт публикации.
-  await getMasterContext(masterId);
+  // Проверка существования (404 MASTER_NOT_FOUND). Из контекста нужен только
+  // сохранённый адрес — для отказа при недоступном геокодере (ниже).
+  const context = await getMasterContext(masterId);
 
   // FEAT-PROVIDER-SOCIALS: validate before any write (throws 400 on invalid).
   const socialData = resolveSocialFieldsOrThrow(input);
@@ -448,15 +448,30 @@ export async function updateMasterProfile(
     throw new AppError(UI_TEXT.cities.addressOutsideRussia, 422, "ADDRESS_OUTSIDE_RUSSIA");
   }
 
+  // GEOCODER-UNAVAILABLE-503 (A-03): геокодер не ответил (сеть, таймаут, 5xx,
+  // 429, квота). Раньше это шло веткой «не распознан» — адрес записывался, а
+  // `cityId` обнулялся, и мастер молча выпадал из каталога с ответом 200.
+  // Новый адрес теперь не пишется вовсе — 503 ДО первой записи: записать адрес
+  // и координаты при старом городе значило бы показать мастера в каталоге
+  // прежнего города с новым адресом. Тот же адрес, что уже сохранён (клиент
+  // прислал его вместе с другими полями), отказа не вызывает: адресная группа
+  // (адрес, координаты, город, пояс) просто не трогается, остальное сохраняется.
+  const addressUnverified =
+    detection !== null && !detection.ok && detection.reason === "geocoder_unavailable";
+  if (addressUnverified && trimmedAddress !== context.address.trim()) {
+    throw new AppError(UI_TEXT.cities.addressCheckUnavailable, 503, "SERVICE_UNAVAILABLE");
+  }
+  const writeAddressGroup = trimmedAddress !== undefined && !addressUnverified;
+
   await prisma.provider.update({
     where: { id: masterId },
     data: {
       ...(input.displayName ? { name: input.displayName.trim() } : {}),
       ...(typeof input.tagline === "string" ? { tagline: input.tagline.trim() } : {}),
-      ...(trimmedAddress !== undefined ? { address: trimmedAddress } : {}),
+      ...(writeAddressGroup ? { address: trimmedAddress } : {}),
       ...(trimmedDistrict !== undefined ? { district: trimmedDistrict } : {}),
-      ...(input.geoLat !== undefined ? { geoLat: input.geoLat } : {}),
-      ...(input.geoLng !== undefined ? { geoLng: input.geoLng } : {}),
+      ...(writeAddressGroup && input.geoLat !== undefined ? { geoLat: input.geoLat } : {}),
+      ...(writeAddressGroup && input.geoLng !== undefined ? { geoLng: input.geoLng } : {}),
       ...(input.bio !== undefined
         ? { description: typeof input.bio === "string" ? input.bio.trim() || null : null }
         : {}),
@@ -467,10 +482,12 @@ export async function updateMasterProfile(
 
   // 2. If address changed, run server-side geocode + city detection. The
   //    server geocoder is authoritative — it overwrites any client-supplied
-  //    geo and writes cityId. On failure we explicitly null cityId: без
-  //    города провайдера не найти в каталоге (`catalogVisibleProviderWhere`),
-  //    и мастер видит баннер адреса.
-  if (trimmedAddress !== undefined) {
+  //    geo and writes cityId. Адрес не распознан (геокодер ответил, города
+  //    нет) — `cityId` обнуляется: без города провайдера не найти в каталоге
+  //    (`catalogVisibleProviderWhere`), и мастер видит баннер адреса.
+  //    Недоступный геокодер сюда не доходит: новый адрес отклонён выше, а у
+  //    прежнего адресная группа не трогается (`writeAddressGroup`).
+  if (writeAddressGroup) {
     if (!trimmedAddress) {
       // Address cleared — drop the city link.
       await prisma.provider.update({

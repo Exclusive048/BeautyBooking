@@ -417,6 +417,35 @@ describe("POST /api/cabinet/studio/masters/{id}/invite/resend", () => {
       message: "Не удалось отправить приглашение ещё раз. Попробуйте ещё раз.",
     });
     expect(refundRateLimit).toHaveBeenCalledWith("rl:master:m-1");
+    // STUDIO-INVITE-LIMITS: и попытки бюджета писем студии и аккаунта.
+    expect(refundRateLimit).toHaveBeenCalledWith("rl:studio:studio-1");
+    expect(refundRateLimit).toHaveBeenCalledWith("rl:user:user-1");
+  });
+
+  it("spends the studio and account invite-email budget too (STUDIO-INVITE-LIMITS)", async () => {
+    const res = await post();
+
+    expect(res.status).toBe(200);
+    expect(checkRateLimit).toHaveBeenCalledWith("rl:studio:studio-1", { windowSeconds: 86_400, maxRequests: 20 });
+    expect(checkRateLimit).toHaveBeenCalledWith("rl:user:user-1", { windowSeconds: 3_600, maxRequests: 10 });
+  });
+
+  it("answers 429 when the studio's daily invite budget is spent and returns the per-master attempt", async () => {
+    checkRateLimit.mockImplementation(async (key: string) =>
+      key === "rl:studio:studio-1" ? { limited: true, retryAfterSeconds: 40_000, reason: "budget" } : { limited: false },
+    );
+
+    const res = await post();
+    const body = await read(res);
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("40000");
+    expect(body.error).toMatchObject({
+      code: "RATE_LIMITED",
+      message: "Слишком много приглашений за сутки. Попробуйте завтра.",
+    });
+    expect(refundRateLimit).toHaveBeenCalledWith("rl:master:m-1");
+    expect(notifyStudioInviteReceived).not.toHaveBeenCalled();
   });
 
   it("answers 401 without a session", async () => {

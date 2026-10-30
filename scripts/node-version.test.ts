@@ -10,8 +10,9 @@ import { nodeVersionMismatch, readPinnedNodeVersion } from "./check-node-version
  * (только `node-version-file: .nvmrc`, литерал `node-version:` запрещён).
  *
  * `engine-strict` в `.npmrc` не ставится: он проверяет `engines` КАЖДОЙ
- * зависимости, а `lighthouse` (`npm run lighthouse`) требует Node ≥ 22.19 —
- * `npm ci` на 20 отказал бы и локально, и в CI, и в сборке образа. Жёсткая
+ * зависимости, и одна с диапазоном без нашей версии остановила бы `npm ci`
+ * и локально, и в CI, и в сборке образа (на Node 20 так было с `lighthouse`,
+ * требующим ≥ 22.19; на Node 26 таких зависимостей нет). Жёсткая
  * проверка — pre-скрипты запуска (`dev`, `build`, `test`, `worker`).
  *
  * Повод — TZ-HOUR-CYCLE-H23: локально Node 24 (ICU 77), в CI `node-version: 20`

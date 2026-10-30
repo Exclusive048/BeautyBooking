@@ -1,44 +1,6 @@
 import { AccountType, MembershipStatus, StudioRole } from "@prisma/client";
-import {
-  CLIENT_CABINET_PATH,
-  MASTER_CABINET_PATH,
-  STUDIO_CABINET_PATH,
-} from "@/lib/auth/cabinet-paths";
 import { prisma } from "@/lib/prisma";
 import { invalidateMeIdentityCache } from "@/lib/users/me";
-
-const ALLOWED_ROLE_ADDITIONS: ReadonlySet<AccountType> = new Set([
-  AccountType.MASTER,
-  AccountType.STUDIO,
-]);
-
-const SELF_SERVICE_ACCOUNT_TYPES: ReadonlySet<AccountType> = new Set([
-  AccountType.CLIENT,
-  AccountType.MASTER,
-  AccountType.STUDIO,
-]);
-
-export function isAllowedRoleAddition(role: AccountType): boolean {
-  return ALLOWED_ROLE_ADDITIONS.has(role);
-}
-
-export function isAllowedAccountTypeSelection(type: AccountType): boolean {
-  return SELF_SERVICE_ACCOUNT_TYPES.has(type);
-}
-
-export function roleRedirect(role: AccountType): string {
-  if (role === AccountType.MASTER) return MASTER_CABINET_PATH;
-  if (role === AccountType.STUDIO || role === AccountType.STUDIO_ADMIN) return STUDIO_CABINET_PATH;
-  if (role === AccountType.CLIENT) return CLIENT_CABINET_PATH;
-  return CLIENT_CABINET_PATH;
-}
-
-export function accountTypeRedirect(type: AccountType): string {
-  if (type === AccountType.MASTER) return MASTER_CABINET_PATH;
-  if (type === AccountType.STUDIO || type === AccountType.STUDIO_ADMIN) return STUDIO_CABINET_PATH;
-  if (type === AccountType.CLIENT) return CLIENT_CABINET_PATH;
-  return "/";
-}
 
 /**
  * INVITE-ROLE-REFRESH (2026-09-24) — единственная запись `UserProfile.roles`.
@@ -125,16 +87,6 @@ export async function hasAnyStudioAffiliation(userId: string): Promise<boolean> 
     }),
   ]);
   return Boolean(ownedStudio || membership);
-}
-
-export async function setAccountTypeRoles(
-  userId: string,
-  roles: AccountType[],
-  type: AccountType
-): Promise<AccountType[]> {
-  const nextRoles = ensureClientRole([...roles, type]);
-  await writeRoles(userId, nextRoles);
-  return nextRoles;
 }
 
 export async function ensureClientRoleForUser(

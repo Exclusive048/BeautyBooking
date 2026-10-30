@@ -1,4 +1,4 @@
-import { NotificationType } from "@prisma/client";
+import { NotificationType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { addMonthsUtc } from "@/lib/billing/utils";
 import { BILLING_PERIODS, PAST_DUE_GRACE_DAYS } from "@/lib/billing/constants";
@@ -7,7 +7,9 @@ import { createBillingAuditLog } from "@/lib/billing/audit";
 import { createBillingNotification } from "@/lib/billing/notifications";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { invalidatePlanCache } from "@/lib/billing/get-current-plan";
-import { getPayment, getRefund } from "@/lib/payments/yookassa/client";
+import { getPayment } from "@/lib/payments/yookassa/client";
+import { apiAmountToKopeks } from "@/lib/payments/yookassa/amount";
+import { processYookassaRefundEvent } from "@/lib/payments/yookassa/refund-webhook";
 import type { YookassaWebhookPayload } from "@/lib/queue/types";
 
 /**
@@ -29,12 +31,23 @@ function getGraceUntil(now: Date): Date {
   return new Date(now.getTime() + PAST_DUE_GRACE_DAYS * 24 * 60 * 60 * 1000);
 }
 
-/** YooKassa `amount.value` (rubles string) → integer kopeks, or null. */
-function apiAmountToKopeks(amount: { value: string; currency: string } | undefined): number | null {
-  if (!amount) return null;
-  const rubles = Number.parseFloat(amount.value);
-  if (!Number.isFinite(rubles)) return null;
-  return Math.round(rubles * 100);
+/**
+ * YOOKASSA-PENDING-SWEEP: запись исхода платежа условна по НАБЛЮДЁННОМУ статусу
+ * строки (`where: { id, status }`, приём LOGIC-02). Один и тот же платёж теперь
+ * может обрабатываться двумя путями одновременно — задачей вебхука (в том числе
+ * повтором после сбоя API ЮКассы) и свипом PENDING-платежей, а ранний выход на
+ * SUCCEEDED проверяет статус, прочитанный ДО записи. Без условия оба пути
+ * проходили бы проверку и оба выдавали бы подписку: второе «Оплата прошла»,
+ * второй аудит и сдвиг `currentPeriodEnd`. Проигравший получает P2025 — строка
+ * есть, но условию уже не отвечает, то есть исход записал другой путь.
+ * P2025 другой модели (пропавшая подписка) этим не является и пробрасывается.
+ */
+function isOutcomeAlreadyRecorded(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2025") {
+    return false;
+  }
+  const modelName = (error.meta as { modelName?: unknown } | undefined)?.modelName;
+  return modelName === undefined || modelName === "BillingPayment";
 }
 
 export async function processYookassaWebhookPayload(payload: YookassaWebhookPayload): Promise<void> {
@@ -45,53 +58,12 @@ export async function processYookassaWebhookPayload(payload: YookassaWebhookPayl
   }
 
   // ─── Refund events ─────────────────────────────────────────────────────
-  // The notification's object.id is a REFUND id — re-fetch the refund to learn
-  // the authoritative status + the payment it belongs to.
+  // The notification's object.id is a REFUND id — the refund is re-fetched and
+  // a full refund is told apart from a partial one in `refund-webhook.ts`
+  // (PARTIAL-REFUND-ACCOUNTING: a partial refund leaves the payment status
+  // as is and goes to manual review).
   if (event.startsWith("refund.")) {
-    // getRefund: null on 404 (forged/foreign → drop); throws on transient
-    // failure (→ the queue retries the job).
-    const refund = await getRefund(objectId);
-    if (!refund) {
-      logInfo("YooKassa refund not found via API (forged/foreign) — dropped", { objectId });
-      return;
-    }
-    if (refund.status !== "succeeded") {
-      logInfo("YooKassa refund not succeeded — no action", { objectId, status: refund.status });
-      return;
-    }
-
-    const billingPayment = await prisma.billingPayment.findUnique({
-      where: { yookassaPaymentId: refund.payment_id },
-      select: {
-        id: true,
-        status: true,
-        subscriptionId: true,
-        subscription: { select: { userId: true, scope: true } },
-      },
-    });
-    if (!billingPayment) {
-      logError("YooKassa refund: payment not found", { yookassaPaymentId: refund.payment_id });
-      return;
-    }
-    // Idempotent: a duplicate / 24h-redelivered refund notification (or a
-    // refund already recorded synchronously by the admin refund route) is a
-    // no-op — no second REFUNDED write, no duplicate audit.
-    if (billingPayment.status === "REFUNDED") {
-      return;
-    }
-
-    await prisma.billingPayment.update({
-      where: { id: billingPayment.id },
-      data: { status: "REFUNDED" },
-    });
-    await createBillingAuditLog({
-      userId: billingPayment.subscription.userId,
-      scope: billingPayment.subscription.scope,
-      subscriptionId: billingPayment.subscriptionId,
-      paymentId: billingPayment.id,
-      action: "PAYMENT_REFUNDED",
-      details: { yookassaPaymentId: refund.payment_id, yookassaRefundId: refund.id },
-    });
+    await processYookassaRefundEvent(objectId);
     return;
   }
 
@@ -243,50 +215,62 @@ export async function processYookassaWebhookPayload(payload: YookassaWebhookPayl
     const periodStart = now;
     const periodEnd = addMonthsUtc(periodStart, grantedPeriodMonths);
 
-    await prisma.$transaction([
-      prisma.billingPayment.update({
-        where: { id: billingPayment.id },
-        data: {
-          status: "SUCCEEDED",
-          yookassaPaymentId: yookassaPaymentId ?? null,
-          confirmationUrl: apiPayment.confirmation?.confirmation_url ?? null,
-        },
-      }),
-      prisma.userSubscription.update({
-        where: { id: billingPayment.subscriptionId },
-        data: {
-          status: "ACTIVE",
-          // FIX-BC-2: the upgrade plan switch is applied HERE (on confirmed payment),
-          // not pre-emptively at checkout. An abandoned upgrade never reaches this
-          // point, so the active subscription stays untouched.
-          planId: grantedPlanId,
-          periodMonths: grantedPeriodMonths,
-          currentPeriodStart: periodStart,
-          currentPeriodEnd: periodEnd,
-          nextBillingAt: periodEnd,
-          graceUntil: null,
-          cancelAtPeriodEnd: false,
-          autoRenew: true,
-          lastPaymentAt: now,
-          // HARDENING-01 FIX-1: a paid conversion terminates the trial in the SAME
-          // grant update, so a mid-trial payer is structurally unselectable by the
-          // trial cron.
-          isTrial: false,
-          trialEndsAt: null,
-          trialEndingNotificationSentAt: null,
-          // BILLING-RENEWAL-OPTIN-02: accepting a price increase re-anchors the
-          // sub here (checkout at the new price); clear the opt-in window state
-          // so no stale pendingPriceOptIn / markers linger on the now-ACTIVE row.
-          pendingPriceOptIn: false,
-          pendingPriceKopeks: null,
-          priceOptIn24hSentAt: null,
-          priceOptIn2hSentAt: null,
-          paymentMethodId: apiPayment.payment_method?.saved
-            ? apiPayment.payment_method?.id ?? undefined
-            : undefined,
-        },
-      }),
-    ]);
+    try {
+      await prisma.$transaction([
+        prisma.billingPayment.update({
+          // YOOKASSA-PENDING-SWEEP: условие на наблюдённый статус — см.
+          // `isOutcomeAlreadyRecorded`. Строка первая в пачке: её P2025 откатывает
+          // и запись подписки.
+          where: { id: billingPayment.id, status: billingPayment.status },
+          data: {
+            status: "SUCCEEDED",
+            yookassaPaymentId: yookassaPaymentId ?? null,
+            confirmationUrl: apiPayment.confirmation?.confirmation_url ?? null,
+          },
+        }),
+        prisma.userSubscription.update({
+          where: { id: billingPayment.subscriptionId },
+          data: {
+            status: "ACTIVE",
+            // FIX-BC-2: the upgrade plan switch is applied HERE (on confirmed payment),
+            // not pre-emptively at checkout. An abandoned upgrade never reaches this
+            // point, so the active subscription stays untouched.
+            planId: grantedPlanId,
+            periodMonths: grantedPeriodMonths,
+            currentPeriodStart: periodStart,
+            currentPeriodEnd: periodEnd,
+            nextBillingAt: periodEnd,
+            graceUntil: null,
+            cancelAtPeriodEnd: false,
+            autoRenew: true,
+            lastPaymentAt: now,
+            // HARDENING-01 FIX-1: a paid conversion terminates the trial in the SAME
+            // grant update, so a mid-trial payer is structurally unselectable by the
+            // trial cron.
+            isTrial: false,
+            trialEndsAt: null,
+            trialEndingNotificationSentAt: null,
+            // BILLING-RENEWAL-OPTIN-02: accepting a price increase re-anchors the
+            // sub here (checkout at the new price); clear the opt-in window state
+            // so no stale pendingPriceOptIn / markers linger on the now-ACTIVE row.
+            pendingPriceOptIn: false,
+            pendingPriceKopeks: null,
+            priceOptIn24hSentAt: null,
+            priceOptIn2hSentAt: null,
+            paymentMethodId: apiPayment.payment_method?.saved
+              ? apiPayment.payment_method?.id ?? undefined
+              : undefined,
+          },
+        }),
+      ]);
+    } catch (error) {
+      if (!isOutcomeAlreadyRecorded(error)) throw error;
+      logInfo("YooKassa payment.succeeded ignored (granted concurrently)", {
+        paymentId: billingPayment.id,
+        subscriptionId: billingPayment.subscriptionId,
+      });
+      return;
+    }
 
     await invalidatePlanCache(billingPayment.subscription.userId, billingPayment.subscription.scope);
 
@@ -323,14 +307,25 @@ export async function processYookassaWebhookPayload(payload: YookassaWebhookPayl
     // any other cancel hint records CANCELED (YooKassa in practice only emits
     // `payment.canceled`; both map to the same API status `canceled`).
     const newStatus = event === "payment.failed" ? "FAILED" : "CANCELED";
-    await prisma.billingPayment.update({
-      where: { id: billingPayment.id },
-      data: {
-        status: newStatus,
-        yookassaPaymentId: yookassaPaymentId ?? null,
-        confirmationUrl: apiPayment.confirmation?.confirmation_url ?? null,
-      },
-    });
+    try {
+      await prisma.billingPayment.update({
+        // YOOKASSA-PENDING-SWEEP: то же условие, что у выдачи, — иначе свип и
+        // задача вебхука вдвоём слали бы «Платёж не прошёл».
+        where: { id: billingPayment.id, status: billingPayment.status },
+        data: {
+          status: newStatus,
+          yookassaPaymentId: yookassaPaymentId ?? null,
+          confirmationUrl: apiPayment.confirmation?.confirmation_url ?? null,
+        },
+      });
+    } catch (error) {
+      if (!isOutcomeAlreadyRecorded(error)) throw error;
+      logInfo("YooKassa payment cancellation ignored (recorded concurrently)", {
+        paymentId: billingPayment.id,
+        subscriptionId: billingPayment.subscriptionId,
+      });
+      return;
+    }
 
     // HARDENING-01 FIX-3: stale-cancellation guard. A late `canceled` for a
     // renewal the user has already re-paid past (sub ACTIVE + `lastPaymentAt`

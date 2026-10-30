@@ -17,6 +17,7 @@ import {
   buildDuplicateGroupIndex,
 } from "@/features/admin-cabinet/cities/lib/duplicate-groups";
 import { getCityTag } from "@/features/admin-cabinet/cities/lib/city-tags";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 export const runtime = "nodejs";
 
@@ -159,6 +160,8 @@ export async function POST(req: Request) {
   if (!auth.ok) return auth.response;
 
   try {
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = await req.json().catch(() => null);
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) {

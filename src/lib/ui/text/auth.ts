@@ -58,6 +58,11 @@ export const auth = {
     // cookie). Причина внутренняя и, как правило, преходящая.
     oauthStartFailed:
       "Не удалось начать вход через этот сервис. Попробуйте ещё раз.",
+    // USER-BLOCKING-01: администратор заблокировал аккаунт. Без «Попробуйте ещё
+    // раз» — повтор ничего не изменит, действие у человека одно: поддержка.
+    // Тот же текст сервер отдаёт OTP-входу (`auth/account-block.ts`).
+    accountBlocked:
+      "Вход в аккаунт ограничен администратором. Если это ошибка, напишите в поддержку: support@masterryadom.ru.",
     // FIX-EXP-CONTENT-GRAMMAR (EXP-008): `stats.masters` counts all published
     // providers (masters + studios) — truthful label is «специалистов».
     socialProofMastersLabel: "мастеров на платформе",

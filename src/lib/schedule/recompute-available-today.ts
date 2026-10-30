@@ -23,8 +23,9 @@ import {
  * untouched (SHA byte-identical).
  *
  * Guardrails:
- *  - **Minimal-write:** compute → compare to the stored value → batch
- *    `updateMany` the flips only (never `false→false` for 43 rows every sweep).
+ *  - **Minimal-write:** compute → conditional `updateMany` right away
+ *    (`availableToday: { not: free }` — an unchanged row is never touched;
+ *    AVAILABLE-TODAY-SWEEP-WRITE replaced the end-of-pass batch, see below).
  *  - **Resilient:** each provider's probe is try/caught → on throw, `logError`
  *    + CONTINUE. A broken provider keeps its PREVIOUS value (not flipped to
  *    false — that would hide real availability) and never aborts the sweep.
@@ -95,49 +96,50 @@ export async function recomputeAvailableToday(
     errored: 0,
     erroredIds: [],
   };
-  const flipToTrue: string[] = [];
-  const flipToFalse: string[] = [];
+  let changed = 0;
   const erroredIds: string[] = [];
 
   for (const provider of providers) {
-    let free: boolean;
     try {
-      free =
+      const free =
         provider.type === ProviderType.MASTER
           ? await providerHasFreeSlotToday(provider, now)
           : // STUDIO → OR over its ACTIVE masters (re-resolved in the helper).
             await hasFreeSlotToday(provider.id, now);
+      // AVAILABLE-TODAY-SWEEP-WRITE (находка B-06, 2026-10-30): флаг пишется
+      // СРАЗУ после расчёта провайдера и той же формой, что и точечный пересчёт.
+      // Раньше перевороты копились по всему проходу (на сотнях провайдеров —
+      // минуты) и писались в конце безусловным `updateMany`, то есть значением,
+      // посчитанным минуты назад, поверх того, что успел записать точечный
+      // пересчёт после новой записи или отмены: каталог до следующего свипа
+      // (до 30 мин) показывал «Свободно сегодня» у мастера без окошек или прятал
+      // свободного. Теперь окно гонки — длительность одной пробы.
+      //
+      // Сравнения со снимком начала прохода (`provider.availableToday`) здесь
+      // нет намеренно: снимок к этому моменту мог устареть, и пропуск по нему
+      // оставил бы в базе устаревшее значение точечного пересчёта. Условие
+      // `not: free` держит минимальную запись на уровне строки — совпавшее
+      // значение строку не трогает, а `count` говорит, что перевёрнуто на деле.
+      const { count } = await prisma.provider.updateMany({
+        where: { id: provider.id, availableToday: { not: free } },
+        data: { availableToday: free },
+      });
+      changed += count;
     } catch (error) {
       erroredIds.push(provider.id);
       logError("availableToday.recompute.provider-failed", {
         providerId: provider.id,
         error: error instanceof Error ? error.message : String(error),
       });
-      await refreshFreeSlotKeys(provider, now, freeSlotSummary);
-      continue; // keep the previous stored value
+      // keep the previous stored value
     }
 
     await refreshFreeSlotKeys(provider, now, freeSlotSummary);
-    if (free === provider.availableToday) continue; // no-op — minimal write
-    (free ? flipToTrue : flipToFalse).push(provider.id);
-  }
-
-  if (flipToTrue.length > 0) {
-    await prisma.provider.updateMany({
-      where: { id: { in: flipToTrue } },
-      data: { availableToday: true },
-    });
-  }
-  if (flipToFalse.length > 0) {
-    await prisma.provider.updateMany({
-      where: { id: { in: flipToFalse } },
-      data: { availableToday: false },
-    });
   }
 
   return {
     total: providers.length,
-    changed: flipToTrue.length + flipToFalse.length,
+    changed,
     errored: erroredIds.length,
     erroredIds,
     freeSlotKeysChanged: freeSlotSummary.freeSlotKeysChanged ?? 0,

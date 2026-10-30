@@ -12,6 +12,7 @@ import {
 } from "@/lib/users/me";
 import { Prisma } from "@prisma/client";
 import { logInfo } from "@/lib/logging/logger";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 export async function GET() {
   const userId = await getSessionUserId();
@@ -43,6 +44,8 @@ export async function PATCH(req: Request) {
   }
 
   try {
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = await req.json().catch(() => null);
 
     // LOGIC-24: раньше здесь стояли ДВЕ зачистки — `displayName`/`address`

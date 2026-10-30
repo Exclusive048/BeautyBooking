@@ -69,7 +69,7 @@ function metrics(over: Partial<{ latency: Partial<ApiMetricsSnapshot["latency"]>
 
 describe("getAdminHealth", () => {
   beforeEach(() => {
-    queueStats.mockResolvedValue({ pending: 3, processing: 0, dead: 0 });
+    queueStats.mockResolvedValue({ pending: 3, delayed: 40, processing: 0, dead: 0, oldestPendingAgeMs: 90_000 });
     reviewCount.mockResolvedValue(0);
     readApiMetrics.mockResolvedValue(metrics());
     readWorkerLiveness.mockResolvedValue({ state: "alive", lastPingAgoMs: 12_000 });
@@ -88,6 +88,7 @@ describe("getAdminHealth", () => {
       "platform:process",
       "queue:worker",
       "queue:queuePending",
+      "queue:queueDelayed",
       "queue:queueProcessing",
       "queue:queueDead",
       "queue:realtime",
@@ -120,6 +121,9 @@ describe("getAdminHealth", () => {
     expect(byKey.worker.tone).toBe("ok");
     expect(byKey.worker.valueText).toContain("12 с назад");
     expect(byKey.queuePending.valueText).toBe("3 ждёт");
+    expect(byKey.queuePending.hint).toContain("1 мин назад");
+    expect(byKey.queueDelayed.valueText).toBe("40");
+    expect(byKey.queueDelayed.tone).toBe("ok");
     expect(byKey.queueDead.tone).toBe("ok");
     expect(byKey.complaintsOpen.tone).toBe("ok");
     expect(byKey.smsBalance.tone).toBe("error");
@@ -127,7 +131,7 @@ describe("getAdminHealth", () => {
 
   it("мёртвый воркер — красный, даже когда очередь пуста", async () => {
     readWorkerLiveness.mockResolvedValue({ state: "stale", lastPingAgoMs: 40 * 60_000 });
-    queueStats.mockResolvedValue({ pending: 0, processing: 0, dead: 0 });
+    queueStats.mockResolvedValue({ pending: 0, delayed: 0, processing: 0, dead: 0, oldestPendingAgeMs: null });
     const { stats } = await getAdminHealth();
     const worker = stats.find((s) => s.key === "worker");
     expect(worker?.tone).toBe("error");
@@ -143,13 +147,13 @@ describe("getAdminHealth", () => {
   });
 
   it("Redis недоступен — очередь, воркер и метрики API нейтральные прочерки", async () => {
-    queueStats.mockResolvedValue({ pending: -1, processing: -1, dead: -1 });
+    queueStats.mockResolvedValue({ pending: -1, delayed: -1, processing: -1, dead: -1, oldestPendingAgeMs: null });
     readWorkerLiveness.mockResolvedValue(null);
     readApiMetrics.mockResolvedValue(
       metrics({ latency: { available: false, p95Ms: null }, uptime: { available: false, ratio: null } }),
     );
     const { stats } = await getAdminHealth();
-    for (const key of ["apiUptime", "p95", "worker", "queuePending", "queueDead"] as const) {
+    for (const key of ["apiUptime", "p95", "worker", "queuePending", "queueDelayed", "queueDead"] as const) {
       const stat = stats.find((s) => s.key === key);
       expect(stat?.tone, key).toBe("neutral");
       expect(stat?.valueText, key).toBe("—");
@@ -158,11 +162,13 @@ describe("getAdminHealth", () => {
   });
 
   it("жалобы и мёртвые задачи окрашиваются по порогам", async () => {
-    queueStats.mockResolvedValue({ pending: 150, processing: 0, dead: 1 });
+    queueStats.mockResolvedValue({ pending: 150, delayed: 5000, processing: 0, dead: 1, oldestPendingAgeMs: 1000 });
     reviewCount.mockResolvedValue(6);
     const { stats } = await getAdminHealth();
     const byKey = Object.fromEntries(stats.map((s) => [s.key, s]));
     expect(byKey.queuePending.tone).toBe("warn");
+    // QUEUE-DELAYED-ZSET: тысячи отложенных — не перегрузка.
+    expect(byKey.queueDelayed.tone).toBe("ok");
     expect(byKey.queueDead.tone).toBe("error");
     expect(byKey.complaintsOpen.tone).toBe("error");
   });

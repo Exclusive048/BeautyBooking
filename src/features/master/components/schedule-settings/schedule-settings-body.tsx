@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Notice } from "@/components/ui/notice";
 import { Tabs, type TabItem } from "@/components/ui/tabs";
 import type { ScheduleEditorSnapshot } from "@/lib/schedule/editor-shared";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -39,6 +40,16 @@ const TABS: TabItem[] = [
   { id: "visibility", label: T.tabs.visibility },
 ];
 
+/**
+ * STUDIO-PROFILE-PERSONAL-RULES (решение владельца 2026-10-30): у расписания
+ * профиля в студии (`?profile=`) те же четыре вкладки, но «Перерывы»,
+ * «Правила» и «Видимость» несут только ЛИЧНЫЕ правила мастера — они
+ * применяются сразу, без заявки (`lib/schedule/studio-profile-rules.ts`).
+ * Общего для студии (отмена записи, точность времени в каталоге) и горящих
+ * окошек вкладки не показывают — роут их изменение отказывает. Пояснение над
+ * вкладкой говорит, что окно записи и приём новых клиентов действуют строже
+ * из правил мастера и студии: сырое значение профиля — не всё правило.
+ */
 type Props = {
   initialSnapshot: ScheduleEditorSnapshot;
   /** Forwarded to the Rules tab so it can render the locked Hot Slots state. */
@@ -119,6 +130,12 @@ export function ScheduleSettingsBody({ initialSnapshot, hotSlotsAllowed, studioA
       />
 
       <Tabs items={TABS} value={active} onChange={setTab} />
+
+      {studioProfile && active !== "calendar" ? (
+        <Notice tone="info" data-testid="studio-profile-rules-note">
+          {T.studioProfileRulesNote}
+        </Notice>
+      ) : null}
 
       <div key={revision}>
         {active === "calendar" ? (

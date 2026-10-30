@@ -34,7 +34,7 @@ vi.mock("@/lib/auth/roles", () => ({
 
 const { resolveEmailLoginProfile } = await import("@/lib/auth/email-login-profile");
 const { releaseUnverifiedEmailClaims } = await import("@/lib/auth/email-claim");
-const { canDeliverServiceEmail } = await import("@/lib/notifications/delivery");
+const { canDeliverServiceEmail } = await import("@/lib/notifications/email-send");
 
 const VICTIM_EMAIL = "victim@example.ru";
 

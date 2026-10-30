@@ -18,8 +18,8 @@ const YANDEX_GEOCODE_URL = "https://geocode-maps.yandex.ru/1.x/";
  *
  * Этот путь дёргается при сохранении адреса кабинета (auto-grow города), то
  * есть внутри пользовательской правки: без границы зависший геокодер держит
- * запрос сохранения. Отказ здесь уже мягкий — `null` и `logError`, — но
- * мягкость наступает ПОСЛЕ возврата вызова.
+ * запрос сохранения. Отказ здесь уже мягкий — исход `unavailable` и
+ * `logError`, — но мягкость наступает ПОСЛЕ возврата вызова.
  */
 const GEOCODE_REQUEST_TIMEOUT_MS = 5_000;
 
@@ -99,16 +99,38 @@ function extractLocality(components: YandexAddressComponent[] | undefined): stri
 }
 
 /**
- * Geocode an address and extract coordinates + locality name.
+ * GEOCODER-UNAVAILABLE-503 — исход геокодирования, а не «результат или null».
  *
- * Returns `null` if the geocoder is unavailable, the API key is missing,
- * the response is empty, or coordinates can't be parsed.
+ * Раньше любой отказ отдавал `null`: нет ключа, обрыв сети, таймаут, 5xx,
+ * 429 и 403 исчерпанной квоты выглядели для вызывающего ровно как «адрес не
+ * распознан». Вызывающий не мог поступить по-разному, и кабинет мастера на
+ * ВРЕМЕННЫЙ сбой обнулял `cityId` — мастер молча выпадал из каталога до
+ * следующего сохранения адреса при живом геокодере (A-03). Теперь это два
+ * разных исхода:
+ *   - `not_found` — сервис ОТВЕТИЛ, и в ответе нет точки (пустая выдача,
+ *     нечитаемые координаты) либо отверг сам запрос (400 — повтор не поможет);
+ *   - `unavailable` — сервис не ответил по существу: нет ключа, сеть, таймаут,
+ *     ответ не JSON, любой не-OK статус кроме 400 (5xx, 429, 401/403 ключа и
+ *     квоты). Повтор позже может помочь — поэтому вызывающий отказывает в
+ *     записи, а не пишет адрес без города.
+ *
+ * Нет ключа — тоже `unavailable`: адрес нельзя проверить, и молча сохранить
+ * его без города значило бы воспроизвести ту же поломку на неверной настройке.
  */
-export async function geocodeWithLocality(address: string): Promise<YandexLocalityResult | null> {
+export type GeocodeLocalityOutcome =
+  | { kind: "found"; result: YandexLocalityResult }
+  | { kind: "not_found" }
+  | { kind: "unavailable" };
+
+/** 400 — Яндекс отверг сам запрос (параметр); повтор того же адреса не поможет. */
+const HTTP_BAD_REQUEST = 400;
+
+/** Geocode an address and extract coordinates + locality name. */
+export async function geocodeWithLocality(address: string): Promise<GeocodeLocalityOutcome> {
   const apiKey = env.YANDEX_GEOCODER_API_KEY?.trim();
   if (!apiKey) {
     logError("yandex-locality.no_api_key", { hint: "Set YANDEX_GEOCODER_API_KEY" });
-    return null;
+    return { kind: "unavailable" };
   }
 
   const url = new URL(YANDEX_GEOCODE_URL);
@@ -126,12 +148,12 @@ export async function geocodeWithLocality(address: string): Promise<YandexLocali
     });
   } catch (err) {
     logError("yandex-locality.fetch_failed", { error: String(err) });
-    return null;
+    return { kind: "unavailable" };
   }
 
   if (!response.ok) {
     logError("yandex-locality.http_error", { status: response.status });
-    return null;
+    return response.status === HTTP_BAD_REQUEST ? { kind: "not_found" } : { kind: "unavailable" };
   }
 
   let payload: YandexGeocodeResponse | null = null;
@@ -139,14 +161,14 @@ export async function geocodeWithLocality(address: string): Promise<YandexLocali
     payload = (await response.json()) as YandexGeocodeResponse | null;
   } catch (err) {
     logError("yandex-locality.parse_failed", { error: String(err) });
-    return null;
+    return { kind: "unavailable" };
   }
 
   const member = payload?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject;
-  if (!member) return null;
+  if (!member) return { kind: "not_found" };
 
   const point = parsePoint(member.Point?.pos);
-  if (!point) return null;
+  if (!point) return { kind: "not_found" };
 
   const meta = member.metaDataProperty?.GeocoderMetaData?.Address;
   const components = meta?.Components;
@@ -157,13 +179,16 @@ export async function geocodeWithLocality(address: string): Promise<YandexLocali
     .map((component) => component.name as string);
 
   return {
-    geoLat: point.geoLat,
-    geoLng: point.geoLng,
-    locality,
-    regions,
-    country: {
-      code: meta?.country_code?.trim() || null,
-      name: countryComponent?.name?.trim() || null,
+    kind: "found",
+    result: {
+      geoLat: point.geoLat,
+      geoLng: point.geoLng,
+      locality,
+      regions,
+      country: {
+        code: meta?.country_code?.trim() || null,
+        name: countryComponent?.name?.trim() || null,
+      },
     },
   };
 }

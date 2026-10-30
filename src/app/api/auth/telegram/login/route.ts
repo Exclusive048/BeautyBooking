@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 
 import { withRequestContext } from "@/lib/api/with-request-context";
+import { ACCOUNT_BLOCKED_REDIRECT_ERROR } from "@/lib/auth/account-block";
 import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
 import { telegramLoginSchema } from "@/lib/auth/schemas";
 import { authenticateTelegramLogin } from "@/lib/auth/telegram-login";
@@ -140,7 +141,8 @@ export async function GET(req: NextRequest) {
         operation: "telegram-login",
         code: result.code,
       });
-      return loginRedirect("telegram");
+      // USER-BLOCKING-01: заблокированному — свой ключ и своё сообщение на /login.
+      return loginRedirect(result.code === "ACCOUNT_BLOCKED" ? ACCOUNT_BLOCKED_REDIRECT_ERROR : "telegram");
     }
 
     // FIX-9: single-use the auth hash — reject a replayed payload (defense in

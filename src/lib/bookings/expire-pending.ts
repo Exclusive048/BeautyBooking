@@ -4,7 +4,7 @@ import { AppError } from "@/lib/api/errors";
 import { PENDING_EXPIRY_HOURS } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { applyBookingTransition } from "@/lib/bookings/transition";
-import { logError } from "@/lib/logging/logger";
+import { logError, logInfo } from "@/lib/logging/logger";
 import {
   loadBookingWithRelations,
   notifyPendingBookingExpired,
@@ -27,19 +27,101 @@ import {
  * Пакет отменяется только ЦЕЛИКОМ (инв. #34) и только когда неподтверждены все
  * его живые компоненты — подтверждённую мастером часть задача не трогает.
  *
+ * Решение владельца 2026-10-30 (PENDING-EXPIRY-STARVATION): «неподтверждённые
+ * записи должны истекать» — значит и те, что раньше застревали мимо правила:
+ * - запрос переноса на НЕПОДТВЕРЖДЁННОЙ записи (`CHANGE_REQUESTED` со
+ *   `statusBeforeChange` = `NEW`/`PENDING`) истекает по тем же срокам — от
+ *   создания и от ИСХОДНОГО начала визита (`startAtUtc`; предложенное время в
+ *   `proposedStartAt` срок не двигает). Перенос ПОДТВЕРЖДЁННОЙ записи
+ *   (`statusBeforeChange` = `CONFIRMED`, либо пусто у строк до миграции) не
+ *   истекает: визит в силе, ответа ждёт только новое время;
+ * - сосед по пакету в терминальном статусе — неявка, как отмена и состоявшийся
+ *   визит, — истечению остальных не мешает: «живые» — только нетерминальные.
+ *
  * Уведомления (клиенту и стороне провайдера) уходят, только если визит ещё не
  * закончился: первый проход на накопленной истории не должен рассылать
  * «запись отменена» по визитам месячной давности — там это просто уборка.
  */
-const EXPIRABLE_STATUSES: BookingStatus[] = [BookingStatus.NEW, BookingStatus.PENDING];
-const BATCH_SIZE = 200;
+const UNCONFIRMED_STATUSES: BookingStatus[] = [BookingStatus.NEW, BookingStatus.PENDING];
+/**
+ * Терминальные статусы услуги: её судьба решена, и истечению соседей по пакету
+ * она не мешает. `CANCELLED` и `NO_SHOW` — те «отменена/неявка», которые
+ * `flow.ts` сводит к `REJECTED`; `FINISHED` — визит состоялся.
+ */
+const TERMINAL_STATUSES: BookingStatus[] = [
+  BookingStatus.REJECTED,
+  BookingStatus.CANCELLED,
+  BookingStatus.NO_SHOW,
+  BookingStatus.FINISHED,
+];
+export const PENDING_EXPIRY_BATCH_SIZE = 200;
 export const PENDING_EXPIRY_REASON = "Запись не подтвердили вовремя.";
+
+/**
+ * Запись ждёт ПЕРВОГО подтверждения: `NEW`/`PENDING` либо запрос переноса,
+ * открытый, пока она была неподтверждённой. Единственное правило
+ * «неподтверждена» — для выборки кандидатов и для пакета; копии в памяти нет.
+ */
+export function unconfirmedBookingWhere(): Prisma.BookingWhereInput {
+  return {
+    OR: [
+      { status: { in: UNCONFIRMED_STATUSES } },
+      { status: BookingStatus.CHANGE_REQUESTED, statusBeforeChange: { in: UNCONFIRMED_STATUSES } },
+    ],
+  };
+}
+
+/**
+ * Услуга, из-за которой пакет истечь НЕ может: живая (нетерминальная) и при этом
+ * не «неподтверждена» — подтверждена, идёт, предоплачена или в переносе
+ * подтверждённой записи. Записано ПОЛОЖИТЕЛЬНО, а не как `NOT unconfirmed`:
+ * `statusBeforeChange` бывает пустым, а `NOT (… IN …)` над `NULL` в SQL даёт
+ * `NULL`, то есть «не блокирует», — и пакет с переносом подтверждённой услуги
+ * истёк бы целиком. По той же причине у `notIn` отдельная ветка `null`.
+ */
+function packageBlockingBookingWhere(): Prisma.BookingWhereInput {
+  return {
+    OR: [
+      {
+        status: {
+          notIn: [...TERMINAL_STATUSES, ...UNCONFIRMED_STATUSES, BookingStatus.CHANGE_REQUESTED],
+        },
+      },
+      {
+        status: BookingStatus.CHANGE_REQUESTED,
+        OR: [{ statusBeforeChange: null }, { statusBeforeChange: { notIn: UNCONFIRMED_STATUSES } }],
+      },
+    ],
+  };
+}
+
+/**
+ * PENDING-EXPIRY-STARVATION (B-02/E-03) — пакет, который можно истечь: не
+ * отменён, и ни одна его услуга не блокирует (см. выше). Одно условие на две
+ * точки — выборку кандидатов и `expirePackage`, который перечитывает пакет ЭТИМ
+ * ЖЕ условием, а не своей проверкой в памяти.
+ *
+ * Зачем в выборке: она идёт от старых к новым с потолком в пачку. Строка,
+ * которую выборка берёт, а `expirePackage` не истечёт, остаётся кандидатом
+ * навсегда; когда таких становилось больше пачки, истечение останавливалось для
+ * всей платформы без ошибки и лога. Две копии правила разошлись бы ровно так.
+ */
+export function expirablePackageWhere(): Prisma.BookingPackageWhereInput {
+  return {
+    status: { not: BookingPackageStatus.CANCELLED },
+    bookings: { none: packageBlockingBookingWhere() },
+  };
+}
 
 export function pendingExpiryWhere(now: Date): Prisma.BookingWhereInput {
   const createdBefore = new Date(now.getTime() - PENDING_EXPIRY_HOURS * 60 * 60 * 1000);
   return {
-    status: { in: EXPIRABLE_STATUSES },
-    OR: [{ createdAt: { lte: createdBefore } }, { startAtUtc: { lte: now } }],
+    AND: [
+      unconfirmedBookingWhere(),
+      // `startAtUtc` — исходное время визита и у записи с запросом переноса.
+      { OR: [{ createdAt: { lte: createdBefore } }, { startAtUtc: { lte: now } }] },
+      { OR: [{ bookingPackageId: null }, { bookingPackage: { is: expirablePackageWhere() } }] },
+    ],
   };
 }
 
@@ -52,18 +134,42 @@ function expiryData(now: Date) {
     actionRequiredBy: null,
     proposedStartAt: null,
     proposedEndAt: null,
+    // Запрос переноса закрыт вместе с записью — как при отказе от переноса.
+    statusBeforeChange: null,
   };
 }
 
-type ExpiredRow = {
-  id: string;
-  providerId: string;
-  masterProviderId: string | null;
-  startAtUtc: Date | null;
-  endAtUtc: Date | null;
-};
+const EXPIRY_CANDIDATE_SELECT = {
+  id: true,
+  status: true,
+  statusBeforeChange: true,
+  providerId: true,
+  masterProviderId: true,
+  startAtUtc: true,
+  endAtUtc: true,
+} as const satisfies Prisma.BookingSelect;
 
-async function afterExpiry(rows: ExpiredRow[], notifyRow: ExpiredRow, now: Date): Promise<void> {
+type ExpiryCandidate = Prisma.BookingGetPayload<{ select: typeof EXPIRY_CANDIDATE_SELECT }>;
+
+/**
+ * Охрана перехода — наблюдённый статус и, у запроса переноса, наблюдённое
+ * `statusBeforeChange`: между чтением и записью мастер мог подтвердить перенос
+ * (`CONFIRMED`), а клиент — тут же попросить новый (снова `CHANGE_REQUESTED`,
+ * но уже от подтверждённой записи). Один статус такую смену не видит.
+ */
+function expiryTransition(booking: ExpiryCandidate, now: Date) {
+  return {
+    id: booking.id,
+    expectedStatus: booking.status,
+    ...(booking.status === BookingStatus.CHANGE_REQUESTED
+      ? { expectAlso: { statusBeforeChange: booking.statusBeforeChange } }
+      : {}),
+    data: expiryData(now),
+    select: { id: true },
+  };
+}
+
+async function afterExpiry(rows: ExpiryCandidate[], notifyRow: ExpiryCandidate, now: Date): Promise<void> {
   for (const row of rows) {
     try {
       await invalidateSlotsForBookingRange({
@@ -96,42 +202,26 @@ function isStatusRace(error: unknown): boolean {
 }
 
 async function expirePackage(bookingPackageId: string, now: Date): Promise<number> {
-  const pkg = await prisma.bookingPackage.findUnique({
-    where: { id: bookingPackageId },
+  // Пакет перечитывается ТЕМ ЖЕ условием, что в выборке, — проверка «можно ли
+  // истечь» одна; в памяти остаётся только «какие услуги живые».
+  const pkg = await prisma.bookingPackage.findFirst({
+    where: { id: bookingPackageId, ...expirablePackageWhere() },
     select: {
       id: true,
-      status: true,
       // include-ok: услуги одного пакета — их единицы, пакет не растёт после создания.
-      bookings: {
-        select: {
-          id: true,
-          status: true,
-          providerId: true,
-          masterProviderId: true,
-          startAtUtc: true,
-          endAtUtc: true,
-        },
-        orderBy: { startAtUtc: "asc" },
-      },
+      bookings: { select: EXPIRY_CANDIDATE_SELECT, orderBy: { startAtUtc: "asc" } },
     },
   });
-  if (!pkg || pkg.status === BookingPackageStatus.CANCELLED) return 0;
+  if (!pkg) return 0;
 
-  const live = pkg.bookings.filter(
-    (booking) => booking.status !== BookingStatus.REJECTED && booking.status !== BookingStatus.FINISHED,
-  );
-  // Мастер подтвердил хоть одну часть — пакет ждёт его решения по остальным.
-  if (live.length === 0 || live.some((booking) => !EXPIRABLE_STATUSES.includes(booking.status))) return 0;
+  // Раз пакет прошёл условие, каждая живая услуга в нём — неподтверждённая.
+  const live = pkg.bookings.filter((booking) => !TERMINAL_STATUSES.includes(booking.status));
+  if (live.length === 0) return 0;
 
   try {
     await prisma.$transaction(async (tx) => {
       for (const booking of live) {
-        await applyBookingTransition(tx, {
-          id: booking.id,
-          expectedStatus: booking.status,
-          data: expiryData(now),
-          select: { id: true },
-        });
+        await applyBookingTransition(tx, expiryTransition(booking, now));
       }
       await tx.bookingPackage.update({
         where: { id: pkg.id },
@@ -142,7 +232,7 @@ async function expirePackage(bookingPackageId: string, now: Date): Promise<numbe
     if (isStatusRace(error)) return 0;
     throw error;
   }
-  // Одно уведомление на пакет — по первой услуге (как и создание пакета).
+  // Одно уведомление на пакет — по первой предстоящей услуге (как и создание пакета).
   const notifyRow = live.find((booking) => booking.endAtUtc && booking.endAtUtc > now) ?? live[0]!;
   await afterExpiry(live, notifyRow, now);
   return live.length;
@@ -153,41 +243,50 @@ export async function expirePendingBookings(
 ): Promise<{ candidates: number; expired: number }> {
   const candidates = await prisma.booking.findMany({
     where: pendingExpiryWhere(now),
-    select: {
-      id: true,
-      status: true,
-      bookingPackageId: true,
-      providerId: true,
-      masterProviderId: true,
-      startAtUtc: true,
-      endAtUtc: true,
-    },
-    orderBy: { createdAt: "asc" },
-    take: BATCH_SIZE,
+    select: { ...EXPIRY_CANDIDATE_SELECT, bookingPackageId: true },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    take: PENDING_EXPIRY_BATCH_SIZE,
   });
 
   let expired = 0;
-  const seenPackages = new Set<string>();
+  /** Строки пачки, которые остались неподтверждёнными (гонка или новый класс застревания). */
+  let stuck = 0;
+  const packageOutcome = new Map<string, boolean>();
   for (const candidate of candidates) {
     if (candidate.bookingPackageId) {
-      if (seenPackages.has(candidate.bookingPackageId)) continue;
-      seenPackages.add(candidate.bookingPackageId);
-      expired += await expirePackage(candidate.bookingPackageId, now);
+      const known = packageOutcome.get(candidate.bookingPackageId);
+      if (known !== undefined) {
+        if (!known) stuck += 1;
+        continue;
+      }
+      const count = await expirePackage(candidate.bookingPackageId, now);
+      packageOutcome.set(candidate.bookingPackageId, count > 0);
+      expired += count;
+      if (count === 0) stuck += 1;
       continue;
     }
     try {
-      await applyBookingTransition(prisma, {
-        id: candidate.id,
-        expectedStatus: candidate.status,
-        data: expiryData(now),
-        select: { id: true },
-      });
+      await applyBookingTransition(prisma, expiryTransition(candidate, now));
     } catch (error) {
-      if (isStatusRace(error)) continue;
+      if (isStatusRace(error)) {
+        stuck += 1;
+        continue;
+      }
       throw error;
     }
     expired += 1;
     await afterExpiry([candidate], candidate, now);
+  }
+
+  // Полная пачка, в которой что-то не сдвинулось, — признак того, что голову
+  // выборки занимают строки, которые истечь не могут (так и копилось
+  // застревание B-02 — молча, ответом `{ candidates: 200, expired: 0 }`).
+  // Отдельные гонки с подтверждением мастера — штатны, это строка в лог; вся
+  // пачка без движения — остановка механизма, это ошибка с алертом.
+  if (candidates.length === PENDING_EXPIRY_BATCH_SIZE && stuck > 0) {
+    const meta = { candidates: candidates.length, expired, stuck };
+    if (stuck === candidates.length) logError("bookings.pendingExpiry.batchStalled", meta);
+    else logInfo("bookings.pendingExpiry.batchShort", meta);
   }
   return { candidates: candidates.length, expired };
 }

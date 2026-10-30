@@ -40,6 +40,7 @@ vi.mock("@/lib/logging/logger", () => ({ logError }));
 vi.mock("@/lib/notifications/delivery", () => ({ deliverExternalChannels }));
 
 import {
+  bookingReminderJobId,
   isBookingReminderJob,
   processBookingReminder,
   reconcileBookingReminders,
@@ -87,6 +88,42 @@ describe("bookings/reminders", () => {
 
     await scheduleBookingReminders("b1");
     expect(enqueue).toHaveBeenCalledTimes(2);
+  });
+
+  it("QUEUE-DELAYED-ZSET: id напоминания детерминирован — повторное планирование даёт те же id", async () => {
+    const startAtUtc = new Date(Date.now() + 26 * 60 * 60 * 1000);
+    const booking = {
+      id: "b1",
+      status: "CONFIRMED",
+      startAtUtc,
+      silentMode: false,
+      provider: { remindersEnabled: true },
+    };
+    bookingFindUnique.mockResolvedValueOnce(booking).mockResolvedValueOnce(booking);
+
+    await scheduleBookingReminders("b1");
+    await scheduleBookingReminders("b1");
+
+    const ids = createBookingReminderJob.mock.calls.map(
+      (call) => (call[1] as { id?: string } | undefined)?.id
+    );
+    expect(ids).toHaveLength(4);
+    expect(ids.slice(0, 2).sort()).toEqual(ids.slice(2).sort());
+    expect(new Set(ids).size).toBe(2); // 24H и 2H различаются
+    expect(ids[0]).toBe(
+      bookingReminderJobId({
+        bookingId: "b1",
+        kind: (createBookingReminderJob.mock.calls[0]?.[0] as { kind: "REMINDER_24H" | "REMINDER_2H" }).kind,
+        startAtUtc: startAtUtc.toISOString(),
+      })
+    );
+  });
+
+  it("QUEUE-DELAYED-ZSET: перенос визита меняет id напоминания", () => {
+    const base = { bookingId: "b1", kind: "REMINDER_2H" as const };
+    expect(bookingReminderJobId({ ...base, startAtUtc: "2026-11-01T10:00:00.000Z" })).not.toBe(
+      bookingReminderJobId({ ...base, startAtUtc: "2026-11-01T12:00:00.000Z" })
+    );
   });
 
   it("publishes notifications when reminder is processed", async () => {

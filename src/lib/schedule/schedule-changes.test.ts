@@ -12,8 +12,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * дата `{kind:"reset"}`) и «правка свелась к нулю — заявка отозвана» (без
  * открытой заявки ответ `created` вместо `unchanged` — студии ушла бы пустая
  * по смыслу заявка). Возвращено — зелёные.
- * @probe 2026-09-28 — в `applyScheduleChangesRequest` снят фильтр прошедших
- * дат: покраснел «прошедшие дни пропускаются» (в покраску ушла вчерашняя дата).
+ * @probe 2026-09-28 — в `applyScheduleChangesRequest` (с 2026-10-30 —
+ * `applyScheduleChangesRequestTx`) снят фильтр прошедших дат: покраснел
+ * «прошедшие дни пропускаются» (в покраску ушла вчерашняя дата).
+ *
+ * Гонки сабмита и решения студии (SCHEDULE-REQUEST-ATOMIC) — в
+ * `schedule-request-atomic.test.ts`; здесь блокировки — заглушки.
  */
 
 const state = vi.hoisted(() => ({
@@ -22,6 +26,7 @@ const state = vi.hoisted(() => ({
   templates: new Set<string>(),
   created: [] as unknown[],
   updated: [] as unknown[],
+  statusUpdates: [] as unknown[],
   deleted: [] as string[],
   exceptions: [] as Array<Record<string, unknown>>,
   currentWeek: [] as unknown[],
@@ -40,19 +45,27 @@ vi.mock("@/lib/prisma", () => {
     studio: { findUnique: async () => ({ id: "studio-1" }) },
     scheduleChangeRequest: {
       findFirst: async () => state.pending,
+      findUnique: async () => state.pending && { ...state.pending, status: "PENDING", providerId: "prov-1" },
       create: async (input: { data: unknown }) => {
         state.created.push(input.data);
         return { id: "req-new" };
       },
-      update: async (input: { data: unknown }) => {
+      updateMany: async (input: { data: unknown }) => {
         state.updated.push(input.data);
+        return { count: 1 };
+      },
+      update: async (input: { data: unknown }) => {
+        state.statusUpdates.push(input.data);
         return {};
       },
-      delete: async (input: { where: { id: string } }) => {
+      deleteMany: async (input: { where: { id: string } }) => {
         state.deleted.push(input.where.id);
-        return {};
+        return { count: 1 };
       },
     },
+    // Блокировки: строка открытой заявки (если есть) и очередь сабмитов профиля.
+    $queryRaw: async () => (state.pending ? [{ id: state.pending.id }] : []),
+    $executeRaw: async () => 1,
     scheduleOverride: {
       findMany: async (input: { where: { date: { in: Date[] } } }) =>
         input.where.date.in
@@ -141,7 +154,7 @@ vi.mock("@/lib/schedule/day-plans", async (importOriginal) => ({
 }));
 
 import {
-  applyScheduleChangesRequest,
+  approveScheduleChangeRequest,
   buildScheduleRequestReview,
   exceptionsToDayChanges,
   submitStudioScheduleChange,
@@ -209,6 +222,7 @@ beforeEach(() => {
   state.templates = new Set(["tpl-morning"]);
   state.created = [];
   state.updated = [];
+  state.statusUpdates = [];
   state.deleted = [];
   state.exceptions = [];
   state.currentWeek = WEEK.map((day) => ({ ...day, isWorkday: false }));
@@ -391,48 +405,56 @@ describe("открытая заявка профиля в студии", () => {
 });
 
 describe("одобрение заявки нового формата", () => {
+  function approve() {
+    return approveScheduleChangeRequest({ requestId: "req-1", studioId: "studio-1", now: NOW });
+  }
+
   it("неделя, затем дни пачками по действию; прошедшие дни пропускаются", async () => {
-    await applyScheduleChangesRequest(
-      "prov-1",
-      request({
-        week: WEEK,
-        days: [
-          { date: "2026-10-04", action: { kind: "off" } },
-          { date: "2026-10-07", action: { kind: "off" } },
-          { date: "2026-10-08", action: { kind: "template", templateId: "tpl-morning" } },
-          { date: "2026-10-09", action: { kind: "off" } },
-        ],
-      }).payloadJson,
-      NOW,
-    );
+    state.pending = request({
+      week: WEEK,
+      days: [
+        { date: "2026-10-04", action: { kind: "off" } },
+        { date: "2026-10-07", action: { kind: "off" } },
+        { date: "2026-10-08", action: { kind: "template", templateId: "tpl-morning" } },
+        { date: "2026-10-09", action: { kind: "off" } },
+      ],
+    });
+    await expect(approve()).resolves.toEqual({ id: "req-1", providerId: "prov-1" });
     expect(spies.week).toHaveLength(1);
     expect(spies.paint).toEqual([
       { dates: ["2026-10-07", "2026-10-09"], action: { kind: "off" } },
       { dates: ["2026-10-08"], action: { kind: "template", templateId: "tpl-morning" } },
     ]);
+    expect(state.statusUpdates).toEqual([{ status: "APPROVED" }]);
     expect(spies.invalidated).toBe(1);
   });
 
   it("график применяется вместе с днями", async () => {
-    await applyScheduleChangesRequest(
-      "prov-1",
-      request({ pattern: PATTERN, days: [{ date: "2026-10-07", action: { kind: "off" } }] }).payloadJson,
-      NOW,
-    );
+    state.pending = request({ pattern: PATTERN, days: [{ date: "2026-10-07", action: { kind: "off" } }] });
+    await approve();
     expect(spies.pattern).toEqual([PATTERN]);
     expect(spies.paint).toHaveLength(1);
   });
 
-  it("рабочий день удалён после отправки — 422 и ничего не покрашено", async () => {
-    await expect(
-      applyScheduleChangesRequest(
-        "prov-1",
-        request({ days: [{ date: "2026-10-07", action: { kind: "template", templateId: "tpl-gone" } }] }).payloadJson,
-        NOW,
-      ),
-    ).rejects.toMatchObject({ status: 422, code: "INVALID_REQUEST_PAYLOAD" });
+  it("заявка прежнего формата графика (`PATTERN_V1`) — тем же путём", async () => {
+    state.pending = { id: "req-1", payloadJson: { format: PATTERN_CHANGE_REQUEST_FORMAT, request: PATTERN } };
+    await approve();
+    expect(spies.pattern).toEqual([PATTERN]);
+    expect(state.statusUpdates).toEqual([{ status: "APPROVED" }]);
+  });
+
+  it("рабочий день удалён после отправки — 422, ничего не покрашено, статус не тронут", async () => {
+    state.pending = request({ days: [{ date: "2026-10-07", action: { kind: "template", templateId: "tpl-gone" } }] });
+    await expect(approve()).rejects.toMatchObject({ status: 422, code: "INVALID_REQUEST_PAYLOAD" });
     expect(spies.paint).toHaveLength(0);
+    expect(state.statusUpdates).toEqual([]);
     expect(spies.invalidated).toBe(0);
+  });
+
+  it("тело неизвестного формата — 422 «отправьте заявку заново»", async () => {
+    state.pending = { id: "req-1", payloadJson: { templates: [], weekly: [], overrides: [] } };
+    await expect(approve()).rejects.toMatchObject({ status: 422, code: "INVALID_REQUEST_PAYLOAD" });
+    expect(state.statusUpdates).toEqual([]);
   });
 });
 

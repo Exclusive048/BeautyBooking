@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import {
@@ -78,6 +79,13 @@ function formatDateKeyLabel(dateKey: string): string {
  * (`/api/masters/{id}/availability`), но с `?manual=1`: для своей стороны
  * кабинета сервер не применяет «запись не ранее чем за N часов» — это правило
  * для клиентов, а ручные пути его и не проверяют.
+ *
+ * MANUAL-SLOTS-ALL (2026-10-30, решение владельца): окошки — те же, что видит
+ * клиент (без промежутков, которые нечем заполнить). Остальные свободные
+ * времена приходят тем же ответом (`otherSlots`) и открываются ссылкой
+ * «Показать все свободные времена» — пунктиром: клиент по телефону может
+ * попросить именно такое время. Предвыбор из ячейки расписания и время
+ * переносимой записи открывают их сами, если время только среди них.
  */
 export function OperatorSlotPicker({
   providerId,
@@ -133,9 +141,17 @@ export function OperatorSlotPicker({
   const [result, setResult] = useState<{
     key: string;
     slots: ApiSlot[];
+    otherSlots: ApiSlot[];
     error: string | null;
     focusStart: string | null;
   } | null>(null);
+
+  // «Все свободные времена» открыты для этого исполнителя и услуги. Выводится,
+  // а не сбрасывается эффектом: смена мастера или услуги возвращает окошки
+  // клиента, смена дня — нет.
+  const scopeKey = providerId && serviceId ? `${providerId}|${serviceId}` : null;
+  const [allStartsFor, setAllStartsFor] = useState<string | null>(null);
+  const showAll = scopeKey !== null && allStartsFor === scopeKey;
 
   // Колбэк родителя не должен перезапускать загрузку — держим его в ref.
   const onChangeRef = useRef(onChange);
@@ -160,7 +176,15 @@ export function OperatorSlotPicker({
       : null;
   const current = result && result.key === requestKey ? result : null;
   const loading = requestKey !== null && current === null;
-  const slots = useMemo(() => current?.slots ?? [], [current]);
+  const otherSlots = useMemo(() => current?.otherSlots ?? [], [current]);
+  const slots = useMemo(() => {
+    const packed = current?.slots ?? [];
+    if (!showAll) return packed;
+    return [...packed, ...otherSlots].sort(
+      (a, b) => new Date(a.startAtUtc).getTime() - new Date(b.startAtUtc).getTime(),
+    );
+  }, [current, otherSlots, showAll]);
+  const otherStarts = useMemo(() => new Set(otherSlots.map((slot) => slot.startAtUtc)), [otherSlots]);
   const error = current?.error ?? null;
   // Окошко из ячейки расписания — его группа (утро/день/вечер) раскрыта.
   const focusStart = current?.focusStart ?? null;
@@ -179,22 +203,36 @@ export function OperatorSlotPicker({
     if (excludeBookingId) url.searchParams.set("excludeBookingId", excludeBookingId);
     if (moveBookingId) url.searchParams.set("moveBookingId", moveBookingId);
     const fail = (message: string) => {
-      setResult({ key: requestKey, slots: [], error: message, focusStart: null });
+      setResult({ key: requestKey, slots: [], otherSlots: [], error: message, focusStart: null });
       onChangeRef.current(null);
     };
-    void fetchJsonWithAuth<{ slots: ApiSlot[] }>(url.toString(), { cache: "no-store" })
+    const requestScope = `${providerId}|${serviceId}`;
+    void fetchJsonWithAuth<{ slots: ApiSlot[]; otherSlots?: ApiSlot[] }>(url.toString(), { cache: "no-store" })
       .then((data) => {
         if (cancelled) return;
-        const daySlots = (data.slots ?? []).filter(
-          (slot) => toLocalDateKey(slot.startAtUtc, timeZone) === selectedDate,
-        );
+        const onSelectedDay = (slot: ApiSlot) => toLocalDateKey(slot.startAtUtc, timeZone) === selectedDate;
+        const daySlots = (data.slots ?? []).filter(onSelectedDay);
+        const dayOther = (data.otherSlots ?? []).filter(onSelectedDay);
 
         const prefillTime = prefillIso ? new Date(prefillIso).getTime() : Number.NaN;
-        const prefillSlot =
-          !prefillConsumedRef.current && Number.isFinite(prefillTime)
-            ? daySlots.find((slot) => new Date(slot.startAtUtc).getTime() === prefillTime)
+        const isPrefill = (slot: ApiSlot) => new Date(slot.startAtUtc).getTime() === prefillTime;
+        const prefillPacked =
+          !prefillConsumedRef.current && Number.isFinite(prefillTime) ? daySlots.find(isPrefill) : undefined;
+        const prefillOther =
+          !prefillConsumedRef.current && Number.isFinite(prefillTime) && !prefillPacked
+            ? dayOther.find(isPrefill)
             : undefined;
-        setResult({ key: requestKey, slots: daySlots, error: null, focusStart: prefillSlot?.startAtUtc ?? null });
+        const prefillSlot = prefillPacked ?? prefillOther;
+        setResult({
+          key: requestKey,
+          slots: daySlots,
+          otherSlots: dayOther,
+          error: null,
+          focusStart: prefillSlot?.startAtUtc ?? null,
+        });
+        // Время ячейки или переносимой записи — только среди остальных: они
+        // открываются, иначе предвыбор был бы невидим.
+        if (prefillOther) setAllStartsFor(requestScope);
         if (prefillSlot) {
           prefillConsumedRef.current = true;
           onChangeRef.current({ startAtUtc: prefillSlot.startAtUtc, endAtUtc: prefillSlot.endAtUtc });
@@ -202,7 +240,7 @@ export function OperatorSlotPicker({
         }
         // Выбранное окошко пропало (сменили день/услугу или его заняли) — сбрасываем.
         const chosen = valueRef.current;
-        if (chosen && !daySlots.some((slot) => slot.startAtUtc === chosen.startAtUtc)) {
+        if (chosen && ![...daySlots, ...dayOther].some((slot) => slot.startAtUtc === chosen.startAtUtc)) {
           onChangeRef.current(null);
         }
       })
@@ -219,6 +257,7 @@ export function OperatorSlotPicker({
       id: slot.startAtUtc,
       label: slot.startAtUtc,
       timeText: UI_FMT.timeShort(slot.startAtUtc, { timeZone }),
+      muted: otherStarts.has(slot.startAtUtc),
     }));
     const nonEmpty = groupSlotsByTimeOfDay(items).filter((group) => group.items.length > 0);
     // Группа с предвыбранным окошком раскрыта — иначе предвыбор из ячейки
@@ -231,11 +270,31 @@ export function OperatorSlotPicker({
       ...group,
       defaultOpen: group.items.some((item) => item.label === focusStart),
     }));
-  }, [slots, timeZone, focusStart]);
+  }, [slots, otherStarts, timeZone, focusStart]);
 
   const slotByStart = useMemo(() => new Map(slots.map((slot) => [slot.startAtUtc, slot])), [slots]);
 
-  const refInstant = slots[0]?.startAtUtc ?? null;
+  const toggleAllStarts = () => {
+    if (!scopeKey) return;
+    // Скрываем остальные времена — выбранное среди них больше не видно.
+    if (showAll && value && otherStarts.has(value.startAtUtc)) onChange(null);
+    setAllStartsFor(showAll ? null : scopeKey);
+  };
+  const allStartsToggle =
+    otherSlots.length > 0 ? (
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={toggleAllStarts}
+        disabled={disabled}
+        aria-expanded={showAll}
+        data-testid="operator-slot-picker-all-toggle"
+      >
+        {showAll ? T.hideAll : T.showAll}
+      </Button>
+    ) : null;
+
+  const refInstant = slots[0]?.startAtUtc ?? otherSlots[0]?.startAtUtc ?? null;
   const zoneLabel =
     refInstant && zonesDifferForViewer({ iso: refInstant, salonTimeZone: timeZone, viewerTimeZone: viewerTz })
       ? formatZoneLabel({ iso: refInstant, timeZone })
@@ -283,19 +342,26 @@ export function OperatorSlotPicker({
             {error}
           </p>
         ) : groups.length === 0 ? (
-          <p className="rounded-xl border border-border-subtle bg-bg-input/40 p-3 text-sm text-text-sec">
-            {T.empty}
-          </p>
+          <div className="space-y-2">
+            <p className="rounded-xl border border-border-subtle bg-bg-input/40 p-3 text-sm text-text-sec">
+              {otherSlots.length > 0 ? T.emptyPacked : T.empty}
+            </p>
+            {allStartsToggle}
+          </div>
         ) : (
-          <SlotPickerOptimized
-            groups={groups}
-            value={value?.startAtUtc ?? ""}
-            disabled={disabled}
-            onChange={(startAtUtc) => {
-              const slot = slotByStart.get(startAtUtc);
-              onChange(slot ? { startAtUtc: slot.startAtUtc, endAtUtc: slot.endAtUtc } : null);
-            }}
-          />
+          <div className="space-y-2">
+            <SlotPickerOptimized
+              groups={groups}
+              value={value?.startAtUtc ?? ""}
+              disabled={disabled}
+              onChange={(startAtUtc) => {
+                const slot = slotByStart.get(startAtUtc);
+                onChange(slot ? { startAtUtc: slot.startAtUtc, endAtUtc: slot.endAtUtc } : null);
+              }}
+            />
+            {showAll ? <p className="text-xs text-text-sec">{T.allHint}</p> : null}
+            {allStartsToggle}
+          </div>
         )}
       </div>
     </div>

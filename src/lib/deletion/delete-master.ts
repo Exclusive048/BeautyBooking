@@ -4,6 +4,7 @@ import { removeProfessionalRoles } from "@/lib/auth/roles";
 import { MediaEntityType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { collectProviderMedia } from "@/lib/media/purge";
+import { markAssetsDeletedTx } from "@/lib/media/soft-delete";
 import { enqueueMediaPurge } from "@/lib/deletion/enqueue-media-purge";
 import { deliverNotification } from "@/lib/notifications/delivery";
 import { logError, logInfo } from "@/lib/logging/logger";
@@ -227,6 +228,11 @@ export async function deleteMasterCabinet(userId: string, options: CabinetDeleti
     }
 
     await tx.masterProfile.delete({ where: { id: masterProfile.id } });
+
+    // MEDIA-PURGE-MARK-DELETED: фото кабинета перестают отдаваться с коммитом,
+    // а не когда `media.purge` доберётся до хранилища (при недоступном
+    // хранилище — никогда); байты удалённой строки подберёт и уборка.
+    await markAssetsDeletedTx(tx, mediaToPurge.map((asset) => asset.id));
 
     return {
       providerId,

@@ -5,6 +5,7 @@ import { createAdminAuditLog } from "@/lib/audit/admin-audit";
 import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { AppError, toAppError } from "@/lib/api/errors";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 const patchSchema = z.object({
   key: z.string().trim().min(1).max(120),
@@ -39,6 +40,8 @@ export async function PATCH(req: Request) {
   if (!auth.ok) return auth.response;
 
   try {
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = await req.json().catch(() => null);
     const parsed = patchSchema.safeParse(body);
     if (!parsed.success) {

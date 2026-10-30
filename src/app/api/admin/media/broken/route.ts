@@ -1,6 +1,8 @@
 import { fail, ok } from "@/lib/api/response";
 import { toAppError } from "@/lib/api/errors";
 import { requireAdminAuth } from "@/lib/auth/admin";
+import { createAdminAuditLogSafe } from "@/lib/audit/admin-audit";
+import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { getMediaCleanupStats, runMediaCleanup } from "@/lib/media/cleanup";
 
@@ -32,6 +34,14 @@ export async function POST(req: Request) {
     if (!auth.ok) return auth.response;
 
     const cleaned = await runMediaCleanup();
+    // Инв. #19: очистка уже прошла по строкам и хранилищу — журнал после неё.
+    await createAdminAuditLogSafe({
+      adminUserId: auth.user.id,
+      action: "MEDIA_CLEANUP_RUN",
+      targetType: "media",
+      details: { cleaned },
+      context: getAdminAuditContext(req),
+    });
     const stats = await getMediaCleanupStats();
     return ok({ cleaned, stats });
   } catch (error) {

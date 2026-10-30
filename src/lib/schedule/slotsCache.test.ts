@@ -92,7 +92,7 @@ describe("schedule/slotsCache", () => {
 
   // SLOTS-GAP-PACKING: клиентская выдача (с отбором «без дыр») и выдача
   // оператора — разные наборы окошек одного дня, поэтому разные записи кэша.
-  // Без флага ключ прежний: операторская выдача читает то же, что и раньше.
+  // Без `starts` ключ прежний: его читает сырая выдача движка (`listAvailabilitySlots`).
   it("keys the gap-packed listing with :pk before the extra-starts suffix", () => {
     const input = {
       masterId: "m1",
@@ -106,12 +106,40 @@ describe("schedule/slotsCache", () => {
       publishedUntilLocal: "2026-04-01",
     };
     const plain = buildSlotsCacheKey(input);
-    expect(buildSlotsCacheKey({ ...input, packing: false })).toBe(plain);
-    expect(buildSlotsCacheKey({ ...input, packing: true })).toBe(`${plain}:pk`);
-    expect(buildSlotsCacheKey({ ...input, packing: true, extraStartMinutes: [29_542_340] })).toBe(
+    expect(buildSlotsCacheKey({ ...input, starts: "packed" })).toBe(`${plain}:pk`);
+    expect(buildSlotsCacheKey({ ...input, starts: "packed", extraStartMinutes: [29_542_340] })).toBe(
       `${plain}:pk:x29542340`
     );
-    expect(buildSlotsCacheKey({ ...input, packing: true }).startsWith("slots:m1:")).toBe(true);
+    expect(buildSlotsCacheKey({ ...input, starts: "packed" }).startsWith("slots:m1:")).toBe(true);
+  });
+
+  // MANUAL-SLOTS-ALL: «все свободные времена» ручной записи — свой ключ. Иначе
+  // они делили бы ключ с выдачей клиента (`:pk`) либо с сырой выдачей движка
+  // (без суффикса, её читает `listAvailabilitySlots`), и одна выдача отдавалась
+  // бы вместо другой.
+  //
+  // @probe 2026-10-30 — ветка `"all"` в `buildSlotsCacheKey` заменена на `""`:
+  // красный «three distinct keys». Возвращено — зелёный.
+  it("keys the manual all-starts listing apart from packed and raw listings (three distinct keys)", () => {
+    const input = {
+      masterId: "m1",
+      dateKey: "2026-03-03",
+      serviceId: "s1",
+      serviceDuration: 20,
+      bufferMin: 0,
+      slotStepMin: 15,
+      timeZone: "UTC",
+      scheduleVersion: "v1",
+      publishedUntilLocal: "2026-04-01",
+    };
+    const plain = buildSlotsCacheKey(input);
+    expect(buildSlotsCacheKey({ ...input, starts: "all" })).toBe(`${plain}:all`);
+    const keys = new Set([
+      plain,
+      buildSlotsCacheKey({ ...input, starts: "packed" }),
+      buildSlotsCacheKey({ ...input, starts: "all" }),
+    ]);
+    expect(keys.size).toBe(3);
   });
 
   it("stores slots and registers index", async () => {

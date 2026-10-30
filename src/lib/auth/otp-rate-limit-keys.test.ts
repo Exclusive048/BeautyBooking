@@ -72,6 +72,18 @@ describe("FIX-D1 · набор очистки полон по построени
     }
   });
 
+  it("🔴 потолок App Review (APP-REVIEW-LOGIN-CAP) — в наборе очистки почты, у телефона его нет", () => {
+    // Билдер только почтовый, поэтому в общий цикл выше (вызов телефонными
+    // аргументами) не встаёт — проверяется отдельно.
+    const email = new Set(keys.allOtpRateLimitKeys("email", "Review@B.test", IP));
+    expect(
+      email.has(keys.otpAppReviewFailKey("review@b.test")),
+      "счётчик App Review не попадает в набор очистки почты",
+    ).toBe(true);
+    const phone = keys.allOtpRateLimitKeys("phone", IDENTITY, IP);
+    expect(phone.some((k) => k.includes("app-review"))).toBe(false);
+  });
+
   it("email — свой набор, не пересекается с телефонным", () => {
     const phone = new Set(keys.allOtpRateLimitKeys("phone", IDENTITY, IP));
     const email = keys.allOtpRateLimitKeys("email", "a@b.test", IP);

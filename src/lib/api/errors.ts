@@ -132,6 +132,9 @@ const ERROR_CODES = [
   "REFERENCE_PHOTO_USED",
   // SEC-16: тело запроса перевалило за планку размера (`lib/http/body-limit.ts`)
   "REQUEST_BODY_TOO_LARGE",
+  // CSRF-CONTENT-TYPE-LAYER: JSON-тело пришло не как `application/json`
+  // (третий слой CSRF, `lib/http/json-content-type.ts`) — 415.
+  "UNSUPPORTED_MEDIA_TYPE",
   // MOBILE-POLISH (App Store 1.2): жалоба на собственный контент
   // (своя страница, свой отзыв, своя работа, своё предложение, своё сообщение).
   "REPORT_OWN_CONTENT",
@@ -157,6 +160,10 @@ const ERROR_CODES = [
   "START_REQUIRED",
   "STEP_INVALID",
   "STUDIO_NOT_FOUND",
+  // STUDIO-INVITE-LIMITS (D-03): у студии предел неотвеченных приглашений.
+  // Отдельный код от `LIMIT_REACHED` (полная команда): там помогает тариф,
+  // здесь — отозвать приглашения, на которые не ответили.
+  "STUDIO_INVITES_PENDING_LIMIT",
   // STUDIO-HIDDEN-MASTER-SERVICES: скрытая студия новых записей не принимает.
   "STUDIO_NOT_ACCEPTING_BOOKINGS",
   "STUDIO_SELECTION_REQUIRED",
@@ -195,6 +202,9 @@ const ERROR_CODES = [
   // список сессий («завершить сеанс» чужой/несуществующей семьи).
   "OAUTH_CODE_INVALID",
   "SESSION_NOT_FOUND",
+  // USER-BLOCKING-01 — администратор заблокировал аккаунт: вход и выдача
+  // сессии отказывают (только после доказательства личности, `account-block.ts`).
+  "ACCOUNT_BLOCKED",
   // VK-YANDEX-UNLINK-01 — отвязка оставила бы аккаунт без единого способа входа.
   "LAST_LOGIN_METHOD",
   // MOBILE-B1 — `?city=<slug>` назвал неизвестный или погашенный город.

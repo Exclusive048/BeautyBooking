@@ -6,6 +6,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { z } from "zod";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,8 @@ export async function POST(req: Request) {
     const user = await getSessionUser();
     if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = await req.json().catch(() => null);
     const parsed = unsubscribeBodySchema.safeParse(body);
     if (!parsed.success) {

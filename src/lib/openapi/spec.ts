@@ -378,7 +378,7 @@ const manualWindowQuery: ParameterObject = {
   required: false,
   schema: { type: "string", enum: ["1"] },
   description:
-    "Operator window for manual booking (master / studio admin): minBookingHoursAhead is not applied, only past slots are hidden. Honoured only for the provider's own side; ignored otherwise.",
+    "Operator window for manual booking (master / studio admin): minBookingHoursAhead is not applied, only past slots are hidden; `slots` are the client's gap-free starts and `otherSlots` the remaining free ones. Honoured only for the provider's own side; ignored otherwise.",
 };
 
 // MOBILE-STUDIO-C (ops) — общие схемы чтений кабинета студии для приложения
@@ -1659,7 +1659,9 @@ const STUDIO_CATALOG_PATHS: Record<string, PathItemObject> = {
         "400": errorResponse("VALIDATION_ERROR / CLIENT_KEY_INVALID"),
         "401": errorResponse("UNAUTHORIZED"),
         "403": errorResponse("FORBIDDEN / FEATURE_GATE"),
-        "404": errorResponse("STUDIO_NOT_FOUND"),
+        "404": errorResponse(
+          "STUDIO_NOT_FOUND / NOT_FOUND «Клиент не найден.» — карточки ещё нет, а записей этого клиента в студии нет (CRM-PHANTOM-CARDS)",
+        ),
         "429": errorResponse("RATE_LIMITED"),
         "500": errorResponse("INTERNAL_ERROR"),
       },
@@ -1702,6 +1704,9 @@ const STUDIO_CATALOG_PATHS: Record<string, PathItemObject> = {
         "400": errorResponse("MEDIA_FILE_REQUIRED / CLIENT_KEY_INVALID"),
         "401": errorResponse("UNAUTHORIZED"),
         "403": errorResponse("FORBIDDEN / FEATURE_GATE"),
+        "404": errorResponse(
+          "STUDIO_NOT_FOUND / NOT_FOUND «Клиент не найден.» — карточки ещё нет, а записей этого клиента в студии нет (CRM-PHANTOM-CARDS)",
+        ),
         "409": errorResponse("PHOTO_LIMIT_REACHED"),
         "429": errorResponse("RATE_LIMITED"),
         "500": errorResponse("INTERNAL_ERROR"),
@@ -1880,7 +1885,7 @@ export const openApiSpec = {
               { $ref: "#/components/schemas/TelegramSettingsData" },
               { $ref: "#/components/schemas/TelegramWebhookData" },
               { $ref: "#/components/schemas/VkStatusData" },
-              { $ref: "#/components/schemas/VkDisableData" },
+              { $ref: "#/components/schemas/VkSettingsData" },
               { $ref: "#/components/schemas/MediaAssetData" },
               { $ref: "#/components/schemas/MediaAssetListData" },
               { $ref: "#/components/schemas/ReviewData" },
@@ -2461,6 +2466,12 @@ export const openApiSpec = {
           required: ["slots", "meta"],
           properties: {
             slots: { type: "array", items: { $ref: "#/components/schemas/AvailabilitySlot" } },
+            otherSlots: {
+              type: "array",
+              items: { $ref: "#/components/schemas/AvailabilitySlot" },
+              description:
+                "Only with ?manual=1 for the provider's own side (MANUAL-SLOTS-ALL): the remaining free starts that `slots` leaves out because they would leave a gap no service fits. Manual booking shows them on request.",
+            },
             meta: { $ref: "#/components/schemas/AvailabilitySlotsMeta" },
           },
         },
@@ -2696,7 +2707,14 @@ export const openApiSpec = {
           token: { type: "string", description: "Ключ доступа сообщества ВКонтакте, 20–512 символов" },
         },
       },
-      VkDisableData: {
+      VkSettingsInput: {
+        type: "object",
+        required: ["enabled"],
+        properties: {
+          enabled: { type: "boolean", description: "Получать уведомления ВКонтакте" },
+        },
+      },
+      VkSettingsData: {
         type: "object",
         required: ["enabled"],
         properties: {
@@ -4333,8 +4351,35 @@ export const openApiSpec = {
             type: "string",
             description:
               "Одноразовый токен привязки (5 мин): передать в `…/oauth/{provider}/start?intent=…`. " +
-              "Привязан к пользователю и провайдеру.",
+              "Привязан к пользователю и провайдеру. Сам по себе ничего не привязывает: колбэк вернёт " +
+              "код привязки, а связку запишет `POST …/oauth/link/complete` с Bearer того же пользователя.",
           },
+        },
+      },
+      // ── MOBILE-OAUTH-LINK-COMPLETE (C-01): завершение привязки ───────────
+      MobileOAuthLinkCompleteInput: {
+        type: "object",
+        required: ["code", "codeVerifier"],
+        properties: {
+          code: {
+            type: "string",
+            maxLength: 256,
+            description: "Одноразовый код привязки из `masterryadom://auth/callback?code=…&link=<provider>` (живёт 60 с).",
+          },
+          codeVerifier: {
+            type: "string",
+            minLength: 43,
+            maxLength: 128,
+            pattern: "^[A-Za-z0-9._~-]{43,128}$",
+            description: "PKCE verifier приложения (RFC 7636), чей S256-челлендж ушёл на старт привязки.",
+          },
+        },
+      },
+      MobileOAuthLinkCompleteData: {
+        type: "object",
+        required: ["linked"],
+        properties: {
+          linked: { type: "string", enum: ["vk", "yandex"], description: "Какой провайдер привязан." },
         },
       },
       // ── MOBILE-AUTH-A3: список сессий ───────────────────────────────────
@@ -4493,6 +4538,35 @@ export const openApiSpec = {
           },
         },
       },
+      // USER-BLOCKING-01 — блокировка аккаунта администратором.
+      AdminUserBlockInput: {
+        type: "object",
+        required: ["reason"],
+        properties: {
+          reason: { type: "string", minLength: 1, maxLength: 500, description: "Причина — видна в «Пользователях» и в журнале действий." },
+        },
+      },
+      AdminUserUnblockInput: {
+        type: "object",
+        properties: {
+          reason: { type: "string", maxLength: 500, description: "По желанию — уходит в журнал действий." },
+        },
+      },
+      AdminUserBlockData: {
+        type: "object",
+        required: ["user"],
+        properties: {
+          user: {
+            type: "object",
+            required: ["userId", "blockedAt", "blockedReason"],
+            properties: {
+              userId: { type: "string" },
+              blockedAt: { type: "string", format: "date-time", nullable: true },
+              blockedReason: { type: "string", nullable: true },
+            },
+          },
+        },
+      },
       ProviderUnlinkData: {
         type: "object",
         required: ["unlinked"],
@@ -4510,7 +4584,7 @@ export const openApiSpec = {
           deliveryEnabled: {
             type: "boolean",
             description:
-              "Уведомления через VK включены. Выключает `POST /api/integrations/vk/disable`; " +
+              "Уведомления через VK включены. Включает и выключает `PATCH /api/integrations/vk/settings`; " +
               "`POST /api/auth/vk/unlink` удаляет связку целиком (`linked = false`).",
           },
           connectedAt: { type: "string", format: "date-time", nullable: true },
@@ -6487,6 +6561,59 @@ export const openApiSpec = {
         },
       },
     },
+    // PUBLIC-BOOKING-READ-TOKEN (SEC-11b, 2026-10-30): карточка записи для экрана
+    // успеха у гостя — по токену ссылки «Управлять записью», без сессии.
+    "/api/public/bookings/manage/{token}": {
+      get: {
+        summary: "Read a guest booking card (success screen) by its signed manage link",
+        tags: ["bookings"],
+        parameters: [{ name: "token", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": okResponse({
+            type: "object",
+            required: ["booking"],
+            properties: {
+              booking: {
+                type: "object",
+                required: ["id", "status", "slotLabel", "provider"],
+                properties: {
+                  id: { type: "string" },
+                  status: { type: "string" },
+                  slotLabel: { type: "string" },
+                  startAtUtc: { type: "string", format: "date-time", nullable: true },
+                  endAtUtc: { type: "string", format: "date-time", nullable: true },
+                  clientName: { type: "string", nullable: true },
+                  clientPhoneMasked: { type: "string", nullable: true },
+                  comment: { type: "string", nullable: true },
+                  service: {
+                    type: "object",
+                    nullable: true,
+                    properties: {
+                      id: { type: "string" },
+                      name: { type: "string" },
+                      price: { type: "integer" },
+                    },
+                  },
+                  provider: {
+                    type: "object",
+                    properties: {
+                      id: { type: "string" },
+                      name: { type: "string" },
+                      publicUsername: { type: "string", nullable: true },
+                      address: { type: "string" },
+                      timezone: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+          }),
+          "403": errorResponse("Booking belongs to an account — read it with a session"),
+          "404": errorResponse("Link is invalid or expired"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
     // GUEST-MANAGE-LINK (2026-09-24): управление гостевой записью по подписанной ссылке.
     "/api/public/bookings/manage/{token}/cancel": {
       post: {
@@ -6927,11 +7054,12 @@ export const openApiSpec = {
         summary: "VK ID authorization callback",
         description:
           "MOBILE-AUTH-A2: флоу, начатый приложением (`/api/mobile/v1/auth/oauth/vk/start`), кончается " +
-          "302 на `masterryadom://auth/callback` с `code` (вход), `linked=vk` (привязка) или `error`; " +
-          "куки сессии такой флоу не ставит.",
+          "302 на `masterryadom://auth/callback` с `code` (вход), `code` + `link=vk` (код привязки — " +
+          "связку пишет `POST /api/mobile/v1/auth/oauth/link/complete`, колбэк в БД не пишет ничего) " +
+          "или `error`; куки сессии такой флоу не ставит.",
         tags: ["auth", "vk"],
         responses: {
-          "302": { description: "Mobile flow: redirect to masterryadom://auth/callback?code|linked|error" },
+          "302": { description: "Mobile flow: redirect to masterryadom://auth/callback?code[&link]|error" },
           "307": { description: "Redirect to cabinet" },
           "400": errorResponse("Validation error"),
           "409": errorResponse("Conflict"),
@@ -6958,41 +7086,15 @@ export const openApiSpec = {
         description:
           "Гейтится тем же флагом, что и start (session-issuing leg). Новый аккаунт без обязательных " +
           "согласий не создаётся — редирект на /login?error=consent. MOBILE-AUTH-A2: флоу приложения " +
-          "кончается 302 на `masterryadom://auth/callback` с `code` / `linked=yandex` / `error`.",
+          "кончается 302 на `masterryadom://auth/callback` с `code` / `code` + `link=yandex` (код " +
+          "привязки для `POST /api/mobile/v1/auth/oauth/link/complete`) / `error`.",
         tags: ["auth", "yandex"],
         responses: {
-          "302": { description: "Mobile flow: redirect to masterryadom://auth/callback?code|linked|error" },
+          "302": { description: "Mobile flow: redirect to masterryadom://auth/callback?code[&link]|error" },
           "307": { description: "Redirect to cabinet" },
           "400": errorResponse("Validation error"),
           "409": errorResponse("Conflict"),
           "503": errorResponse("Auth method not configured"),
-          "500": errorResponse("Internal error"),
-        },
-      },
-    },
-    "/api/integrations/vk/start": {
-      get: {
-        summary: "Start VK ID integration linking",
-        description:
-          "FIX-B14: тоже навигация (кабинетная кнопка «подключить»), конверта ошибки нет. Аудитория — " +
-          "уже вошедший пользователь, поэтому адрес возврата не /login, а страница-источник (Referer, " +
-          "прогнанный через sanitizeInternalPath; дефолт /cabinet/profile) с ?vk=<исход>. " +
-          "Исключение — отсутствие сессии: /login?next=<страница-источник>.",
-        tags: ["integrations", "vk"],
-        responses: {
-          "307": { description: "Redirect to VK ID, back to the connect surface with ?vk=<исход>, or /login" },
-        },
-      },
-    },
-    "/api/integrations/vk/callback": {
-      get: {
-        summary: "VK ID integration callback",
-        tags: ["integrations", "vk"],
-        responses: {
-          "307": { description: "Redirect to cabinet" },
-          "400": errorResponse("Validation error"),
-          "401": errorResponse("Unauthorized"),
-          "409": errorResponse("Conflict"),
           "500": errorResponse("Internal error"),
         },
       },
@@ -7008,15 +7110,26 @@ export const openApiSpec = {
         },
       },
     },
-    "/api/integrations/vk/disable": {
-      post: {
-        summary: "Disable VK integration",
-        tags: ["integrations", "vk"],
+    "/api/integrations/vk/settings": {
+      patch: {
+        operationId: "integrationsVkSettings",
+        summary: "Turn VK notifications on or off",
+        description:
+          "Включает и выключает уведомления ВКонтакте у привязанного VK (`VkLink.isEnabled`). " +
+          "Выключение при непривязанном VK — `200 { enabled: false }`, включение — `409 VK_NOT_LINKED`. " +
+          "VK-INTEGRATIONS-ROUTES-ORPHANED: заменяет удалённый `POST /api/integrations/vk/disable`. " +
+          "Привязка и отвязка VK — `/api/auth/vk/{start,unlink}`. Bearer или кука.",
+        tags: ["mobile", "integrations", "vk"],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/VkSettingsInput" } } },
+        },
         responses: {
-          "200": okResponse({ $ref: "#/components/schemas/VkDisableData" }),
-          "401": errorResponse("Unauthorized"),
-          "409": errorResponse("Conflict"),
-          "500": errorResponse("Internal error"),
+          "200": okResponse({ $ref: "#/components/schemas/VkSettingsData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "409": errorResponse("VK_NOT_LINKED"),
+          "500": errorResponse("INTERNAL_ERROR"),
         },
       },
     },
@@ -8614,7 +8727,12 @@ export const openApiSpec = {
           "Ровно один контакт — `phone` или `email`. Уведомление (и письмо — для почты) уходит только для НОВОГО " +
           "приглашения; повторная отправка — `POST /api/cabinet/studio/masters/{id}/invite/resend`. Полная команда → " +
           "409 `LIMIT_REACHED` (`details: { limitKey: \"maxTeamMasters\", max, current }`), хотя ожидающие " +
-          "приглашения места не занимают; контакт уже принятого мастера → 409 `ALREADY_EXISTS`.",
+          "приглашения места не занимают; контакт уже принятого мастера → 409 `ALREADY_EXISTS`. Неотвеченных " +
+          "приглашений не больше двух на место тарифа (минимум 10, без ограничения команды — 100) → 409 " +
+          "`STUDIO_INVITES_PENDING_LIMIT` (`details: { max, current }`). Новых приглашений — не больше 20 в сутки на " +
+          "студию и 10 в час на аккаунт → 429 `RATE_LIMITED` (`Retry-After`, `details.retryAfterSeconds`); попытку " +
+          "тратит только созданное приглашение — отказ и повтор на тот же контакт её возвращают. Счётчик " +
+          "недоступен → 503 `RATE_LIMIT_UNAVAILABLE`.",
         tags: ["mobile", "studio", "masters"],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }],
         requestBody: {
@@ -8629,10 +8747,11 @@ export const openApiSpec = {
           "401": errorResponse("UNAUTHORIZED"),
           "403": errorResponse("FORBIDDEN"),
           "404": errorResponse("STUDIO_NOT_FOUND"),
-          "409": errorResponse("LIMIT_REACHED | ALREADY_EXISTS"),
+          "409": errorResponse("LIMIT_REACHED | ALREADY_EXISTS | STUDIO_INVITES_PENDING_LIMIT"),
           "422": errorResponse("FORBIDDEN_WORDS"),
           "429": errorResponse("RATE_LIMITED"),
           "500": errorResponse("INTERNAL_ERROR"),
+          "503": errorResponse("RATE_LIMIT_UNAVAILABLE"),
         },
       },
     },
@@ -10065,6 +10184,56 @@ export const openApiSpec = {
         },
       },
     },
+    "/api/admin/users/{id}/block": {
+      post: {
+        summary: "Block a user account («Заблокировать»)",
+        description:
+          "Одна транзакция: отметка блокировки, отзыв всех семей сессий, удаление push-устройств приложения, " +
+          "журнал действий USER_BLOCKED. Действующий access-токен перестаёт проходить сразу. Нельзя: себя — 403; " +
+          "постоянного администратора платформы — 403; администратора, если вы не SUPERADMIN, — 403; последнего " +
+          "действующего администратора — 409. Уже заблокирован — 409 CONFLICT. Вход заблокированному отвечает " +
+          "403 ACCOUNT_BLOCKED (после принятого кода).",
+        tags: ["admin"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", maxLength: 64 } }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/AdminUserBlockInput" } } },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/AdminUserBlockData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("FORBIDDEN"),
+          "404": errorResponse("NOT_FOUND"),
+          "409": errorResponse("CONFLICT"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/admin/users/{id}/unblock": {
+      post: {
+        summary: "Unblock a user account («Разблокировать»)",
+        description:
+          "Снимает отметку блокировки; причина по желанию, тело можно не передавать. Права — как у блокировки " +
+          "(администратора разблокирует только SUPERADMIN). Не заблокирован — 409 CONFLICT. Журнал действий: " +
+          "USER_UNBLOCKED (с прежней причиной). Отозванные сессии не возвращаются — нужно войти заново.",
+        tags: ["admin"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", maxLength: 64 } }],
+        requestBody: {
+          required: false,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/AdminUserUnblockInput" } } },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/AdminUserBlockData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("FORBIDDEN"),
+          "404": errorResponse("NOT_FOUND"),
+          "409": errorResponse("CONFLICT"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
     "/api/admin/reports/{id}/dismiss": {
       post: {
         summary: "Dismiss a content report («Отклонить»)",
@@ -10215,11 +10384,14 @@ export const openApiSpec = {
           "Открывать в системном браузере (ASWebAuthenticationSession / Custom Tabs), не в WebView. " +
           "Успех — редирект к провайдеру, дальше общий колбэк `/api/auth/{provider}/callback`, который " +
           "кончается 302 на `masterryadom://auth/callback?code=…` (вход; код — в " +
-          "`POST /api/mobile/v1/auth/oauth/exchange`) либо `?linked=<provider>` (привязка по `intent`). " +
+          "`POST /api/mobile/v1/auth/oauth/exchange`) либо `?code=…&link=<provider>` (привязка по " +
+          "`intent`: код привязки — в `POST /api/mobile/v1/auth/oauth/link/complete` с Bearer владельца " +
+          "intent; до этого шага связка, номер и записи не трогаются). " +
           "Любой отказ — 302 на `masterryadom://auth/callback?error=<код>`: invalid_request · " +
           "provider_unavailable · consent_required · intent_invalid · start_failed (старт); " +
           "state_invalid · access_denied · provider_timeout · vk_already_linked · yandex_already_linked · " +
-          "email_taken · callback_failed (колбэк). Сессию браузера не читает. Согласия обязательны, " +
+          "email_taken · account_blocked (аккаунт заблокирован администратором) · callback_failed (колбэк). " +
+          "Сессию браузера не читает. Согласия обязательны, " +
           "если нет `intent` (вход может создать аккаунт).",
         tags: ["mobile", "auth"],
         parameters: [
@@ -10255,7 +10427,8 @@ export const openApiSpec = {
         summary: "Mobile: one-time intent to link VK ID / Yandex ID to the signed-in account",
         description:
           "Одноразовый, 5 минут, привязан к пользователю и провайдеру. `no-store`. Лимит прокси: 30/мин " +
-          "на IP (тир mobileAuth).",
+          "на IP (тир mobileAuth). Привязку завершает только `POST …/oauth/link/complete` с Bearer того " +
+          "же пользователя (C-01).",
         tags: ["mobile", "auth"],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }],
         parameters: [
@@ -10291,6 +10464,39 @@ export const openApiSpec = {
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/MobileAuthData" }),
           "400": errorResponse("VALIDATION_ERROR | OAUTH_CODE_INVALID"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+          "503": errorResponse("SERVICE_UNAVAILABLE | RATE_LIMIT_UNAVAILABLE"),
+        },
+      },
+    },
+    "/api/mobile/v1/auth/oauth/link/complete": {
+      post: {
+        operationId: "mobileAuthOAuthLinkComplete",
+        summary: "Mobile: complete linking VK ID / Yandex ID to the signed-in account",
+        description:
+          "MOBILE-OAUTH-LINK-COMPLETE (C-01). Единственное место, где из приложения пишется связка: " +
+          "колбэк флоу с `intent` кончается `masterryadom://auth/callback?code=…&link=<provider>` и в БД " +
+          "ничего не пишет. Нужны оба доказательства: Bearer пользователя, выпустившего intent, и PKCE " +
+          "verifier к челленджу старта. Без сессии — 401 до чтения кода (код не сгорает: обновить токен и " +
+          "повторить). Дальше код сгорает при любом исходе, и любая проблема с ним (нет, протух, " +
+          "использован, чужой аккаунт, чужой verifier) — один ответ 400 OAUTH_CODE_INVALID: начать " +
+          "привязку заново. Коды входа и привязки не взаимозаменяемы. Успех — та же привязка, что в вебе " +
+          "(связка, согласия, номер из профиля провайдера с переносом гостевых записей). `no-store`. " +
+          "Лимит прокси: 30/мин на IP (тир mobileAuth), fail-closed при обрыве Redis.",
+        tags: ["mobile", "auth"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/MobileOAuthLinkCompleteInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MobileOAuthLinkCompleteData" }),
+          "400": errorResponse("VALIDATION_ERROR | OAUTH_CODE_INVALID"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "409": errorResponse("VK_ALREADY_LINKED | YANDEX_ALREADY_LINKED — аккаунт провайдера у другого пользователя"),
           "429": errorResponse("RATE_LIMITED"),
           "500": errorResponse("INTERNAL_ERROR"),
           "503": errorResponse("SERVICE_UNAVAILABLE | RATE_LIMIT_UNAVAILABLE"),
@@ -10419,8 +10625,9 @@ export const openApiSpec = {
         summary: "Send a pending master invite again",
         description:
           "То же уведомление, что при приглашении (и письмо — для приглашения по почте). Лимит — 3 в час на " +
-          "мастера; отказы 404/409 попытку не тратят. 409 `MASTER_NOT_INVITED` — приглашение принято, отозвано " +
-          "или его нет.",
+          "мастера и, как у приглашений, 20 в сутки на студию и 10 в час на аккаунт (свой счётчик у повторов); " +
+          "отказы 404/409 попытку не тратят, сбой отправки её возвращает. 409 `MASTER_NOT_INVITED` — приглашение " +
+          "принято, отозвано или его нет.",
         tags: ["mobile", "studio", "masters"],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }],
         parameters: [
@@ -10579,10 +10786,14 @@ export const openApiSpec = {
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/StudioScheduleRequestDecisionData" }),
-          "400": errorResponse("VALIDATION_ERROR — «Запрос уже обработан.» | SCHEDULE_PATTERN_INVALID"),
+          "400": errorResponse("SCHEDULE_PATTERN_INVALID"),
           "401": errorResponse("UNAUTHORIZED"),
           "403": errorResponse("FORBIDDEN"),
           "404": errorResponse("NOT_FOUND"),
+          "409": errorResponse(
+            "CONFLICT — «Заявка уже обработана. Обновите страницу.» (SCHEDULE-REQUEST-ATOMIC: статус " +
+              "перепроверяется под блокировкой строки заявки; расписание применяется не больше одного раза)",
+          ),
           "422": errorResponse("INVALID_REQUEST_PAYLOAD"),
           "429": errorResponse("RATE_LIMITED"),
           "500": errorResponse("INTERNAL_ERROR"),
@@ -10619,11 +10830,15 @@ export const openApiSpec = {
           "200": okResponse({ $ref: "#/components/schemas/StudioScheduleRequestDecisionData" }),
           "400": errorResponse(
             "VALIDATION_ERROR — «Комментарий обязателен.» | «Комментарий — не длиннее 500 символов.» " +
-              "(оба с `error.fieldErrors.comment`) | «Запрос уже обработан.»",
+              "(оба с `error.fieldErrors.comment`)",
           ),
           "401": errorResponse("UNAUTHORIZED"),
           "403": errorResponse("FORBIDDEN"),
           "404": errorResponse("NOT_FOUND"),
+          "409": errorResponse(
+            "CONFLICT — «Заявка уже обработана. Обновите страницу.» (SCHEDULE-REQUEST-ATOMIC: статус " +
+              "меняется только у открытой заявки — одобренную другим администратором не перезаписывает)",
+          ),
           "429": errorResponse("RATE_LIMITED"),
           "500": errorResponse("INTERNAL_ERROR"),
         },
@@ -10746,7 +10961,13 @@ export const openApiSpec = {
         summary: "Update booking rules, visibility, slot step, buffer, hot slots (and legacy week / exceptions)",
         description:
           "Тело не через Zod: значения нормализуются и молча ограничиваются. У администратора студии " +
-          "`visibility.isPublished` не применяется; `hotSlots` — по тарифу вызывающего (403 `FEATURE_GATE`).",
+          "`visibility.isPublished` не применяется; `hotSlots` — по тарифу вызывающего (403 `FEATURE_GATE`). " +
+          "Мастер в режиме `STUDIO_MASTER` (профиль в студии `?profile=`) меняет сам, сразу и без заявки, " +
+          "личные правила: `slotStepMin`, `bufferBetweenBookingsMin`, `bookingRules.{minHoursAhead,maxDaysAhead," +
+          "autoConfirm}`, `visibility.{visibleSlotDays,acceptNewClients}` (`approval.lastAction` = `APPLIED`). " +
+          "Общее для студии — `bookingRules.{freeCancelHours,lateCancelAction}`, `visibility.slotPrecision` — и " +
+          "`hotSlots` задаёт студия: изменение — 403 `FORBIDDEN`, неизменённые значения проходят " +
+          "(STUDIO-PROFILE-PERSONAL-RULES).",
         tags: ["mobile", "schedule"],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }],
         parameters: SCHEDULE_ACTOR_PARAMETERS,
@@ -10755,7 +10976,9 @@ export const openApiSpec = {
           "200": okResponse({ type: "object", description: "ScheduleEditorSnapshot + `approval` (`lastAction`)" }),
           "400": errorResponse("INVALID_BODY | VALIDATION_ERROR | DAY_INVALID | TIME_RANGE_INVALID | BREAK_OVERLAP"),
           "401": errorResponse("UNAUTHORIZED"),
-          "403": errorResponse("FORBIDDEN | FEATURE_GATE"),
+          "403": errorResponse(
+            "FORBIDDEN (в т.ч. мастер на профиле в студии меняет настройки, которые задаёт студия) | FEATURE_GATE",
+          ),
           "404": errorResponse("MASTER_NOT_FOUND | STUDIO_NOT_FOUND"),
           "429": errorResponse("RATE_LIMITED"),
           "500": errorResponse("INTERNAL_ERROR"),

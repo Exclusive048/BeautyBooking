@@ -31,6 +31,7 @@ vi.mock("@/lib/auth/session", () => ({
 }));
 vi.mock("@/lib/master/access", () => ({
   getCurrentMasterProviderId: vi.fn(async () => "prov1"),
+  getMasterWorkProfiles: vi.fn(async () => ({ personalId: "prov1", studioProfiles: [], allIds: ["prov1"], worksInStudio: false })),
 }));
 vi.mock("@/lib/billing/get-current-plan", () => ({
   getCurrentPlan: vi.fn(async () => ({ features: { clientCards: true } })),

@@ -4,12 +4,15 @@ import { formatZodError } from "@/lib/api/validation";
 import { toAuthSurfaceError } from "@/lib/auth/auth-surface-error";
 import { vkSettingsSchema } from "@/lib/vk/schemas";
 import { setVkLinkEnabled } from "@/lib/vk/links";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 export async function PATCH(req: Request) {
   const auth = await requireAuth();
   if (!auth.ok) return auth.response;
 
   try {
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = await req.json().catch(() => null);
     const parsed = vkSettingsSchema.safeParse(body);
     if (!parsed.success) {

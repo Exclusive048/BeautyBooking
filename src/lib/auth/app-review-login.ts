@@ -16,8 +16,11 @@ import { logInfo } from "@/lib/logging/logger";
  *   - вход (`verifyEmailOtpLogin` — общий для сайта и приложения) принимает
  *     этот код, сравнение — за постоянное время; неверный код — обычный отказ
  *     `CODE_NOT_FOUND` со счётчиком неверных попыток и блокировкой.
- * Все лимиты (запрос кода, блокировка входа) действуют как для всех. Включено,
- * только когда заданы оба значения и оба верны; иначе — выключено целиком.
+ * Все лимиты (запрос кода, блокировка входа) действуют как для всех. Сверх них —
+ * потолок неверных кодов с любого IP (APP-REVIEW-LOGIN-CAP, 20 за сутки; смысл и
+ * размен — `otp-rate-limit.ts`): код постоянный, и блокировка (почта, IP) от
+ * распределённого перебора его не защищает. Включено, только когда заданы оба
+ * значения и оба верны; иначе — выключено целиком.
  * Каждый запрос и вход пишет строку в лог БЕЗ адреса и кода.
  */
 
@@ -60,7 +63,14 @@ export function matchesAppReviewLoginCode(
   return timingSafeStringEqual(code.trim(), config.code);
 }
 
-/** Строка аудита: этап и исход, без адреса, кода и IP. */
-export function logAppReviewLogin(stage: "request" | "verify", outcome: "accepted" | "rejected"): void {
+/**
+ * Строка аудита: этап и исход, без адреса, кода и IP. `locked` — режим закрыт
+ * потолком неверных кодов (APP-REVIEW-LOGIN-CAP, `otp-rate-limit.ts`): код не
+ * сравнивался.
+ */
+export function logAppReviewLogin(
+  stage: "request" | "verify",
+  outcome: "accepted" | "rejected" | "locked",
+): void {
   logInfo("auth.app-review-login", { stage, outcome });
 }

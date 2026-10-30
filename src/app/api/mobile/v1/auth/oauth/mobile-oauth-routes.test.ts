@@ -9,10 +9,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  *    те же куки, что у веба, + подписанная кука мобильного флоу; сессия
  *    браузера не читается; любой отказ — переход на `masterryadom://`;
  *  · колбэк (общий с вебом): флоу приложения получает одноразовый код, а не
- *    куки сессии, и игнорирует веб-сессию браузера; привязка — только к
- *    пользователю из intent; отказы — `?error=` в приложение; веб-флоу (и
- *    чужая/протухшая мобильная кука) идут прежним путём;
+ *    куки сессии, и игнорирует веб-сессию браузера; флоу привязки получает
+ *    КОД ПРИВЯЗКИ и ничего не привязывает сам (C-01); отказы — `?error=` в
+ *    приложение; веб-флоу (и чужая/протухшая мобильная кука) идут прежним путём;
  *  · обмен: PKCE S256, код одноразовый при любом исходе, один код ошибки;
+ *  · завершение привязки (MOBILE-OAUTH-LINK-COMPLETE): Bearer владельца intent
+ *    + verifier, код одноразовый при любом исходе, коды входа и привязки не
+ *    взаимозаменяемы;
  *  · link-intent: только с сессией, одноразовый, привязан к провайдеру.
  *
  * Redis подменён картой с семантикой `SET NX EX` / `GETDEL`; куки — банкой,
@@ -138,6 +141,7 @@ import { AppError } from "@/lib/api/errors";
 import { GET as mobileStart } from "@/app/api/mobile/v1/auth/oauth/[provider]/start/route";
 import { POST as linkIntent } from "@/app/api/mobile/v1/auth/oauth/[provider]/link-intent/route";
 import { POST as exchange } from "@/app/api/mobile/v1/auth/oauth/exchange/route";
+import { POST as linkComplete } from "@/app/api/mobile/v1/auth/oauth/link/complete/route";
 import { GET as vkCallback } from "@/app/api/auth/vk/callback/route";
 import { GET as yandexCallback } from "@/app/api/auth/yandex/callback/route";
 import { MOBILE_OAUTH_FLOW_COOKIE, signMobileOAuthFlowCookieValue } from "@/lib/auth/mobile-oauth-flow";
@@ -370,31 +374,39 @@ describe("колбэк провайдера, флоу приложения", () 
     expect(spies.issueSession).not.toHaveBeenCalled();
   });
 
-  it("привязка по intent: связка к пользователю intent, а не к сессии браузера → ?linked=vk", async () => {
+  it("привязка по intent (C-01): колбэк НЕ привязывает — код привязки в приложение, ?code=…&link=vk", async () => {
     const intent = await issueIntent("vk");
+    await start("vk", `codeChallenge=${CHALLENGE}&intent=${intent}`);
+    // В Custom Tabs может жить веб-сессия ДРУГОГО человека.
+    spies.getSessionUser.mockClear();
     spies.getSessionUser.mockResolvedValue({ id: "someone-else", phone: null, roles: ["CLIENT"] });
-    await start("vk", `codeChallenge=${CHALLENGE}&intent=${intent}`);
 
     const res = await vkCallbackFor(vkState());
 
-    expect(appOutcome(res).get("linked")).toBe("vk");
-    expect(spies.linkOAuthIdentity).toHaveBeenCalledWith(
-      expect.objectContaining({ user: expect.objectContaining({ id: "u-app" }) }),
-    );
+    const outcome = appOutcome(res);
+    expect(outcome.get("link")).toBe("vk");
+    expect(outcome.get("code")).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(outcome.has("linked")).toBe(false);
+    expect(spies.linkOAuthIdentity).not.toHaveBeenCalled();
     expect(spies.resolveOAuthLogin).not.toHaveBeenCalled();
+    expect(spies.getSessionUser).not.toHaveBeenCalled();
     expect(spies.setSessionCookies).not.toHaveBeenCalled();
-    expect(state.redis.size).toBe(0); // ни intent, ни кода входа не осталось
-  });
-
-  it("аккаунт VK уже у другого пользователя → ?error=vk_already_linked", async () => {
-    const intent = await issueIntent("vk");
-    await start("vk", `codeChallenge=${CHALLENGE}&intent=${intent}`);
-    spies.linkOAuthIdentity.mockRejectedValueOnce(
-      new AppError("Этот аккаунт VK уже привязан к другому пользователю.", 409, "VK_ALREADY_LINKED"),
-    );
-
-    const res = await vkCallbackFor(vkState());
-    expect(appOutcome(res).get("error")).toBe("vk_already_linked");
+    // В Redis — одна запись привязки (intent погашен): владелец intent,
+    // челлендж старта и ТОЛЬКО то, что нужно связке, — без имени и без
+    // токена провайдера.
+    const entries = [...state.redis.entries()];
+    expect(entries).toHaveLength(1);
+    const [key, raw] = entries[0];
+    expect(key.startsWith("mobile:oauth:link:")).toBe(true);
+    expect(key).not.toContain(outcome.get("code"));
+    expect(JSON.parse(raw)).toEqual({
+      linkUserId: "u-app",
+      codeChallenge: CHALLENGE,
+      identity: { provider: "vk", profile: { id: "vk-1", phone: null }, deviceId: "vk-device" },
+      consentFlags: { terms: false, pdProcessing: false, marketing: false },
+    });
+    expect(raw).not.toContain("Анна");
+    expect(raw).not.toContain("provider-access");
   });
 
   it("согласий нет, а вход создал бы аккаунт → ?error=consent_required", async () => {
@@ -450,6 +462,178 @@ describe("колбэк провайдера, флоу приложения", () 
 
     const exchanged = await exchangeCode(code);
     expect(exchanged.status).toBe(200);
+  });
+});
+
+// ── Завершение привязки (MOBILE-OAUTH-LINK-COMPLETE) ────────────────────────
+
+describe("POST /api/mobile/v1/auth/oauth/link/complete", () => {
+  /** link-intent владельца `u-app` → старт → колбэк провайдера → код привязки. */
+  async function linkCodeFor(provider: Provider = "vk"): Promise<string> {
+    const intent = await issueIntent(provider);
+    await start(provider, `codeChallenge=${CHALLENGE}&intent=${intent}`);
+    const res =
+      provider === "vk"
+        ? await vkCallbackFor(vkState())
+        : await yandexCallback(
+            new Request(
+              `http://localhost/api/auth/yandex/callback?code=provider-code&state=${
+                readSignedYandexCookieValue(state.jar.get(YANDEX_STATE_COOKIE)) as string
+              }`,
+            ),
+          );
+    const outcome = appOutcome(res);
+    expect(outcome.get("link")).toBe(provider);
+    return outcome.get("code") as string;
+  }
+
+  /** `as` — чей Bearer предъявлен (`null` — без сессии). */
+  async function completeLink(code: string, opts: { as?: string | null; codeVerifier?: string } = {}) {
+    const as = opts.as === undefined ? "u-app" : opts.as;
+    spies.getSessionUser.mockResolvedValueOnce(as ? { id: as, phone: null, roles: ["CLIENT"] } : null);
+    return linkComplete(
+      postJson(
+        "/api/mobile/v1/auth/oauth/link/complete",
+        { code, codeVerifier: opts.codeVerifier ?? VERIFIER },
+        { authorization: "Bearer app-access" },
+      ),
+    );
+  }
+
+  async function errorCode(res: Response): Promise<string> {
+    return ((await res.json()) as { error: { code: string } }).error.code;
+  }
+
+  it("Bearer владельца intent + верный verifier → связка к нему, { linked }, no-store", async () => {
+    const code = await linkCodeFor("vk");
+
+    const res = await completeLink(code);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(((await res.json()) as { data: unknown }).data).toEqual({ linked: "vk" });
+    expect(spies.linkOAuthIdentity).toHaveBeenCalledTimes(1);
+    expect(spies.linkOAuthIdentity).toHaveBeenCalledWith({
+      identity: { provider: "vk", profile: { id: "vk-1", phone: null }, deviceId: "vk-device" },
+      user: expect.objectContaining({ id: "u-app" }),
+      consent: {
+        flags: { terms: false, pdProcessing: false, marketing: false },
+        ipAddress: "203.0.113.7",
+        userAgent: null,
+      },
+    });
+    expect(state.redis.size).toBe(0); // код сгорел
+  });
+
+  it("Яндекс: тот же путь, личность без устройства", async () => {
+    const code = await linkCodeFor("yandex");
+
+    const res = await completeLink(code);
+
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { data: unknown }).data).toEqual({ linked: "yandex" });
+    expect(spies.linkOAuthIdentity).toHaveBeenCalledWith(
+      expect.objectContaining({ identity: { provider: "yandex", profile: { id: "ya-1", phone: null } } }),
+    );
+  });
+
+  it("C-01: чужой Bearer (приложение жертвы поймало код) → OAUTH_CODE_INVALID, связки нет, код сгорел", async () => {
+    // Владелец intent `u-app` отправил по ссылке чужой браузер; колбэк
+    // отработал там и ничего не привязал, код уехал на чужое устройство.
+    const code = await linkCodeFor("vk");
+    expect(spies.linkOAuthIdentity).not.toHaveBeenCalled();
+
+    const foreign = await completeLink(code, { as: "u-victim" });
+    expect(foreign.status).toBe(400);
+    expect(await errorCode(foreign)).toBe("OAUTH_CODE_INVALID");
+    expect(foreign.headers.get("cache-control")).toBe("no-store");
+
+    // Сгорел при отказе: владельцу intent этот код тоже больше не поможет.
+    const owner = await completeLink(code);
+    expect(owner.status).toBe(400);
+    expect(spies.linkOAuthIdentity).not.toHaveBeenCalled();
+  });
+
+  it("чужой verifier → OAUTH_CODE_INVALID, и код сгорел (верный verifier после — тоже отказ)", async () => {
+    const code = await linkCodeFor("vk");
+
+    const wrong = await completeLink(code, { codeVerifier: "x".repeat(43) });
+    expect(wrong.status).toBe(400);
+    expect(await errorCode(wrong)).toBe("OAUTH_CODE_INVALID");
+
+    const late = await completeLink(code);
+    expect(late.status).toBe(400);
+    expect(spies.linkOAuthIdentity).not.toHaveBeenCalled();
+  });
+
+  it("повтор кода → OAUTH_CODE_INVALID, связка записана один раз", async () => {
+    const code = await linkCodeFor("vk");
+    expect((await completeLink(code)).status).toBe(200);
+
+    const replay = await completeLink(code);
+    expect(replay.status).toBe(400);
+    expect(await errorCode(replay)).toBe("OAUTH_CODE_INVALID");
+    expect(spies.linkOAuthIdentity).toHaveBeenCalledTimes(1);
+  });
+
+  it("без сессии → 401, код НЕ сгорает: после обновления токена приложение завершает", async () => {
+    const code = await linkCodeFor("vk");
+
+    const anonymous = await completeLink(code, { as: null });
+    expect(anonymous.status).toBe(401);
+    expect(await errorCode(anonymous)).toBe("UNAUTHORIZED");
+    expect(state.redis.size).toBe(1);
+
+    expect((await completeLink(code)).status).toBe(200);
+  });
+
+  it("коды не взаимозаменяемы: код привязки не входит, код входа не привязывает", async () => {
+    const linkCode = await linkCodeFor("vk");
+    const asLogin = await exchangeCode(linkCode);
+    expect(asLogin.status).toBe(400);
+    expect(spies.issueSession).not.toHaveBeenCalled();
+    // `exchange` не трогает запись привязки — у неё свой префикс.
+    expect((await completeLink(linkCode)).status).toBe(200);
+
+    await start("vk", `codeChallenge=${CHALLENGE}&${CONSENTED}`);
+    const loginCode = appOutcome(await vkCallbackFor(vkState())).get("code") as string;
+    const asLink = await completeLink(loginCode, { as: "u-oauth" });
+    expect(asLink.status).toBe(400);
+    expect(await errorCode(asLink)).toBe("OAUTH_CODE_INVALID");
+    expect(spies.linkOAuthIdentity).toHaveBeenCalledTimes(1);
+  });
+
+  it("аккаунт VK уже у другого пользователя → 409 VK_ALREADY_LINKED с готовым текстом, без details", async () => {
+    const code = await linkCodeFor("vk");
+    spies.linkOAuthIdentity.mockRejectedValueOnce(
+      new AppError("Этот аккаунт VK уже привязан к другому пользователю.", 409, "VK_ALREADY_LINKED", {
+        providerResponse: "сырой ответ",
+      }),
+    );
+
+    const res = await completeLink(code);
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { error: { code: string; message: string; details?: unknown } };
+    expect(body.error.code).toBe("VK_ALREADY_LINKED");
+    expect(body.error.message).toBe("Этот аккаунт VK уже привязан к другому пользователю.");
+    expect(body.error.details).toBeUndefined();
+  });
+
+  it("Redis недоступен → 503 SERVICE_UNAVAILABLE", async () => {
+    const code = await linkCodeFor("vk");
+    state.redisUp = false;
+
+    const res = await completeLink(code);
+    expect(res.status).toBe(503);
+    expect(await errorCode(res)).toBe("SERVICE_UNAVAILABLE");
+    expect(spies.linkOAuthIdentity).not.toHaveBeenCalled();
+  });
+
+  it("кривое тело → 400 VALIDATION_ERROR", async () => {
+    spies.getSessionUser.mockResolvedValueOnce({ id: "u-app", phone: null, roles: ["CLIENT"] });
+    const res = await linkComplete(postJson("/api/mobile/v1/auth/oauth/link/complete", { code: "x" }));
+    expect(res.status).toBe(400);
+    expect(await errorCode(res)).toBe("VALIDATION_ERROR");
   });
 });
 

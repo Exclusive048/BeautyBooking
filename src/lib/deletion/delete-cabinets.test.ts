@@ -10,11 +10,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * весь десяток моделей, которые трогает удаление.
  */
 
-type Call = { model: string; method: string; args: unknown };
+type Call = { model: string; method: string; args: unknown; inTx: boolean };
 
 const h = vi.hoisted(() => {
   const calls: Call[] = [];
   const answers = new Map<string, (args: unknown) => unknown>();
+  // Вызов сделан внутри `$transaction` — MEDIA-PURGE-MARK-DELETED проверяет,
+  // что пометка медиа идёт той же транзакцией, что и удаление кабинета.
+  const state = { inTx: false };
   const neutral = (method: string) => {
     if (method === "findMany") return [];
     if (method === "count") return 0;
@@ -26,14 +29,21 @@ const h = vi.hoisted(() => {
     {
       get(_target, model: string) {
         if (model === "$transaction") {
-          return async (cb: (tx: unknown) => unknown) => cb(client);
+          return async (cb: (tx: unknown) => unknown) => {
+            state.inTx = true;
+            try {
+              return await cb(client);
+            } finally {
+              state.inTx = false;
+            }
+          };
         }
         return new Proxy(
           {},
           {
             get(_t, method: string) {
               return async (args: unknown) => {
-                calls.push({ model, method, args });
+                calls.push({ model, method, args, inTx: state.inTx });
                 const answer = answers.get(`${model}.${method}`);
                 return answer ? answer(args) : neutral(method);
               };
@@ -47,10 +57,14 @@ const h = vi.hoisted(() => {
 });
 
 const notify = vi.hoisted(() => vi.fn());
+const media = vi.hoisted(() => ({
+  collectProviderMedia: vi.fn(async (): Promise<Array<{ id: string; storageKey: string }>> => []),
+  enqueueMediaPurge: vi.fn(),
+}));
 
 vi.mock("@/lib/prisma", () => ({ prisma: h.client }));
-vi.mock("@/lib/media/purge", () => ({ collectProviderMedia: vi.fn(async () => []) }));
-vi.mock("@/lib/deletion/enqueue-media-purge", () => ({ enqueueMediaPurge: vi.fn() }));
+vi.mock("@/lib/media/purge", () => ({ collectProviderMedia: media.collectProviderMedia }));
+vi.mock("@/lib/deletion/enqueue-media-purge", () => ({ enqueueMediaPurge: media.enqueueMediaPurge }));
 vi.mock("@/lib/notifications/delivery", () => ({ deliverNotification: notify }));
 vi.mock("@/lib/auth/roles", () => ({
   removeProfessionalRoles: vi.fn(),
@@ -72,6 +86,8 @@ beforeEach(() => {
   h.calls.length = 0;
   h.answers.clear();
   notify.mockReset();
+  media.collectProviderMedia.mockReset().mockResolvedValue([]);
+  media.enqueueMediaPurge.mockReset();
 });
 
 describe("DELETION-03 · какие записи блокируют удаление", () => {
@@ -210,5 +226,87 @@ describe("deleteStudioCabinet", () => {
   it("silent — владельцу уведомление не шлётся", async () => {
     await deleteStudioCabinet(USER, { silent: true });
     expect(notify).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * MEDIA-PURGE-MARK-DELETED — фото удаляемого кабинета помечаются удалёнными
+ * В ТРАНЗАКЦИИ удаления: аватар кабинета публичен по построению, и пока строка
+ * жива, `/api/media/file/{id}` отдавал его до тех пор, пока `media.purge` не
+ * удалит строку (при недоступном хранилище — никогда). Пометка — та же
+ * транзакция, что удаление данных; задача ставится уже после неё.
+ *
+ * @probe 2026-10-30 — в `deleteMasterCabinet` вызов `markAssetsDeletedTx`
+ *        перенесён за транзакцию (после `$transaction`): красный «помечаются
+ *        той же транзакцией» (inTx = false). Убран вызов в `deleteStudioCabinet`:
+ *        красный студийный кейс. Возвращено — зелёный.
+ */
+describe("MEDIA-PURGE-MARK-DELETED · пометка медиа в транзакции удаления", () => {
+  const ASSETS = [
+    { id: "a1", storageKey: "master/prov/avatar-1.jpg" },
+    { id: "a2", storageKey: "master/prov/portfolio-1.jpg" },
+  ];
+
+  type MarkArgs = { where: { id: { in: string[] }; deletedAt: null }; data: Record<string, unknown> };
+
+  function markCalls(): Call[] {
+    return h.calls.filter(
+      (c) => c.model === "mediaAsset" && c.method === "updateMany" && "deletedAt" in (c.args as MarkArgs).data,
+    );
+  }
+
+  function expectMarkedInTx(): void {
+    const marks = markCalls();
+    expect(marks).toHaveLength(1);
+    expect(marks[0]!.inTx).toBe(true);
+    const args = marks[0]!.args as MarkArgs;
+    expect(args.where).toEqual({ id: { in: ["a1", "a2"] }, deletedAt: null });
+    expect(args.data).toMatchObject({
+      deletedAt: expect.any(Date),
+      visualDescription: null,
+      visualCategory: null,
+    });
+    const embeddings = h.calls.filter((c) => c.model === "mediaAssetEmbedding" && c.method === "deleteMany");
+    expect(embeddings).toEqual([
+      { model: "mediaAssetEmbedding", method: "deleteMany", args: { where: { assetId: { in: ["a1", "a2"] } } }, inTx: true },
+    ]);
+    // Задача на байты — после коммита, с тем же снимком.
+    expect(media.enqueueMediaPurge).toHaveBeenCalledWith(ASSETS, expect.any(String), USER);
+  }
+
+  it("кабинет мастера: фото помечаются той же транзакцией, задача — после неё", async () => {
+    h.answers.set("masterProfile.findUnique", () => ({
+      id: "mp",
+      providerId: "prov-m",
+      provider: { id: "prov-m", name: "Анна" },
+    }));
+    media.collectProviderMedia.mockResolvedValue(ASSETS);
+    await deleteMasterCabinet(USER);
+    expectMarkedInTx();
+  });
+
+  it("студия: фото помечаются той же транзакцией, задача — после неё", async () => {
+    h.answers.set("studio.findFirst", () => ({
+      id: "st",
+      providerId: "prov-s",
+      ownerUserId: USER,
+      provider: { id: "prov-s", name: "Студия" },
+    }));
+    media.collectProviderMedia.mockResolvedValue(ASSETS);
+    await deleteStudioCabinet(USER);
+    expectMarkedInTx();
+  });
+
+  it("удаление отказано (живая запись) — фото не помечаются и задача не ставится", async () => {
+    h.answers.set("masterProfile.findUnique", () => ({
+      id: "mp",
+      providerId: "prov-m",
+      provider: { id: "prov-m", name: "Анна" },
+    }));
+    h.answers.set("booking.count", () => 1);
+    media.collectProviderMedia.mockResolvedValue(ASSETS);
+    await expect(deleteMasterCabinet(USER)).rejects.toMatchObject({ code: "ACTIVE_BOOKINGS" });
+    expect(markCalls()).toEqual([]);
+    expect(media.enqueueMediaPurge).not.toHaveBeenCalled();
   });
 });

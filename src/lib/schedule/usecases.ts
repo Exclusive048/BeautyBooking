@@ -262,9 +262,10 @@ export async function listAvailabilitySlotsPaginated(
     /**
      * SLOTS-GAP-PACKING (2026-10-30, решение владельца): отбор начал «без
      * дыр» по услугам профиля (`buildSlotsForDay.packingDurationsMin`). По
-     * умолчанию включён — так окошки видит клиент и так их проверяет запись.
-     * Выключает только окно оператора (ручная запись мастера и студии,
-     * перенос из кабинета студии): там время выбирает человек, знающий день.
+     * умолчанию включён — так окошки видит клиент, ручная запись и так их
+     * проверяет запись. `false` — «все свободные времена» ручной записи
+     * (MANUAL-SLOTS-ALL): сетка, «впритык» и «подряд» без отбора, то есть всё,
+     * что видит клиент, и время, оставляющее дыру.
      */
     packing?: boolean;
   }
@@ -365,7 +366,7 @@ export async function listAvailabilitySlotsPaginated(
         scheduleVersion: scheduleWindow.scheduleVersion,
         publishedUntilLocal: scheduleWindow.publishedUntilLocal,
         extraStartMinutes: extraMinutesByDateKey.get(cursorKey),
-        packing,
+        starts: packing ? "packed" : "all",
       }),
     });
   }
@@ -487,6 +488,7 @@ export async function listAvailabilitySlotsPaginated(
           slotStepMin,
           extraStartsUtc,
           packingDurationsMin,
+          chainStarts: !packing,
         });
         computed.set(day.dateKey, daySlots);
         // RESCHEDULE-SELF-SLOT: выдача без одной брони — не то, что лежит в
@@ -511,7 +513,7 @@ export async function listAvailabilitySlotsPaginated(
           // параметры сетки, версия расписания и непокрытый отрезок. Запросы с
           // разными отрезками друг друга не блокируют. Дополнительные начала —
           // тоже часть работы (их дни пишутся под своими ключами).
-          lockKey: `sf:slots:${providerId}:${serviceId}:${durationMin}:${bufferMin}:${slotStepMin}:${timezone}:${scheduleWindow.scheduleVersion}:${missingDays[0].dateKey}:${missingDays[missingDays.length - 1].dateKey}${packing ? ":pk" : ""}${extraLockSuffix(missingDays)}`,
+          lockKey: `sf:slots:${providerId}:${serviceId}:${durationMin}:${bufferMin}:${slotStepMin}:${timezone}:${scheduleWindow.scheduleVersion}:${missingDays[0].dateKey}:${missingDays[missingDays.length - 1].dateKey}${packing ? ":pk" : ":all"}${extraLockSuffix(missingDays)}`,
           read: async () => {
             const values = await Promise.all(missingDays.map((day) => getCachedSlots(day.cacheKey)));
             // Частично заполненный набор — ещё не результат: победитель пишет дни по

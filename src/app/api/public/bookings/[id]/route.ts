@@ -1,27 +1,25 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { jsonOk, jsonFail } from "@/lib/api/contracts";
+import { resolveBookingSide } from "@/lib/auth/ownership";
+import { getSessionUserFromRequest } from "@/lib/auth/session";
+import { loadPublicBookingDto } from "@/lib/bookings/public-booking-read";
 import { logError, getRequestId } from "@/lib/logging/logger";
 
 /**
- * Public booking detail endpoint — hydrates the widget's success
- * phase on refresh / share-link reopen (32b).
+ * Карточка записи для экрана успеха виджета (обновление страницы, повторное
+ * открытие) — для ВОШЕДШЕЙ стороны брони.
  *
- * The `bookingId` itself is the implicit access token: anyone who
- * already received the URL after a successful submit can re-render
- * the confirmation card without re-authenticating. We compensate by
- * returning a **safe DTO** — only fields the user already saw on
- * submit, with `clientPhone` masked. No `clientUserId`, no internal
- * status flags, no other clients of the master.
+ * PUBLIC-BOOKING-READ-TOKEN (SEC-11b, 2026-10-30): раньше id брони считался
+ * «неявным токеном» — кто знал CUID, читал имя клиента, комментарий, время и
+ * адрес визита. Id не секрет: он лежит в адресной строке (`?bookingId=`), в
+ * реферере и в логах. Теперь читать здесь может только сессия стороны брони
+ * (клиент, владелец, мастер-исполнитель, админ студии поверхности — правило
+ * `resolveBookingSide`, то же, что у подтверждения и переноса). Гость читает
+ * свою запись по подписанной ссылке: `GET /api/public/bookings/manage/[token]`.
+ *
+ * Чужим и анонимам — 404, как несуществующей брони: 403 подтверждал бы, что
+ * запись с таким id есть.
  */
-
-function maskPhone(phone: string | null): string | null {
-  if (!phone) return null;
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length < 4) return phone;
-  const suffix = digits.slice(-4);
-  return `••• ${suffix}`;
-}
+const NOT_FOUND_MESSAGE = "Запись не найдена.";
 
 export async function GET(
   req: Request,
@@ -35,60 +33,16 @@ export async function GET(
   }
 
   try {
-    const booking = await prisma.booking.findUnique({
-      where: { id: p.id },
-      select: {
-        id: true,
-        status: true,
-        slotLabel: true,
-        startAtUtc: true,
-        endAtUtc: true,
-        clientName: true,
-        clientPhone: true,
-        comment: true,
-        service: { select: { id: true, name: true, title: true, price: true } },
-        provider: {
-          select: {
-            id: true,
-            name: true,
-            publicUsername: true,
-            address: true,
-            timezone: true,
-          },
-        },
-      },
-    });
+    const user = await getSessionUserFromRequest(req);
+    if (!user) return jsonFail(404, NOT_FOUND_MESSAGE, "NOT_FOUND");
 
-    if (!booking) {
-      return jsonFail(404, "Запись не найдена.", "NOT_FOUND");
-    }
+    const side = await resolveBookingSide(user.id, p.id);
+    if (!side) return jsonFail(404, NOT_FOUND_MESSAGE, "NOT_FOUND");
 
-    return jsonOk({
-      booking: {
-        id: booking.id,
-        status: booking.status,
-        slotLabel: booking.slotLabel,
-        startAtUtc: booking.startAtUtc?.toISOString() ?? null,
-        endAtUtc: booking.endAtUtc?.toISOString() ?? null,
-        clientName: booking.clientName ?? null,
-        clientPhoneMasked: maskPhone(booking.clientPhone ?? null),
-        comment: booking.comment ?? null,
-        service: booking.service
-          ? {
-              id: booking.service.id,
-              name: booking.service.title?.trim() || booking.service.name,
-              price: booking.service.price,
-            }
-          : null,
-        provider: {
-          id: booking.provider.id,
-          name: booking.provider.name,
-          publicUsername: booking.provider.publicUsername,
-          address: booking.provider.address,
-          timezone: booking.provider.timezone,
-        },
-      },
-    });
+    const booking = await loadPublicBookingDto(p.id);
+    if (!booking) return jsonFail(404, NOT_FOUND_MESSAGE, "NOT_FOUND");
+
+    return jsonOk({ booking });
   } catch (error) {
     logError("GET /api/public/bookings/[id] failed", {
       requestId,

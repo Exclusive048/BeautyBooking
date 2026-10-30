@@ -16,6 +16,7 @@ import {
   maskSmtpIdentity,
   normalizeSmtpAddressList,
 } from "@/lib/support/smtp";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 export const runtime = "nodejs";
 
@@ -147,6 +148,8 @@ export async function POST(req: Request) {
       : supportFail(ipRefusal.status, ipRefusal.message, ipRefusal.code);
   }
 
+  const nonJson = nonJsonBodyRefusal(req);
+  if (nonJson) return nonJson;
   const read = await readBodyTextCapped(req);
   if (!read.ok) {
     return supportFail(413, TOO_LARGE_ERROR, "REQUEST_BODY_TOO_LARGE");

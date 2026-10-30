@@ -5,6 +5,7 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 import { getSessionUser } from "@/lib/auth/session";
 import { mediaListQuerySchema, mediaUploadBodySchema } from "@/lib/media/schemas";
 import { listMediaAssets, uploadMediaAsset } from "@/lib/media/service";
+import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 import {
   MEDIA_MAX_FILE_SIZE_BYTES,
 } from "@/lib/media/types";
@@ -87,7 +88,7 @@ export async function POST(req: Request) {
       sizeBytes: upload.sizeBytes,
       bytes: upload.bytes,
       originalFilename: fileValue.name || "upload",
-    });
+    }, { auditContext: getAdminAuditContext(req) });
 
     if ((parsedBody.data.kind as MediaKind) === MediaKind.PORTFOLIO) {
       return jsonOk(

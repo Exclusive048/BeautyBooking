@@ -13,6 +13,7 @@ import { hasAnyStudioAffiliation, removeProfessionalRoles } from "@/lib/auth/rol
 import { MediaEntityType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { collectProviderMedia } from "@/lib/media/purge";
+import { markAssetsDeletedTx } from "@/lib/media/soft-delete";
 import { enqueueMediaPurge } from "@/lib/deletion/enqueue-media-purge";
 import { deliverNotification } from "@/lib/notifications/delivery";
 import { logError, logInfo } from "@/lib/logging/logger";
@@ -218,6 +219,10 @@ export async function deleteStudioCabinet(userId: string, options: CabinetDeleti
     });
 
     await tx.studio.delete({ where: { id: studio.id } });
+
+    // MEDIA-PURGE-MARK-DELETED: см. delete-master — фото студии не отдаются
+    // с коммитом, байты удаляют `media.purge` и уборка хранилища.
+    await markAssetsDeletedTx(tx, mediaToPurge.map((asset) => asset.id));
 
     return {
       studioId: studio.id,

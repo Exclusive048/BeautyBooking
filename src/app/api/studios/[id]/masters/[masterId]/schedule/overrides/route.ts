@@ -9,6 +9,7 @@ import { removeScheduleOverride, setScheduleOverride } from "@/lib/schedule/usec
 import { ensureStartNotAfterEnd, parseISOToUTC } from "@/lib/time";
 import { toAppError } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 const breakSchema = z.object({
   startLocal: z.string().min(1),
@@ -126,6 +127,8 @@ export async function PUT(
     const masterError = await ensureMasterInStudio(p.masterId, p.id);
     if (masterError) return masterError;
 
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = await req.json().catch(() => null);
     const parsed = overrideSchema.safeParse(body);
     if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
@@ -173,6 +176,8 @@ export async function DELETE(
     const masterError = await ensureMasterInStudio(p.masterId, p.id);
     if (masterError) return masterError;
 
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = await req.json().catch(() => null);
     const parsed = deleteSchema.safeParse(body);
     if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");

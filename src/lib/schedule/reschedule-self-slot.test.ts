@@ -87,7 +87,7 @@ function slotCacheKey(dateKey: string): string {
       timeZone: TIMEZONE,
     }),
     // SLOTS-GAP-PACKING: клиентская выдача — с отбором «без дыр».
-    packing: true,
+    starts: "packed",
   });
 }
 

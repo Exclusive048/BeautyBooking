@@ -99,10 +99,22 @@ export function otpVerifyFailKey(
 }
 
 /**
+ * APP-REVIEW-LOGIN-CAP — неверные коды для адреса App Review с ЛЮБОГО IP: одна
+ * строка на адрес, без IP в ключе (смысл — `otp-rate-limit.ts`, раздел App
+ * Review). Только почта: вход App Review — это email-OTP. Смена адреса в env
+ * даёт новый ключ, то есть и чистый счётчик.
+ */
+export function otpAppReviewFailKey(email: string): string {
+  return `otp:verify:email:app-review-fail:${hashOtpKeyPart(normalizeOtpIdentity("email", email))}`;
+}
+
+/**
  * ВСЕ ключи, которыми лимитер может держать эту (идентичность, IP).
  *
  * Потребитель — `clearOtpRateLimit` в харнессе: ему нужен именно полный набор,
  * и полнота обязана следовать из этого файла, а не из памяти автора спеки.
+ * Счётчик App Review — только у почты (у телефона его не бывает); для
+ * обычного адреса ключа просто нет, удалять его безвредно.
  */
 export function allOtpRateLimitKeys(
   channel: OtpKeyChannel,
@@ -115,5 +127,6 @@ export function allOtpRateLimitKeys(
     otpRequestIdentityKey(channel, identity),
     otpVerifyLockKey(channel, identity, ip),
     otpVerifyFailKey(channel, identity, ip),
+    ...(channel === "email" ? [otpAppReviewFailKey(identity)] : []),
   ];
 }

@@ -7,6 +7,7 @@ import { requireAdminAuth } from "@/lib/auth/admin";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { formatZodError } from "@/lib/api/validation";
 import { logInfo } from "@/lib/logging/logger";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 export const runtime = "nodejs";
 
@@ -42,6 +43,8 @@ export async function POST(req: Request, ctx: RouteContext) {
     const { id: sourceId } = await ctx.params;
     if (!sourceId) return fail("Город-источник не найден.", 404, "NOT_FOUND");
 
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = await req.json().catch(() => null);
     const parsed = bodySchema.safeParse(body);
     if (!parsed.success) {

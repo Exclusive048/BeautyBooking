@@ -28,8 +28,21 @@ export type DetectCityResult =
        * `foreign_country` — адрес вне России (29.09 доработки · 27, RF-ONLY):
        * вызывающий отказывает в сохранении адреса, а не молча выводит из
        * каталога.
+       *
+       * `geocoder_unavailable` — геокодер не ответил по существу (нет ключа,
+       * сеть, таймаут, 5xx, 429, квота; GEOCODER-UNAVAILABLE-503). Адрес НЕ
+       * проверен — это не «не распознан»: вызывающий отказывает в записи нового
+       * адреса (503), а не пишет его без города.
+       *
+       * `geocoder_failed` — геокодер ответил, а точки нет (адрес не найден),
+       * либо не удалось завести город. `no_locality` — точка есть, города нет.
        */
-      reason: "no_address" | "geocoder_failed" | "no_locality" | "foreign_country";
+      reason:
+        | "no_address"
+        | "geocoder_failed"
+        | "geocoder_unavailable"
+        | "no_locality"
+        | "foreign_country";
     };
 
 const DEFAULT_TIMEZONE = "Europe/Moscow";
@@ -57,10 +70,14 @@ export async function detectCityFromAddress(
     return { ok: false, reason: "no_address" };
   }
 
-  const geo = await geocodeWithLocality(address);
-  if (!geo) {
+  const outcome = await geocodeWithLocality(address);
+  if (outcome.kind === "unavailable") {
+    return { ok: false, reason: "geocoder_unavailable" };
+  }
+  if (outcome.kind === "not_found") {
     return { ok: false, reason: "geocoder_failed" };
   }
+  const geo = outcome.result;
 
   // 29.09 доработки · 27: только Россия. Проверка — до поиска города, а не
   // только до создания: иначе заведённая раньше «Алматы» продолжала бы

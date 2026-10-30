@@ -6,7 +6,6 @@ import { prisma } from "@/lib/prisma";
 import { env, isProduction } from "@/lib/env";
 import {
   REFRESH_TOKEN_TTL_SECONDS,
-  signAccessToken,
   signAccessTokenWithExpiry,
   signRefreshTokenWithExpiry,
   verifyToken,
@@ -21,6 +20,7 @@ import {
 } from "./session-client-meta";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
 import { unlinkPushDevicesOfFamilies } from "@/lib/notifications/native-push/devices";
+import { accountBlockedError } from "./account-block";
 
 const ACCESS_COOKIE_MAX_AGE_SECONDS = 2 * 60 * 60;
 const REFRESH_COOKIE_MAX_AGE_SECONDS = REFRESH_TOKEN_TTL_SECONDS;
@@ -169,11 +169,16 @@ export type SessionUser = Prisma.UserProfileGetPayload<{
   select: typeof SESSION_USER_SELECT;
 }>;
 
+/**
+ * USER-BLOCKING-01: `blockedAt: null` — заблокированный аккаунт теряет доступ
+ * сразу, с любым ещё живым access-токеном (кука и Bearer идут сюда оба).
+ */
 async function loadActiveSessionUser(userId: string, familyId?: string | null) {
   return prisma.userProfile.findFirst({
     where: {
       id: userId,
       isDeleted: false,
+      blockedAt: null,
       ...(familyId
         ? { refreshSessions: { some: { familyId, revokedAt: null } } }
         : {}),
@@ -313,6 +318,17 @@ export async function issueSession(
   payload: SessionCookiePayload,
   meta?: SessionIssueMeta,
 ): Promise<SessionTokens> {
+  // USER-BLOCKING-01: страховка под любой путь входа. Пути входа проверяют
+  // блокировку раньше и отвечают своей формой; сюда заблокированный доходит
+  // только мимо них — тогда отказ, а не сессия. Гонка «заблокировали между
+  // этой проверкой и вставкой» безвредна: чтение сессии и ротация требуют
+  // `blockedAt: null` сами, а блокировка отзывает все семьи.
+  const owner = await prisma.userProfile.findUnique({
+    where: { id: payload.sub },
+    select: { blockedAt: true },
+  });
+  if (owner?.blockedAt) throw accountBlockedError();
+
   // SEC-13: новая сессия = новая семья. Идентификатор генерируем сами, а не
   // берём id строки, — тогда хватает одного запроса и семья остаётся
   // самостоятельным понятием, а не псевдонимом первой строки цепочки.
@@ -372,11 +388,6 @@ export async function setSessionCookies(response: NextResponse, payload: Session
   const tokens = await issueSession(payload, await readWebIssueMetaFromRequest());
   setAccessCookie(response, tokens.accessToken);
   setRefreshCookie(response, tokens.refreshToken);
-}
-
-export function setAccessSessionCookie(response: NextResponse, payload: SessionCookiePayload): void {
-  const accessToken = signAccessToken(payload);
-  setAccessCookie(response, accessToken);
 }
 
 /**
@@ -459,7 +470,8 @@ export async function rotateSession(
       });
       if (!successor) return null;
       const reissueUser = await tx.userProfile.findFirst({
-        where: { id: claims.sub, isDeleted: false },
+        // USER-BLOCKING-01: заблокированному не выдаётся и повторный преемник.
+        where: { id: claims.sub, isDeleted: false, blockedAt: null },
         select: { id: true, phone: true, roles: true },
       });
       if (!reissueUser) return null;
@@ -479,8 +491,10 @@ export async function rotateSession(
       };
     }
 
+    // USER-BLOCKING-01: refresh-токен заблокированного свежий access не
+    // выпускает — ветка та же, что у удалённого аккаунта (строка отзывается).
     const user = await tx.userProfile.findFirst({
-      where: { id: claims.sub, isDeleted: false },
+      where: { id: claims.sub, isDeleted: false, blockedAt: null },
       select: { id: true, phone: true, roles: true },
     });
     if (!user) {
@@ -695,6 +709,7 @@ export async function getSessionUserId(): Promise<string | null> {
     where: {
       id: payload.sub,
       isDeleted: false,
+      blockedAt: null,
       ...(payload.fid
         ? { refreshSessions: { some: { familyId: payload.fid, revokedAt: null } } }
         : {}),

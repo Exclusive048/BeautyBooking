@@ -42,16 +42,62 @@ describe("geocodeWithLocality — страна", () => {
         { kind: "locality", name: "Алматы" },
       ],
     });
-    const result = await geocodeWithLocality("Алматы, ул. Достык, 89");
+    const outcome = await geocodeWithLocality("Алматы, ул. Достык, 89");
+    expect(outcome.kind).toBe("found");
+    const result = outcome.kind === "found" ? outcome.result : null;
     expect(result?.country).toEqual({ code: "KZ", name: "Казахстан" });
     expect(result?.locality).toBe("Алматы");
   });
 
   it("без кода — только название; без обоих — null, null", async () => {
     respond({ Components: [{ kind: "country", name: "Россия" }, { kind: "locality", name: "Москва" }] });
-    expect((await geocodeWithLocality("Москва"))?.country).toEqual({ code: null, name: "Россия" });
+    expect(foundCountry(await geocodeWithLocality("Москва"))).toEqual({ code: null, name: "Россия" });
 
     respond({ Components: [] });
-    expect((await geocodeWithLocality("где-то"))?.country).toEqual({ code: null, name: null });
+    expect(foundCountry(await geocodeWithLocality("где-то"))).toEqual({ code: null, name: null });
+  });
+});
+
+function foundCountry(outcome: Awaited<ReturnType<typeof geocodeWithLocality>>) {
+  return outcome.kind === "found" ? outcome.result.country : undefined;
+}
+
+/**
+ * GEOCODER-UNAVAILABLE-503 (A-03) — «геокодер недоступен» и «адрес не
+ * распознан» различаются. Раньше оба были `null`, и кабинет мастера на
+ * временный сбой обнулял город (мастер молча выпадал из каталога).
+ *
+ * @probe 2026-10-30 — ветка `!response.ok` возвращена к единому `not_found`
+ * (как прежний `null`): покраснели все шесть кейсов HTTP (429, 5xx, 401/403).
+ * Возвращено — зелёный.
+ */
+describe("geocodeWithLocality — недоступен ≠ не распознан", () => {
+  function status(code: number, body = "{}") {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(body, { status: code })));
+  }
+
+  it.each([429, 500, 502, 503, 401, 403])("HTTP %i — unavailable (повтор может помочь)", async (code) => {
+    status(code);
+    expect(await geocodeWithLocality("Москва, Тверская 1")).toEqual({ kind: "unavailable" });
+  });
+
+  it("обрыв сети / таймаут — unavailable", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("fetch failed"); }));
+    expect(await geocodeWithLocality("Москва, Тверская 1")).toEqual({ kind: "unavailable" });
+  });
+
+  it("ответ не JSON (страница ошибки прокси) — unavailable", async () => {
+    status(200, "<html>bad gateway</html>");
+    expect(await geocodeWithLocality("Москва, Тверская 1")).toEqual({ kind: "unavailable" });
+  });
+
+  it("400 — not_found: Яндекс отверг сам запрос, повтор того же адреса не поможет", async () => {
+    status(400);
+    expect(await geocodeWithLocality("???")).toEqual({ kind: "not_found" });
+  });
+
+  it("пустая выдача — not_found (адрес не распознан)", async () => {
+    status(200, JSON.stringify({ response: { GeoObjectCollection: { featureMember: [] } } }));
+    expect(await geocodeWithLocality("нигде")).toEqual({ kind: "not_found" });
   });
 });

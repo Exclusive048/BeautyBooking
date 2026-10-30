@@ -55,10 +55,14 @@ export async function applyBookingTransition<S extends Prisma.BookingSelect>(
      * переноса берёт время из `proposedStartAt`, а встречное предложение с
      * другой стороны меняет это поле, НЕ меняя статус (`CHANGE_REQUESTED` →
      * `CHANGE_REQUESTED`) — одного статуса для такого случая мало.
+     * `statusBeforeChange` — истечение неподтверждённой записи с запросом
+     * переноса (PENDING-EXPIRY-STARVATION): решение «неподтверждена» берётся
+     * из него, а статус между чтением и записью мог пройти круг
+     * `CHANGE_REQUESTED` → `CONFIRMED` → `CHANGE_REQUESTED`.
      */
     expectAlso?: Pick<
       Prisma.BookingWhereInput,
-      "proposedStartAt" | "proposedEndAt" | "actionRequiredBy"
+      "proposedStartAt" | "proposedEndAt" | "actionRequiredBy" | "statusBeforeChange"
     >;
     data: Prisma.BookingUpdateInput;
     select: S;

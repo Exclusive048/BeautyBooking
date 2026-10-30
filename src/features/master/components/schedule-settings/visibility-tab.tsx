@@ -55,7 +55,12 @@ export function VisibilityTab({ initialSnapshot, onSnapshotPatch }: Props) {
 
   return (
     <div className="space-y-6">
-      <SlotVisibilitySection visibility={draft} onChange={setDraft} showPublished={!studioProfile} />
+      <SlotVisibilitySection
+        visibility={draft}
+        onChange={setDraft}
+        showPublished={!studioProfile}
+        showPrecision={!studioProfile}
+      />
       <NewClientsSection
         acceptNewClients={draft.acceptNewClients}
         onChange={(next) => setDraft((prev) => ({ ...prev, acceptNewClients: next }))}

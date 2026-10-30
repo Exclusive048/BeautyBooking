@@ -1,8 +1,15 @@
 import { isIP } from "net";
 
+/**
+ * Источник — раздел «Входящие уведомления» документации ЮКассы
+ * (https://yookassa.ru/developers/using-api/webhooks, список IP для проверки
+ * подлинности). PAY-SEC-01-REVISIT 2026-10-30: список сверен, расхождений нет.
+ * Allowlist по-прежнему только пишет в лог (инв. #5): подлинность держит
+ * перезапрос объекта воркером, а не адрес отправителя.
+ */
 export const YOOKASSA_ALLOWLIST_METADATA = {
   source: "YooKassa official webhook IP ranges",
-  lastReviewedAt: "2026-03-14",
+  lastReviewedAt: "2026-10-30",
   reviewCadenceDays: 30,
   changeProcess:
     "When YooKassa updates webhook IP ranges, update YOOKASSA_ALLOWED_IP_RANGES and lastReviewedAt together.",

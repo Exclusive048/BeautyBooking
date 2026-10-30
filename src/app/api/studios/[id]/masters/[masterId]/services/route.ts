@@ -3,6 +3,7 @@ import { ok, fail } from "@/lib/api/response";
 import { requireAuth } from "@/lib/auth/guards";
 import { listMasterServiceOverrides, setMasterServiceOverride } from "@/lib/studios/master-services";
 import { ensureStudioAdmin } from "@/lib/studios/access";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 const updateSchema = z.object({
   serviceId: z.string().min(1),
@@ -43,6 +44,8 @@ export async function PUT(
   const accessError = await ensureStudioAdmin(p.id, auth.user.id);
   if (accessError) return accessError;
 
+  const nonJson = nonJsonBodyRefusal(req);
+  if (nonJson) return nonJson;
   const body = await req.json().catch(() => null);
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");

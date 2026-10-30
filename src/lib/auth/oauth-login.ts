@@ -2,6 +2,7 @@ import type { Prisma, UserProfile } from "@prisma/client";
 import { AccountType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
+import { ACCOUNT_BLOCKED_REDIRECT_ERROR, isAccountBlocked } from "@/lib/auth/account-block";
 import type { OAuthLoginProvider } from "@/lib/auth/oauth-providers";
 import { applyProviderVerifiedPhoneSafe, type ProviderPhoneOutcome } from "@/lib/auth/phone-provider-proof";
 import { ensureClientRoleForUser } from "@/lib/auth/roles";
@@ -46,6 +47,24 @@ export type OAuthIdentity =
   | { provider: "vk"; profile: OAuthProviderProfile; deviceId: string }
   | { provider: "yandex"; profile: OAuthProviderProfile };
 
+/**
+ * MOBILE-OAUTH-LINK-COMPLETE — ровно то, что читает ПРИВЯЗКА: id аккаунта
+ * провайдера (связка), устройство VK (`VkLink.deviceId`) и номер
+ * (PHONE-OAUTH-PROOF-01). Имя, почта и аватар нужны только входу.
+ *
+ * Мобильная привязка держит личность в Redis между колбэком и шагом
+ * приложения (`mobile-oauth-store.ts`), и этот тип — граница минимизации:
+ * в запись уходит только он, а `linkOAuthIdentity` принимает только его.
+ * Начнёт привязка читать ещё одно поле профиля — это ошибка `typecheck`
+ * здесь, а не молча пустое значение из Redis. `OAuthIdentity` ему
+ * присваивается, поэтому веб-колбэк передаёт полную личность как раньше.
+ */
+export type OAuthLinkProfile = Pick<OAuthProviderProfile, "id" | "phone">;
+
+export type OAuthLinkIdentity =
+  | { provider: "vk"; profile: OAuthLinkProfile; deviceId: string }
+  | { provider: "yandex"; profile: OAuthLinkProfile };
+
 /** Согласия флоу (подписанная state-bound кука) и доказательная обвязка записи. */
 export type OAuthConsentContext = {
   flags: ConsentFlags | null;
@@ -82,7 +101,7 @@ async function findLinkedUserId(identity: OAuthIdentity): Promise<string | null>
  * the code exchange stay in the caller's local scope (they are what
  * `fetch*Profile` is called with) and are never written to the database.
  */
-async function upsertOAuthLink(identity: OAuthIdentity, userId: string): Promise<void> {
+async function upsertOAuthLink(identity: OAuthLinkIdentity, userId: string): Promise<void> {
   if (identity.provider === "vk") {
     const vkUserId = identity.profile.id;
     const existing = await prisma.vkLink.findUnique({
@@ -152,14 +171,22 @@ async function ensureFreeSubscriptionsAfterOAuth(
 
 /**
  * Привязка аккаунта провайдера к уже известному пользователю: у веба — к
- * сессии браузера, у приложения — к владельцу link-intent. Регистрации нет,
- * поэтому согласия не обязательны; пришедшие с формы входа — записываются.
+ * сессии браузера, у приложения — к вошедшему владельцу link-intent, который
+ * сам подтвердил привязку (`POST /api/mobile/v1/auth/oauth/link/complete`,
+ * MOBILE-OAUTH-LINK-COMPLETE). Регистрации нет, поэтому согласия не
+ * обязательны; пришедшие с формы входа — записываются.
+ *
+ * 🔴 Звать только там, где получатель связки ДОКАЗАН в этом же запросе
+ * (сессия браузера, Bearer приложения). Колбэк провайдера мобильного флоу
+ * такого доказательства не имеет: браузер, прошедший флоу, мог открыть кто
+ * угодно по чужой ссылке — и связка, номер и гостевые записи уехали бы
+ * владельцу ссылки (C-01).
  *
  * Возвращает итог подтверждения номера (PHONE-OAUTH-PROOF-01) — веб строит по
  * нему возврат на страницу «Подтвердить номер».
  */
 export async function linkOAuthIdentity(input: {
-  identity: OAuthIdentity;
+  identity: OAuthLinkIdentity;
   user: { id: string; roles: AccountType[] };
   consent: OAuthConsentContext;
 }): Promise<ProviderPhoneOutcome | null> {
@@ -190,7 +217,25 @@ export async function linkOAuthIdentity(input: {
 export type OAuthLoginResolution =
   | { ok: true; user: UserProfile }
   /** RKN-FIX-01: вход создал бы аккаунт, а доказуемого согласия нет. */
-  | { ok: false; reason: "consent_required" };
+  | { ok: false; reason: "consent_required" }
+  /**
+   * USER-BLOCKING-01: связка ведёт в заблокированный аккаунт. Отказ — до
+   * любой записи (имя, фото, связка, номер, согласия): провайдер доказал
+   * личность, но аккаунт этим не меняется.
+   */
+  | { ok: false; reason: "account_blocked" };
+
+export type OAuthLoginRefusal = Extract<OAuthLoginResolution, { ok: false }>["reason"];
+
+/**
+ * Куда веб-колбэк уводит отказ входа. `consent` — исторический ключ RKN-FIX-01
+ * (его читает `login-client.tsx`), блокировка — общий с приложением ключ.
+ */
+export function webOAuthLoginRefusalPath(reason: OAuthLoginRefusal): string {
+  return reason === "account_blocked"
+    ? `/login?error=${ACCOUNT_BLOCKED_REDIRECT_ERROR}`
+    : "/login?error=consent";
+}
 
 /**
  * Вход без известного пользователя: найти по связке либо создать.
@@ -215,6 +260,11 @@ export async function resolveOAuthLogin(input: {
 
   if (!user && linkedUserId) {
     throw oauthAlreadyLinkedError(provider);
+  }
+
+  if (user && isAccountBlocked(user)) {
+    logInfo(`${PROVIDER_LOG_LABEL[provider]} auth refused: account blocked`, { userProfileId: user.id });
+    return { ok: false, reason: "account_blocked" };
   }
 
   if (!user) {

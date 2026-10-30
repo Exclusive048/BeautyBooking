@@ -11,6 +11,7 @@ import { formatTimeBucketUtc, sha256 } from "@/lib/billing/utils";
 import { isCurrentMasterManagedByStudio } from "@/lib/master/access";
 import { invalidatePlanCache } from "@/lib/billing/get-current-plan";
 import { isLaunchPromoActive } from "@/lib/billing/launch-promo";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 export const runtime = "nodejs";
 
@@ -51,6 +52,8 @@ export async function POST(req: Request) {
   const user = await getSessionUser();
   if (!user) return fail("Войдите в аккаунт, чтобы продолжить.", 401, "UNAUTHORIZED");
 
+  const nonJson = nonJsonBodyRefusal(req);
+  if (nonJson) return nonJson;
   const body = await req.json().catch(() => null);
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {

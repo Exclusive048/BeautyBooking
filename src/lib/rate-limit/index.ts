@@ -93,8 +93,12 @@ const SENSITIVE_ROUTE_PREFIXES = [
    * `route-template.ts`: динамические сегменты схлопываются в `:id`, поэтому
    * префикс с `[id]`/`:id` внутри перестал бы совпадать. Следствие — префикс
    * покрывает ПОДДЕРЕВО, то есть чуть шире названных роутов; состав покрытого
-   * (43 роута на 2026-08-12) выводится из дерева `src/app/api` и проверяется
-   * тестом `fail-closed-classes.test.ts` — там же поведенческая половина.
+   * (43 роута на 2026-08-12; +5 чтений ПДн и 2 точных шаблона карточек
+   * записи — CRM-MOBILE-FAIL-CLOSED 2026-10-30) выводится из дерева
+   * `src/app/api` и проверяется тестом `fail-closed-classes.test.ts` — там же
+   * поведенческая половина. Полноту класса (в) для ЧТЕНИЙ держит
+   * `pd-read-fail-closed.test.ts`: роут, из которого достижим след
+   * `recordPdAccess`, обязан быть здесь.
    * Ни один публичный browsing-путь (каталог, профили, слоты) в них не попал:
    * обрыв Redis не гасит анонимный сайт.
    */
@@ -114,9 +118,24 @@ const SENSITIVE_ROUTE_PREFIXES = [
   // поэтому метод здесь не различается (как и у всех префиксов выше).
   "/api/me",
   "/api/cabinet/user/profile",
+  // Список `GET /api/master/clients` удалён (29.09 доработки · 31), но префикс
+  // живой: под ним карточка клиента, её фото и `detail` — веб-кабинет мастера.
   "/api/master/clients",
   "/api/chat/threads",
   "/api/integrations/vk",
+  // CRM-MOBILE-FAIL-CLOSED (C-04): мобильные чтения той же CRM-базы — список
+  // мастера, список студии и карточка клиента студии по `clientKey` (ключ
+  // гостя — номер телефона, перебор карточек = перечисление базы). Все три
+  // пишут след (`master.clients.list`, `studio.clients.list`,
+  // `studio.clients.detail`), а префикса не получили — веб-аналоги fail-closed.
+  "/api/cabinet/master/clients",
+  "/api/cabinet/studio/clients",
+  // «История событий» админки и её выгрузка: имена и телефоны клиентов и
+  // мастеров всей платформы, след `admin.events.list` / `admin.events.export`
+  // (ADMIN-EVENTS-02). Нашёл сторож `pd-read-fail-closed.test.ts`. Остальной
+  // `/api/admin/dashboard` (состояние системы, KPI) ПДн не отдаёт и остаётся
+  // fail-open — по нему администратор и разбирается с обрывом Redis.
+  "/api/admin/dashboard/events",
 
   // (г) создание аккаунта / подписки — mass-trial-вектор, ради которого класс и
   // существует: эти шесть роутов создают `UserProfile` + `UserSubscription`.
@@ -197,6 +216,16 @@ const SENSITIVE_ROUTE_TEMPLATES = [
   // MOBILE-STUDIO-C (team): повтор приглашения шлёт SMS/письмо на контакт мастера —
   // при обрыве Redis лимит не деградирует до памяти, роут отвечает 503.
   "/api/cabinet/studio/masters/:id/invite/resend",
+  // CRM-MOBILE-FAIL-CLOSED (C-04): карточки записи приложения — единственное
+  // место мобильного кабинета, где у записи есть телефон клиента. Списки
+  // (`/api/cabinet/{master,studio}/bookings`) телефона не несут и остаются
+  // fail-open: на них главные экраны приложения. Но список отдаёт id записей,
+  // а карточка по id — номер, то есть «список → карточки» перечисляет телефоны
+  // базы; веб-аналоги (`/api/studio/bookings`, `/api/master/clients/:id/detail`)
+  // fail-closed префиксами. Шаблон точный, а не префикс: под префиксом лежит
+  // список.
+  "/api/cabinet/master/bookings/:id",
+  "/api/cabinet/studio/bookings/:id",
 ] as const;
 
 const RATE_LIMIT_UNAVAILABLE_RETRY_SECONDS = 60;

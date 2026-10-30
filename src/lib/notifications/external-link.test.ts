@@ -16,7 +16,8 @@ import { toExternalSafeLink } from "@/lib/notifications/external-link";
  * `api/bookings/[id]/chat/messages`, `hot-slots/*`).
  *
  * Полнота для писем: HTML и текст письма-уведомления собирают ровно два места —
- * `delivery.ts` (ссылка через `toExternalSafeLink`) и приглашение в студию
+ * `email-send.ts` (задача `email.send`, ссылка через `toExternalSafeLink`;
+ * до NOTIFICATION-EMAIL-QUEUE — `delivery.ts`) и приглашение в студию
  * (`studio-notifications.ts`, постоянная ссылка на вход без id). Третий
  * сборщик валит сторож ниже, пока ему не назначат правило.
  *
@@ -64,7 +65,7 @@ describe("toExternalSafeLink — без внутренних id", () => {
     });
   }
 
-  it("письма-уведомления собирают только delivery.ts и приглашение в студию", () => {
+  it("письма-уведомления собирают только email-send.ts и приглашение в студию", () => {
     const builders = listSourceFiles()
       .filter((file) => !/\.test\.tsx?$/.test(file))
       .filter((file) =>
@@ -74,6 +75,6 @@ describe("toExternalSafeLink — без внутренних id", () => {
       )
       .map((file) => relative(SRC, file).replaceAll("\\", "/"))
       .sort();
-    expect(builders).toEqual(["lib/notifications/delivery.ts", "lib/notifications/studio-notifications.ts"]);
+    expect(builders).toEqual(["lib/notifications/email-send.ts", "lib/notifications/studio-notifications.ts"]);
   });
 });

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { decideRetry, retryDelaysFor } from "@/lib/queue/retry-policy";
+import { SLOT_FREED_JOB_TYPE } from "@/lib/queue/types";
 
 /**
  * FIX-C12 — отказ dedup-сторожа есть свойство ПРОГОНА, и решение по нему
@@ -194,9 +196,22 @@ describe("FIX-C12 · weekly-stats: обрыв в середине снимает
  */
 describe("FIX-C12 · ратификация fail-closed опирается на ретрай — он проверяется", () => {
   it("slot.freed ретраится воркером и уходит в dead-letter, а не теряется", () => {
+    // QUEUE-RETRY-POLICY-PER-TYPE: расписание повторов — таблица типа, а не
+    // константа воркера. У slot.freed повторы есть, и после них — мёртвые.
+    expect(decideRetry({ type: SLOT_FREED_JOB_TYPE, attempts: 0 }).kind).toBe("retry");
+    expect(
+      decideRetry({ type: SLOT_FREED_JOB_TYPE, attempts: retryDelaysFor(SLOT_FREED_JOB_TYPE).length }).kind,
+    ).toBe("dead");
     const worker = readFileSync(resolve(process.cwd(), "src/worker.ts"), "utf8");
-    expect(worker).toContain("WORKER_RETRY_MAX_ATTEMPTS");
-    expect(worker).toContain("moveToDeadQueue");
+    // Общий `catch` в `processJob` решает по той же таблице. С
+    // WORKER-CATCH-REDIS-SAFE решение живёт в `lib/queue/failed-job.ts`
+    // (поведение — `failed-job.test.ts`), а воркер обязан звать его из `catch`
+    // и передавать ему и повтор, и мёртвые.
+    expect(worker).toMatch(
+      /\} catch \(error\) \{[\s\S]{0,600}?settleFailedJob\(job, error, \{[\s\S]{0,120}?retry: enqueueRetry,[\s\S]{0,120}?deadLetter: moveToDeadQueue/,
+    );
+    const settle = readFileSync(resolve(process.cwd(), "src/lib/queue/failed-job.ts"), "utf8");
+    expect(settle).toMatch(/"Worker job processing failed"[\s\S]{0,800}?const decision = decideRetry\(job\);[\s\S]{0,400}?deps\.deadLetter/);
     // Обработчик slot.freed обязан идти общим путём `processJob`, у которого
     // и живёт ретрай: собственный try/catch внутри обработчика его отменил бы.
     expect(worker).toMatch(/SLOT_FREED_JOB_TYPE\)\s*\{\s*await processSlotFreedJob\(job\)/);

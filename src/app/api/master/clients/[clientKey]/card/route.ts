@@ -68,6 +68,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     if (!params.clientKey) return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
 
     const providerId = await getCurrentMasterProviderId(user.id);
+    const workProfiles = await getMasterWorkProfiles(user.id);
     const plan = await getCurrentPlan(user.id, SubscriptionScope.MASTER);
     ensureClientCardAccess(plan.features);
 
@@ -89,6 +90,9 @@ export async function PATCH(req: Request, ctx: RouteContext) {
           : null;
     const updated = await upsertClientCard({
       providerId,
+      // CRM-PHANTOM-CARDS (Y22): карточка — только клиенту, который записывался
+      // к мастеру (в любой его профиль — как в списке клиентов).
+      bookingWhere: masterClientBookingsScope(workProfiles.allIds),
       clientKey: params.clientKey,
       notes,
       tags: body.tags,

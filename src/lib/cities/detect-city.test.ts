@@ -41,6 +41,11 @@ import { Prisma } from "@prisma/client";
 import { logInfo } from "@/lib/logging/logger";
 import { detectCityFromAddress } from "@/lib/cities/detect-city";
 
+/** Ответ геокодера, нашедшего точку (форма исхода `geocodeWithLocality`). */
+function found(result: Record<string, unknown>) {
+  return { kind: "found", result };
+}
+
 const moskvaRow = {
   id: "city-moskva",
   slug: "moskva",
@@ -85,20 +90,30 @@ describe("detectCityFromAddress", () => {
     expect(geocodeWithLocality).not.toHaveBeenCalled();
   });
 
-  it("returns geocoder_failed when geocoder is unavailable", async () => {
-    geocodeWithLocality.mockResolvedValue(null);
+  it("returns geocoder_failed when the geocoder answered without a point (address not found)", async () => {
+    geocodeWithLocality.mockResolvedValue({ kind: "not_found" });
     const result = await detectCityFromAddress("Москва, Тверская 1");
     expect(result).toEqual({ ok: false, reason: "geocoder_failed" });
   });
 
+  // GEOCODER-UNAVAILABLE-503: временный сбой — отдельный исход, а не «не
+  // распознан»; иначе кабинет мастера снова обнулит город на сбое (A-03).
+  it("returns geocoder_unavailable when the geocoder did not answer", async () => {
+    geocodeWithLocality.mockResolvedValue({ kind: "unavailable" });
+    const result = await detectCityFromAddress("Москва, Тверская 1");
+    expect(result).toEqual({ ok: false, reason: "geocoder_unavailable" });
+    expect(findUnique).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+  });
+
   it("returns no_locality when geocoder result has no city component", async () => {
-    geocodeWithLocality.mockResolvedValue({ geoLat: 55.7, geoLng: 37.6, locality: null });
+    geocodeWithLocality.mockResolvedValue(found({ geoLat: 55.7, geoLng: 37.6, locality: null }));
     const result = await detectCityFromAddress("какой-то остров без города");
     expect(result).toEqual({ ok: false, reason: "no_locality" });
   });
 
   it("returns existing city when slug matches", async () => {
-    geocodeWithLocality.mockResolvedValue({ geoLat: 55.75, geoLng: 37.62, locality: "Москва" });
+    geocodeWithLocality.mockResolvedValue(found({ geoLat: 55.75, geoLng: 37.62, locality: "Москва" }));
     findUnique.mockResolvedValue(moskvaRow);
 
     const result = await detectCityFromAddress("Москва, Тверская 1");
@@ -117,11 +132,11 @@ describe("detectCityFromAddress", () => {
   });
 
   it("normalizes 'г. Москва' before slug lookup (no duplicate)", async () => {
-    geocodeWithLocality.mockResolvedValue({
+    geocodeWithLocality.mockResolvedValue(found({
       geoLat: 55.75,
       geoLng: 37.62,
       locality: "г. Москва",
-    });
+    }));
     findUnique.mockResolvedValue(moskvaRow);
 
     const result = await detectCityFromAddress("Тверская 1");
@@ -134,12 +149,12 @@ describe("detectCityFromAddress", () => {
   });
 
   it("новый город получает пояс своего субъекта, адрес в лог не пишется", async () => {
-    geocodeWithLocality.mockResolvedValue({
+    geocodeWithLocality.mockResolvedValue(found({
       geoLat: 53.2,
       geoLng: 50.15,
       locality: "Самара",
       regions: ["Приволжский федеральный округ", "Самарская область"],
-    });
+    }));
     findUnique.mockResolvedValue(null);
     findFirst.mockResolvedValue(null);
     create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
@@ -160,11 +175,11 @@ describe("detectCityFromAddress", () => {
   });
 
   it("auto-creates new city with autoCreated:true when slug doesn't exist", async () => {
-    geocodeWithLocality.mockResolvedValue({
+    geocodeWithLocality.mockResolvedValue(found({
       geoLat: 45.04,
       geoLng: 38.97,
       locality: "Краснодар",
-    });
+    }));
     findUnique.mockResolvedValue(null);
     findFirst.mockResolvedValue(null);
     create.mockResolvedValue(krasnodarRow);
@@ -194,11 +209,11 @@ describe("detectCityFromAddress", () => {
   });
 
   it("recovers from race condition: P2002 on create → re-fetch wins", async () => {
-    geocodeWithLocality.mockResolvedValue({
+    geocodeWithLocality.mockResolvedValue(found({
       geoLat: 45.04,
       geoLng: 38.97,
       locality: "Краснодар",
-    });
+    }));
     // First lookup miss (no city yet)
     findUnique.mockResolvedValueOnce(null);
     findFirst.mockResolvedValueOnce(null);
@@ -229,11 +244,11 @@ describe("detectCityFromAddress", () => {
   it("falls back to case-insensitive name match before auto-creating", async () => {
     // Admin manually created "Москва" with slug "msk" (custom slug).
     // Our slug computation gives "moskva", which doesn't match → fallback to name.
-    geocodeWithLocality.mockResolvedValue({
+    geocodeWithLocality.mockResolvedValue(found({
       geoLat: 55.75,
       geoLng: 37.62,
       locality: "Москва",
-    });
+    }));
     findUnique.mockResolvedValue(null);
     findFirst.mockResolvedValue({ ...moskvaRow, slug: "msk" });
 
@@ -268,13 +283,13 @@ describe("detectCityFromAddress — страна", () => {
   });
 
   it("KZ — отказ foreign_country, город не ищется и не создаётся", async () => {
-    geocodeWithLocality.mockResolvedValue({
+    geocodeWithLocality.mockResolvedValue(found({
       geoLat: 43.24,
       geoLng: 76.95,
       locality: "Алматы",
       regions: [],
       country: { code: "KZ", name: "Казахстан" },
-    });
+    }));
     const result = await detectCityFromAddress("Алматы, ул. Достык, 89");
     expect(result).toEqual({ ok: false, reason: "foreign_country" });
     expect(findUnique).not.toHaveBeenCalled();
@@ -283,59 +298,59 @@ describe("detectCityFromAddress — страна", () => {
 
   it("существующий город + KZ — тоже отказ (заведённая раньше «Алматы» адресов не принимает)", async () => {
     findUnique.mockResolvedValue(almatyRow);
-    geocodeWithLocality.mockResolvedValue({
+    geocodeWithLocality.mockResolvedValue(found({
       geoLat: 43.24,
       geoLng: 76.95,
       locality: "Алматы",
       regions: [],
       country: { code: "KZ", name: null },
-    });
+    }));
     expect(await detectCityFromAddress("Алматы, ул. Достык, 89")).toEqual({ ok: false, reason: "foreign_country" });
   });
 
   it("RU — как раньше", async () => {
     findUnique.mockResolvedValue(moskvaRow);
-    geocodeWithLocality.mockResolvedValue({
+    geocodeWithLocality.mockResolvedValue(found({
       geoLat: 55.75,
       geoLng: 37.62,
       locality: "Москва",
       regions: [],
       country: { code: "RU", name: "Россия" },
-    });
+    }));
     const result = await detectCityFromAddress("Москва, Тверская 1");
     expect(result).toMatchObject({ ok: true, cityId: "city-moskva" });
   });
 
   it("кода нет — по названию страны: «Россия» пускает, другое — отказ", async () => {
     findUnique.mockResolvedValue(moskvaRow);
-    geocodeWithLocality.mockResolvedValue({
+    geocodeWithLocality.mockResolvedValue(found({
       geoLat: 55.75,
       geoLng: 37.62,
       locality: "Москва",
       regions: [],
       country: { code: null, name: "Россия" },
-    });
+    }));
     expect(await detectCityFromAddress("Москва")).toMatchObject({ ok: true });
 
-    geocodeWithLocality.mockResolvedValue({
+    geocodeWithLocality.mockResolvedValue(found({
       geoLat: 53.9,
       geoLng: 27.56,
       locality: "Минск",
       regions: [],
       country: { code: null, name: "Беларусь" },
-    });
+    }));
     expect(await detectCityFromAddress("Минск")).toEqual({ ok: false, reason: "foreign_country" });
   });
 
   it("страны в ответе нет (пустые компоненты) — пускаем и пишем в лог, а не foreign_country (решение 27.2)", async () => {
     findUnique.mockResolvedValue(moskvaRow);
-    geocodeWithLocality.mockResolvedValue({
+    geocodeWithLocality.mockResolvedValue(found({
       geoLat: 55.75,
       geoLng: 37.62,
       locality: "Москва",
       regions: [],
       country: { code: null, name: null },
-    });
+    }));
     expect(await detectCityFromAddress("Москва")).toMatchObject({ ok: true });
     expect(logInfo).toHaveBeenCalledWith("city.country_unknown", { locality: "Москва" });
   });
@@ -344,13 +359,13 @@ describe("detectCityFromAddress — страна", () => {
     findUnique.mockResolvedValue(null);
     findFirst.mockResolvedValue(null);
     create.mockResolvedValue({ ...krasnodarRow, id: "city-samara", slug: "samara", name: "Самара" });
-    geocodeWithLocality.mockResolvedValue({
+    geocodeWithLocality.mockResolvedValue(found({
       geoLat: 53.2,
       geoLng: 50.15,
       locality: "Самара",
       regions: ["Самарская область"],
       country: { code: "RU", name: "Россия" },
-    });
+    }));
     await detectCityFromAddress("Самара, ул. Ленинградская, 24, кв. 5");
     const logged = JSON.stringify(vi.mocked(logInfo).mock.calls);
     expect(logged).toContain("city.auto_created");

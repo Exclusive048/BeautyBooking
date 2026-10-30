@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { OtpChannel } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { fail, ok } from "@/lib/api/response";
@@ -16,6 +15,7 @@ import { isProduction } from "@/lib/env";
 import { extractClientIp } from "@/lib/http/ip";
 import { observeAuthClientIp } from "@/lib/http/proxy-trust";
 import { isAppReviewLoginEmail, logAppReviewLogin } from "@/lib/auth/app-review-login";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 export async function POST(req: Request) {
   return withRequestContext(req, async () => {
@@ -25,6 +25,8 @@ export async function POST(req: Request) {
       return fail("Вход по email не настроен.", 503, "EMAIL_NOT_CONFIGURED");
     }
 
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = await req.json().catch(() => null);
     const parsed = otpEmailRequestSchema.safeParse(body);
     if (!parsed.success) {

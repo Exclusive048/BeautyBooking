@@ -15,6 +15,7 @@ import {
   clearWelcomeDialogEnabledCache,
   WELCOME_DIALOG_DEFAULT,
 } from "@/lib/onboarding/welcome-dialog";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 const updateSchema = z.object({
   onlinePaymentsEnabled: z.boolean().optional(),
@@ -103,6 +104,8 @@ export async function PATCH(req: Request) {
   if (!auth.ok) return auth.response;
 
   try {
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = await req.json().catch(() => null);
     const parsed = updateSchema.safeParse(body);
     if (!parsed.success) {

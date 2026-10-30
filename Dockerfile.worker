@@ -1,9 +1,10 @@
 # Версия Node — ровно та, что в .nvmrc: та же в CI и локально (NODE-VERSION-PIN-01,
 # сторож scripts/node-version.test.ts). Плавающий тег node:20-alpine приносил новый
-# ICU без ведома проекта — так пришёл час «24:00» (TZ-HOUR-CYCLE-H23).
+# ICU без ведома проекта — так пришёл час «24:00» (TZ-HOUR-CYCLE-H23). Node 26 — Active
+# LTS (поддержка до 30.04.2029), NODE-LTS-UPGRADE.
 # ─── Stage 1: Full deps + Prisma generate ────────────────────────────────────
 # prisma CLI (in devDeps) is needed only for generate; we copy the output to stage 2.
-FROM node:20.20.2-alpine AS prisma-builder
+FROM node:26.13.0-alpine AS prisma-builder
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 COPY package.json package-lock.json ./
@@ -12,7 +13,7 @@ COPY prisma ./prisma
 RUN npx prisma generate
 
 # ─── Stage 2: Production runtime ─────────────────────────────────────────────
-FROM node:20.20.2-alpine AS runner
+FROM node:26.13.0-alpine AS runner
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 

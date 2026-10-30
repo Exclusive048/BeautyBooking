@@ -5,12 +5,15 @@ import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { setTelegramLinkEnabled } from "@/lib/telegram/links";
 import { telegramSettingsSchema } from "@/lib/telegram/schemas";
 import { toAuthSurfaceError } from "@/lib/auth/auth-surface-error";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 export async function PATCH(req: Request) {
   const auth = await requireAuth();
   if (!auth.ok) return auth.response;
 
   try {
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = await req.json().catch(() => null);
     const parsed = telegramSettingsSchema.safeParse(body);
     if (!parsed.success) {

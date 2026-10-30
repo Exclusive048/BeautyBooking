@@ -5,7 +5,6 @@
     "src/app/api/admin/cities/[id]/merge/route.ts": 1,
     "src/app/api/admin/cities/[id]/route.ts": 1,
     "src/app/api/admin/cities/route.ts": 1,
-    "src/app/api/bookings/[id]/chat/route.ts": 3,
     "src/app/api/favorites/route.ts": 1,
     "src/app/api/master/model-offers/route.ts": 2,
     "src/features/admin-cabinet/users/server/users.service.ts": 1,

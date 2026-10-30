@@ -37,7 +37,7 @@ vi.mock("@/lib/prisma", () => ({
 
 import { listBookableSlots } from "@/lib/schedule/bookable-window";
 
-async function starts(operatorWindow?: boolean): Promise<string[]> {
+async function starts(operatorWindow?: boolean, allStarts?: boolean): Promise<string[]> {
   const result = await listBookableSlots({
     provider: { id: "prov1", timezone: "Europe/Moscow", minBookingHoursAhead: 2 },
     serviceId: "svc1",
@@ -45,6 +45,7 @@ async function starts(operatorWindow?: boolean): Promise<string[]> {
     fromKey: "2026-09-23",
     now: NOW,
     operatorWindow,
+    allStarts,
   });
   if (!result.ok) throw new Error(result.message);
   return result.slots.map((slot) => String(slot.startAtUtc));
@@ -59,30 +60,30 @@ describe("listBookableSlots · окно оператора", () => {
     expect(await starts(true)).toEqual([SOON, LATER, FAR]);
   });
 
-  // SLOTS-GAP-PACKING: отбор «без дыр» — правило клиентской выдачи. Оператор
-  // выбирает время сам (ручная запись начала по движку не сверяет), поэтому
-  // видит все свободные начала.
+  // MANUAL-SLOTS-ALL (2026-10-30, решение владельца): отбор «без дыр»
+  // (SLOTS-GAP-PACKING) — и у клиента, и у оператора: ручная запись по
+  // умолчанию видит те же окошки. Без отбора — только «все свободные времена»
+  // (`allStarts`), которые роут отдаёт отдельным списком.
   //
-  // @probe 2026-10-30 — `packing: !input.operatorWindow` заменён на `true`:
-  // красный «окошки оператора — без отбора». Возвращено — зелёный.
-  it("окошки клиента — с отбором «без дыр», окошки оператора — без", async () => {
+  // @probe 2026-10-30 — `packing: !input.allStarts` заменён на
+  // `!input.operatorWindow` (прежнее правило SLOTS-GAP-PACKING): красный этот
+  // кейс (оператор без `allStarts` получал выдачу без отбора). Возвращено — зелёный.
+  it("окошки клиента и оператора — с отбором «без дыр», «все времена» — без", async () => {
+    const packingOf = () =>
+      (listAvailabilitySlotsPaginated.mock.calls.at(-1) as unknown as [string, string, number, { packing?: boolean }])[3]
+        .packing;
+
     listAvailabilitySlotsPaginated.mockClear();
     await starts();
-    expect(listAvailabilitySlotsPaginated).toHaveBeenCalledWith(
-      "prov1",
-      "svc1",
-      60,
-      expect.objectContaining({ packing: true })
-    );
+    expect(packingOf()).toBe(true);
 
     listAvailabilitySlotsPaginated.mockClear();
     await starts(true);
-    expect(listAvailabilitySlotsPaginated).toHaveBeenCalledWith(
-      "prov1",
-      "svc1",
-      60,
-      expect.objectContaining({ packing: false })
-    );
+    expect(packingOf()).toBe(true);
+
+    listAvailabilitySlotsPaginated.mockClear();
+    await starts(true, true);
+    expect(packingOf()).toBe(false);
   });
 });
 

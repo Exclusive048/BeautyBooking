@@ -16,7 +16,7 @@ import { ConfirmationSection } from "./rules/confirmation-section";
 import { HotSlotsSection } from "./rules/hot-slots-section";
 import { useSaveStatus } from "./save-status-provider";
 import { useAutoSave } from "./use-auto-save";
-import { useScheduleEndpoint } from "./schedule-endpoint-context";
+import { useIsStudioProfileSchedule, useScheduleEndpoint } from "./schedule-endpoint-context";
 
 const T = UI_TEXT.cabinetMaster.scheduleSettings;
 
@@ -62,6 +62,10 @@ export function RulesTab({ initialSnapshot, hotSlotsAllowed, onSnapshotPatch }: 
 
   // STUDIO-MASTER-PROFILES: личное расписание или профиля в студии.
   const endpoint = useScheduleEndpoint();
+  // STUDIO-PROFILE-PERSONAL-RULES: у профиля в студии отмену записи задаёт
+  // студия, а горящие окошки есть только в личном расписании — секций нет,
+  // их значения уходят в запросе без изменений.
+  const studioProfile = useIsStudioProfileSchedule();
   useAutoSave({
     value: draft,
     baseline,
@@ -115,15 +119,19 @@ export function RulesTab({ initialSnapshot, hotSlotsAllowed, onSnapshotPatch }: 
           }))
         }
       />
-      <CancellationSection
-        rules={draft.bookingRules}
-        onChange={(rules) => setDraft((prev) => ({ ...prev, bookingRules: rules }))}
-      />
-      <HotSlotsSection
-        hotSlots={draft.hotSlots}
-        onChange={(hotSlots) => setDraft((prev) => ({ ...prev, hotSlots }))}
-        isLocked={!hotSlotsAllowed}
-      />
+      {studioProfile ? null : (
+        <>
+          <CancellationSection
+            rules={draft.bookingRules}
+            onChange={(rules) => setDraft((prev) => ({ ...prev, bookingRules: rules }))}
+          />
+          <HotSlotsSection
+            hotSlots={draft.hotSlots}
+            onChange={(hotSlots) => setDraft((prev) => ({ ...prev, hotSlots }))}
+            isLocked={!hotSlotsAllowed}
+          />
+        </>
+      )}
     </div>
   );
 }

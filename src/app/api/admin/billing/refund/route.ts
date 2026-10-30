@@ -24,6 +24,7 @@ import { dispatchAdminInitiatedNotification } from "@/lib/notifications/admin-in
 import { buildRefundBody } from "@/lib/notifications/admin-body-templates";
 
 import { logError } from "@/lib/logging/logger";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 
 
@@ -55,6 +56,8 @@ export async function POST(req: Request) {
 
   try {
 
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = await req.json().catch(() => null);
 
     const parsed = bodySchema.safeParse(body);

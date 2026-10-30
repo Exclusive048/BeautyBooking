@@ -315,7 +315,23 @@ export async function getAdminHealth(): Promise<AdminHealth> {
               HEALTH_THRESHOLDS.queuePending.warn,
               HEALTH_THRESHOLDS.queuePending.error,
             ),
-      hint: queue.pending < 0 ? T.queueRedisUnavailableHint : T.queuePendingHint,
+      // QUEUE-DELAYED-ZSET: «ждёт» — только готовые к работе; возраст первой
+      // в очереди виден в подсказке (разбор отстаёт — растёт он, а не число).
+      hint:
+        queue.pending < 0
+          ? T.queueRedisUnavailableHint
+          : typeof queue.oldestPendingAgeMs === "number"
+            ? `${T.queuePendingHint}. ${T.queuePendingOldest(formatAgo(queue.oldestPendingAgeMs))}`
+            : T.queuePendingHint,
+    },
+    {
+      // Отложенные до своего времени — отдельное число: тысяча напоминаний на
+      // завтра не перегрузка, и порогов у строки нет.
+      key: "queueDelayed",
+      section: "queue",
+      valueText: queue.delayed < 0 ? T.metricUnavailable : UI_FMT.count(queue.delayed),
+      tone: queue.delayed < 0 ? "neutral" : "ok",
+      hint: queue.delayed < 0 ? T.queueRedisUnavailableHint : T.queueDelayedHint,
     },
     {
       key: "queueProcessing",

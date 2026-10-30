@@ -1,4 +1,4 @@
-import { SubscriptionScope } from "@prisma/client";
+import { SubscriptionScope, type Prisma } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { STUDIO_TEAM_CAP_BY_TIER } from "@/lib/billing/constants";
 import type { PlanFeatures } from "@/lib/billing/features";
@@ -46,12 +46,44 @@ export function isStudioTeamAtCap(activeCount: number, cap: number | null): bool
  * @throws 404 STUDIO_NOT_FOUND · 409 LIMIT_REACHED
  */
 export async function ensureStudioTeamLimit(studioId: string): Promise<void> {
-  const { providerId, cap } = await resolveStudioTeamCapForStudio(studioId);
-  if (cap === null) return; // unlimited
+  await assertStudioTeamSeatAvailable(await resolveStudioTeamSeat(studioId));
+}
 
-  const activeCount = await countActiveStudioMasters(providerId);
-  if (isStudioTeamAtCap(activeCount, cap)) {
-    throw createLimitReachedError("maxTeamMasters", cap, activeCount);
+/** Потолок команды студии по тарифу владельца и Provider студии, чьи мастера считаются. */
+export type StudioTeamSeat = {
+  /** `Provider.id` студии. */
+  providerId: string;
+  /** `null` — без ограничения. */
+  cap: number | null;
+};
+
+type TeamCountClient = Pick<Prisma.TransactionClient, "provider">;
+
+/**
+ * INVITE-ACCEPT-ATOMIC — {@link ensureStudioTeamLimit} в две половины. Тариф
+ * владельца читается через общий клиент (`getCurrentPlan`) и в транзакции не
+ * нужен; занятые места считает {@link assertStudioTeamSeatAvailable} тем
+ * клиентом, в чьей транзакции место занимается, — под блокировкой студии
+ * (`acceptStudioInvite`): иначе два мастера, принимающие приглашения в студию
+ * с одним свободным местом, прошли бы подсчёт оба.
+ *
+ * @param studioId `Studio.id`
+ * @throws 404 STUDIO_NOT_FOUND
+ */
+export function resolveStudioTeamSeat(studioId: string): Promise<StudioTeamSeat> {
+  return resolveStudioTeamCapForStudio(studioId);
+}
+
+/** @throws 409 LIMIT_REACHED */
+export async function assertStudioTeamSeatAvailable(
+  seat: StudioTeamSeat,
+  db: TeamCountClient = prisma,
+): Promise<void> {
+  if (seat.cap === null) return; // unlimited
+
+  const activeCount = await countActiveStudioMasters(seat.providerId, db);
+  if (isStudioTeamAtCap(activeCount, seat.cap)) {
+    throw createLimitReachedError("maxTeamMasters", seat.cap, activeCount);
   }
 }
 
@@ -77,8 +109,43 @@ export async function getStudioTeamCapacity(studioId: string): Promise<StudioTea
   return { max: cap, activeCount: await countActiveStudioMasters(providerId) };
 }
 
-function countActiveStudioMasters(studioProviderId: string): Promise<number> {
-  return prisma.provider.count({
+/**
+ * STUDIO-INVITE-LIMITS (D-03, 2026-10-30) — потолок НЕОТВЕЧЕННЫХ приглашений
+ * студии. Ожидающее приглашение места в команде не занимает (BC-CAP), поэтому
+ * лимит команды их не ограничивал вовсе, а каждое тянет за собой заготовку
+ * мастера (`Provider` без владельца) и письмо.
+ *
+ * Потолок — вдвое больше мест тарифа (FREE 2 → 4, PRO 6 → 12, PREMIUM 20 → 40):
+ * студия может звать кандидатов с запасом на тех, кто не ответит. Но не меньше
+ * 10: у FREE четыре — это два места и по одному запасному, а приглашения не
+ * истекают сами, по телефону без SMS-шлюза доходят не до всех и висят, пока
+ * студия их не отзовёт. Команда без ограничения (`null`, назначает админ) — 100.
+ * Упёрлась студия — отзывает неотвеченные (`revokeStudioMasterInvite`), текст
+ * отказа говорит именно это.
+ */
+export const STUDIO_PENDING_INVITES_MIN = 10;
+export const STUDIO_PENDING_INVITES_PER_SEAT = 2;
+export const STUDIO_PENDING_INVITES_UNLIMITED_TEAM = 100;
+
+export function resolveStudioPendingInviteCap(teamCap: number | null): number {
+  if (teamCap === null) return STUDIO_PENDING_INVITES_UNLIMITED_TEAM;
+  return Math.max(STUDIO_PENDING_INVITES_MIN, teamCap * STUDIO_PENDING_INVITES_PER_SEAT);
+}
+
+/**
+ * Потолок неотвеченных приглашений студии по тарифу ВЛАДЕЛЬЦА (тот же, что у
+ * лимита команды).
+ *
+ * @param studioId `Studio.id`
+ * @throws 404 STUDIO_NOT_FOUND
+ */
+export async function getStudioPendingInviteCap(studioId: string): Promise<number> {
+  const { cap } = await resolveStudioTeamCapForStudio(studioId);
+  return resolveStudioPendingInviteCap(cap);
+}
+
+function countActiveStudioMasters(studioProviderId: string, db: TeamCountClient = prisma): Promise<number> {
+  return db.provider.count({
     where: {
       type: "MASTER",
       studioId: studioProviderId,

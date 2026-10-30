@@ -14,6 +14,9 @@ import { MediaAssetStatus, MediaEntityType, MediaKind } from "@prisma/client";
  * @probe 2026-09-23 — в роуте убрана проверка версии (`params.v !==
  *        cropVersionToken(asset)`): красный «устаревшая версия уводит
  *        редиректом» — ответ 200 вместо 307. Возвращено — зелёный.
+ * @probe 2026-10-30 — в `readCroppedMedia` убрана запись в `inflightCrops`:
+ *        красный «одновременные одинаковые запросы читают исходник один раз»
+ *        (4 чтения вместо 2). Возвращено — зелёный.
  */
 
 const YELLOW = { r: 255, g: 225, b: 25 };
@@ -23,6 +26,7 @@ const state = vi.hoisted(() => ({
   publiclyVisible: true,
   sessionUser: null as { id: string } | null,
   source: Buffer.alloc(0) as Buffer,
+  getObjectCalls: 0,
 }));
 
 vi.mock("@/lib/auth/session", () => ({
@@ -38,8 +42,10 @@ vi.mock("@/lib/media/access", () => ({
 
 vi.mock("@/lib/media/storage", () => ({
   getStorageProvider: () => ({
-    getObject: () =>
-      Promise.resolve({ stream: Readable.from([state.source]), contentType: "image/png", sizeBytes: state.source.length }),
+    getObject: () => {
+      state.getObjectCalls += 1;
+      return Promise.resolve({ stream: Readable.from([state.source]), contentType: "image/png", sizeBytes: state.source.length });
+    },
   }),
 }));
 
@@ -89,6 +95,7 @@ beforeEach(async () => {
   state.source = await quadrants();
   state.publiclyVisible = true;
   state.sessionUser = null;
+  state.getObjectCalls = 0;
   state.asset = {
     id: "cmasset00000000000000001",
     entityId: "prov1",
@@ -103,6 +110,23 @@ beforeEach(async () => {
 });
 
 describe("GET /api/media/file/[id]/crop/[v]", () => {
+  // MEDIA-RENDER-DEDUP: одинаковые одновременные запросы — одно чтение
+  // исходника (и один рендер, `lib/media/crop-delivery.test.ts`), ответы
+  // одинаковые; другая ширина — свой вырез.
+  it("одновременные одинаковые запросы читают исходник один раз", async () => {
+    const responses = await Promise.all([
+      call(TOKEN, undefined, "?w=320"),
+      call(TOKEN, undefined, "?w=320"),
+      call(TOKEN, undefined, "?w=320"),
+      call(TOKEN, undefined, "?w=640"),
+    ]);
+    expect(responses.map((res) => res.status)).toEqual([200, 200, 200, 200]);
+    expect(state.getObjectCalls).toBe(2);
+    const bodies = await Promise.all(responses.map(async (res) => Buffer.from(await res.arrayBuffer())));
+    expect(bodies[1]).toEqual(bodies[0]);
+    expect(bodies[2]).toEqual(bodies[0]);
+  });
+
   it("отдаёт вырез сохранённой области: квадрат, жёлтый, public immutable", async () => {
     const res = await call(TOKEN);
     expect(res.status).toBe(200);

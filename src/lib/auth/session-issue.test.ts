@@ -94,7 +94,11 @@ vi.mock("@/lib/prisma", () => {
     refreshSession,
     userProfile: { findFirst: async () => ({ id: "u1", phone: "+79990000000", roles: ["CLIENT"] }) },
   };
-  return { prisma: { $transaction: async (fn: (t: typeof tx) => unknown) => fn(tx), refreshSession } };
+  // USER-BLOCKING-01: `issueSession` спрашивает отметку блокировки владельца.
+  const userProfile = { findUnique: async () => ({ blockedAt: null }) };
+  return {
+    prisma: { $transaction: async (fn: (t: typeof tx) => unknown) => fn(tx), refreshSession, userProfile },
+  };
 });
 vi.mock("@/lib/monitoring/status", () => ({ recordSurfaceEvent }));
 vi.mock("@/lib/env", () => ({

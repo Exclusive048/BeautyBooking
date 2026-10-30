@@ -1,92 +1,34 @@
-import { z } from "zod";
-import { prisma } from "@/lib/prisma";
-import { ok, fail } from "@/lib/api/response";
+import { fail } from "@/lib/api/response";
 import { requireAdminAuth } from "@/lib/auth/admin";
-import { AppError, toAppError } from "@/lib/api/errors";
-import { recalculateTargetRatings } from "@/lib/reviews/recalculate-ratings";
 
-const dismissSchema = z.object({
-  action: z.enum(["dismiss_report"]),
-});
+/**
+ * ADMIN-AUDIT-COVERAGE (SECURITY-EXPOSURE-AUDIT-01 · Y14) — легаси `PATCH`
+ * (снять жалобу с отзыва) и `DELETE` (мягко удалить отзыв) **выведены → 410**,
+ * по образцу `api/admin/billing/route.ts`.
+ *
+ * Оба писали в базу без строки `AdminAuditLog` (инв. #18): `DELETE` ещё и в
+ * обход рассылки «отзыв удалён». Вызывающих не было — интерфейс модерации ходит
+ * в выделенные роуты с аудитом:
+ *   - удалить отзыв — `POST /api/admin/reviews/[id]/delete`
+ *     (`delete-review.service.ts`: аудит `REVIEW_DELETED` + уведомление);
+ *   - снять жалобу / одобрить — `POST /api/admin/reviews/[id]/approve`
+ *     (`approve-review.service.ts`: аудит `REVIEW_APPROVED`).
+ *
+ * Проверка входа идёт первой, чтобы 410 не был ответом на неавторизованный
+ * запрос к админскому адресу.
+ */
 
-type RouteContext = {
-  params: Promise<{ id: string }>;
-};
+const RETIRED_MESSAGE =
+  "Этот адрес выведен из эксплуатации. Удаляйте отзыв через /api/admin/reviews/[id]/delete, снимайте жалобу через /api/admin/reviews/[id]/approve.";
 
-export async function PATCH(req: Request, ctx: RouteContext) {
+export async function PATCH() {
   const auth = await requireAdminAuth();
   if (!auth.ok) return auth.response;
-
-  try {
-    const { id } = await ctx.params;
-    if (!id) return fail("Отзыв не найден.", 404, "NOT_FOUND");
-
-    const body = await req.json().catch(() => null);
-    const parsed = dismissSchema.safeParse(body);
-    if (!parsed.success) return fail("Неверные данные.", 400, "VALIDATION_ERROR");
-
-    const review = await prisma.review.findUnique({
-      where: { id },
-      select: { id: true, reportedAt: true },
-    });
-    if (!review) return fail("Отзыв не найден.", 404, "NOT_FOUND");
-    if (!review.reportedAt) return fail("Отзыв не был помечен как жалоба.", 400, "NOT_REPORTED");
-
-    await prisma.review.update({
-      where: { id },
-      data: { reportedAt: null, reportComment: null, reportReason: null },
-    });
-
-    return ok({ id, dismissed: true });
-  } catch (error) {
-    const appError = error instanceof AppError ? error : toAppError(error);
-    return fail(appError.message, appError.status, appError.code, appError.details);
-  }
+  return fail(RETIRED_MESSAGE, 410, "ENDPOINT_RETIRED");
 }
 
-export async function DELETE(_req: Request, ctx: RouteContext) {
+export async function DELETE() {
   const auth = await requireAdminAuth();
   if (!auth.ok) return auth.response;
-
-  try {
-    const { id } = await ctx.params;
-    if (!id) return fail("Отзыв не найден.", 404, "NOT_FOUND");
-
-    const review = await prisma.review.findUnique({
-      where: { id },
-      select: { id: true, targetType: true, targetId: true, masterId: true, deletedAt: true },
-    });
-
-    if (!review) {
-      return fail("Отзыв не найден.", 404, "NOT_FOUND");
-    }
-
-    // Idempotent: already soft-deleted — return success without
-    // re-running the rating recalc. Matches the new admin delete
-    // service in `delete-review.service.ts`.
-    if (review.deletedAt) {
-      return ok({ id });
-    }
-
-    // Soft delete (REVIEW-SOFT-DELETE-A). The new admin UI uses the
-    // dedicated `POST /[id]/delete` route which also writes audit +
-    // dispatches notification; this legacy DELETE handler keeps the
-    // minimal flow (no audit/notify) for backwards compatibility.
-    // BACKLOG: retire once no consumers remain.
-    await prisma.$transaction(async (tx) => {
-      await tx.review.update({
-        where: { id },
-        data: {
-          deletedAt: new Date(),
-          deletedByUserId: auth.user.id,
-        },
-      });
-      await recalculateTargetRatings(tx, review);
-    });
-
-    return ok({ id });
-  } catch (error) {
-    const appError = error instanceof AppError ? error : toAppError(error);
-    return fail(appError.message, appError.status, appError.code, appError.details);
-  }
+  return fail(RETIRED_MESSAGE, 410, "ENDPOINT_RETIRED");
 }

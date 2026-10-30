@@ -9,6 +9,7 @@ import {
   logAppReviewLogin,
   matchesAppReviewLoginCode,
 } from "@/lib/auth/app-review-login";
+import { failAccountBlocked, isAccountBlocked } from "@/lib/auth/account-block";
 import { toAuthSurfaceError } from "@/lib/auth/auth-surface-error";
 import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
 import { findVerifiedEmailProfile, resolveEmailLoginProfile } from "@/lib/auth/email-login-profile";
@@ -18,6 +19,8 @@ import {
   checkOtpVerifyLock,
   clearOtpEmailVerifyFailures,
   clearOtpVerifyFailures,
+  isAppReviewLoginOpen,
+  registerAppReviewLoginFailure,
   registerOtpEmailVerifyFailure,
   registerOtpVerifyFailure,
 } from "@/lib/auth/otp-rate-limit";
@@ -36,6 +39,7 @@ import { sendTelegramAlert } from "@/lib/monitoring/alerts";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
 import { invalidateMeIdentityCache } from "@/lib/users/me";
 import * as UI_TEXT from "@/lib/ui/text";
+import { assertJsonContentType } from "@/lib/validation";
 
 /**
  * MOBILE-AUTH-A — вход по одноразовому коду, общий для веба и приложения.
@@ -52,7 +56,17 @@ import * as UI_TEXT from "@/lib/ui/text";
  *
  * Отказ возвращается готовым ответом (`fail()` / `otpRateLimitFail`), а не
  * исключением: роуты отдают его как есть, ровно как отдавали до выноса.
+ *
+ * USER-BLOCKING-01: заблокированный аккаунт получает 403 `ACCOUNT_BLOCKED` —
+ * только ПОСЛЕ принятого кода (иначе по номеру или адресу узнавали бы, что
+ * аккаунт заблокирован), до сжигания кода и до любых побочных эффектов.
  */
+
+function refuseBlockedLogin(userProfileId: string, operation: string): OtpLoginResult {
+  logInfo("auth.login.blocked", { userProfileId, operation });
+  void recordSurfaceEvent({ surface: "auth", outcome: "denied", operation, code: "ACCOUNT_BLOCKED" });
+  return { ok: false, response: failAccountBlocked() };
+}
 
 export type OtpLoginProfile = {
   id: string;
@@ -83,6 +97,8 @@ export async function verifyPhoneOtpLogin(req: Request, options: OtpLoginOptions
   }
 
   const startedAt = Date.now();
+  // CSRF-CONTENT-TYPE-LAYER: бросает 415, роуты отдают его своим конвертом.
+  assertJsonContentType(req);
   const body = await req.json().catch(() => null);
   const parsed = otpVerifySchema.safeParse(body);
   if (!parsed.success) {
@@ -145,9 +161,17 @@ export async function verifyPhoneOtpLogin(req: Request, options: OtpLoginOptions
   // вопроса (гейт согласий + чей профиль) — `classifyPhoneLoginTarget`.
   const existingProfile = await prisma.userProfile.findUnique({
     where: { phone },
-    select: PHONE_LOGIN_PROFILE_SELECT,
+    select: { ...PHONE_LOGIN_PROFILE_SELECT, blockedAt: true },
   });
   const loginTarget = await classifyPhoneLoginTarget(existingProfile);
+
+  // USER-BLOCKING-01: блокировка закрывает вход в ЭТОТ профиль (владелец и
+  // конверсия гостя). Регистрация поверх чужой неподтверждённой заявки
+  // (FOREIGN_CLAIM) входит в свежий профиль — заблокированная строка заявителя
+  // тут ни при чём, её заявка просто освобождается.
+  if (existingProfile && !isPhoneLoginRegistration(loginTarget) && isAccountBlocked(existingProfile)) {
+    return refuseBlockedLogin(existingProfile.id, "otp-verify");
+  }
 
   // Server-side enforcement, not just UI gating: creating an account without
   // consent to the offer AND to PD processing is exactly what 152-ФЗ ст. 9
@@ -217,6 +241,8 @@ export async function verifyPhoneOtpLogin(req: Request, options: OtpLoginOptions
 
 export async function verifyEmailOtpLogin(req: Request, options: OtpLoginOptions): Promise<OtpLoginResult> {
   const startedAt = Date.now();
+  // CSRF-CONTENT-TYPE-LAYER: бросает 415, роуты отдают его своим конвертом.
+  assertJsonContentType(req);
   const body = await req.json().catch(() => null);
   const parsed = otpEmailVerifySchema.safeParse(body);
   if (!parsed.success) {
@@ -240,9 +266,17 @@ export async function verifyEmailOtpLogin(req: Request, options: OtpLoginOptions
   // подходит только постоянный код из env (сравнение за постоянное время),
   // кодов в базе у этого адреса нет (запрос их не создаёт). Блокировка выше и
   // счётчик неверных попыток ниже — те же, что у всех.
+  //
+  // APP-REVIEW-LOGIN-CAP: у постоянного кода нет одноразовости и срока, на
+  // которых держится блокировка (почта, IP), поэтому у адреса есть ещё потолок
+  // неверных кодов с любого IP (`otp-rate-limit.ts`). Выбран — режим закрыт:
+  // код не сравнивается вовсе, а отказ идёт той же веткой, что неверный код.
   const appReview = isAppReviewLoginEmail(normalizedEmail);
-  const appReviewCodeOk = appReview && matchesAppReviewLoginCode(normalizedEmail, code);
-  if (appReview) logAppReviewLogin("verify", appReviewCodeOk ? "accepted" : "rejected");
+  const appReviewOpen = appReview && (await isAppReviewLoginOpen(normalizedEmail));
+  const appReviewCodeOk = appReviewOpen && matchesAppReviewLoginCode(normalizedEmail, code);
+  if (appReview) {
+    logAppReviewLogin("verify", appReviewCodeOk ? "accepted" : appReviewOpen ? "rejected" : "locked");
+  }
 
   const otp = appReview
     ? null
@@ -258,6 +292,7 @@ export async function verifyEmailOtpLogin(req: Request, options: OtpLoginOptions
       });
 
   if (!otp && !appReviewCodeOk) {
+    if (appReview) await registerAppReviewLoginFailure(normalizedEmail);
     const failResult = await registerOtpEmailVerifyFailure(normalizedEmail, clientIp);
     if (!failResult.ok) {
       void recordSurfaceEvent({ surface: "auth", outcome: "failure", operation: "otp-email-verify", code: failResult.error ?? "OTP_VERIFY_LOCKED" });
@@ -278,6 +313,9 @@ export async function verifyEmailOtpLogin(req: Request, options: OtpLoginOptions
   // сессию В ЧУЖОЙ профиль. Неподтверждённая строка теперь для входа
   // невидима — решение принимает `findVerifiedEmailProfile`.
   const existingProfile = await findVerifiedEmailProfile(normalizedEmail);
+  if (existingProfile && isAccountBlocked(existingProfile)) {
+    return refuseBlockedLogin(existingProfile.id, "otp-email-verify");
+  }
 
   if (!existingProfile && !hasRequiredConsents(consent)) {
     void recordSurfaceEvent({

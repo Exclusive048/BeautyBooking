@@ -16,8 +16,9 @@ import { scrubRecord } from "@/lib/observability/scrub";
  * catch previously did `fail(msg, status, code, appError.details)`, sending it
  * straight to the browser.
  *
- * This helper is the single place all three callbacks (auth/vk, auth/yandex,
- * integrations/vk) route their catch through: it logs a **scrubbed** view for
+ * This helper is the single place the callbacks (auth/vk, auth/yandex; the third,
+ * integrations/vk, was removed by VK-INTEGRATIONS-ROUTES-ORPHANED) route their
+ * catch through: it logs a **scrubbed** view for
  * server-side diagnostics (tokens/PII redacted by `scrubRecord`) and returns
  * only the curated message + code — never the raw payload.
  */

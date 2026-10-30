@@ -25,6 +25,7 @@ import {
 } from "@/lib/deletion/account-deletion-policy";
 import { enqueueMediaPurge } from "@/lib/deletion/enqueue-media-purge";
 import { logInfo } from "@/lib/logging/logger";
+import { markAssetsDeletedTx } from "@/lib/media/soft-delete";
 import { prisma } from "@/lib/prisma";
 
 type Tx = Prisma.TransactionClient;
@@ -114,7 +115,13 @@ export async function runDeferredAccountDeletionPolicy(
       if (users.length === 0) break;
       const ids = users.map((user) => user.id);
       const media = await collectPolicyMedia(prisma, ids, kinds);
-      const count = await prisma.$transaction((tx) => anonymizeClientBookingsTx(tx, ids));
+      // MEDIA-PURGE-MARK-DELETED: медиа связи помечается удалённым той же
+      // транзакцией — не отдаётся с коммитом, а не после `media.purge`.
+      const count = await prisma.$transaction(async (tx) => {
+        const anonymized = await anonymizeClientBookingsTx(tx, ids);
+        await markAssetsDeletedTx(tx, media.map((asset) => asset.id), now);
+        return anonymized;
+      });
       summary.bookingsAnonymized += count;
       await enqueueMediaPurge(media, "account-deletion", null);
       // Страховка: пачка без изменений значит, что отбор и действие разошлись.

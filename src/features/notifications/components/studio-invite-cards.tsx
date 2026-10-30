@@ -44,7 +44,10 @@ export function StudioInviteCards({ invites, masterReadiness = null, onChanged, 
   const t = UI_TEXT.notificationsCenter.invites;
   const tCenter = UI_TEXT.notificationsCenter;
   const [items, setItems] = useState<NotificationCenterInviteItem[]>(invites);
-  const [savingId, setSavingId] = useState<string | null>(null);
+  // INVITE-ACCEPT-ATOMIC: пока одно приглашение принимается или отклоняется,
+  // кнопки остальных выключены — мастер работает в одной студии, и второе
+  // «Принять» сервер всё равно отклонит («Мастер уже состоит в студии»).
+  const [saving, setSaving] = useState<{ inviteId: string; action: "accept" | "reject" } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const revalidateMe = useRevalidateMe();
@@ -62,7 +65,7 @@ export function StudioInviteCards({ invites, masterReadiness = null, onChanged, 
   };
 
   const postInviteAction = async (inviteId: string, action: "accept" | "reject") => {
-    setSavingId(inviteId);
+    setSaving({ inviteId, action });
     setError(null);
     try {
       try {
@@ -102,11 +105,14 @@ export function StudioInviteCards({ invites, masterReadiness = null, onChanged, 
     } catch {
       setError(t.networkError);
     } finally {
-      setSavingId(null);
+      setSaving(null);
     }
   };
 
   const setupBlocked = masterReadiness !== null && !masterReadiness.ready;
+  const busy = saving !== null;
+  const isSaving = (inviteId: string, action: "accept" | "reject") =>
+    saving?.inviteId === inviteId && saving.action === action;
 
   if (items.length === 0) {
     return (
@@ -164,21 +170,21 @@ export function StudioInviteCards({ invites, masterReadiness = null, onChanged, 
               <Button
                 type="button"
                 onClick={() => void postInviteAction(invite.id, "accept")}
-                disabled={savingId === invite.id || setupBlocked}
+                disabled={busy || setupBlocked}
                 size="sm"
                 className="rounded-full"
               >
-                {savingId === invite.id ? t.accepting : t.accept}
+                {isSaving(invite.id, "accept") ? t.accepting : t.accept}
               </Button>
               <Button
                 type="button"
                 onClick={() => void postInviteAction(invite.id, "reject")}
-                disabled={savingId === invite.id}
+                disabled={busy}
                 variant="secondary"
                 size="sm"
                 className="rounded-full"
               >
-                {savingId === invite.id ? t.rejecting : t.reject}
+                {isSaving(invite.id, "reject") ? t.rejecting : t.reject}
               </Button>
               <Button asChild variant="ghost" size="sm" className="rounded-full">
                 <Link

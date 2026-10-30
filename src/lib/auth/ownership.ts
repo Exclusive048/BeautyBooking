@@ -167,6 +167,39 @@ export async function requireBookingRescheduleAccess(
   throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
 }
 
+/**
+ * PUBLIC-BOOKING-READ-TOKEN (SEC-11b): чья сторона этой брони — без исключений.
+ *
+ * Правило то же, что у подтверждения и переноса: клиент брони, владелец
+ * провайдера, мастер-исполнитель, OWNER/ADMIN студии ПОВЕРХНОСТИ брони
+ * (инв. #45). Не бросает: и «брони нет», и «вы не её сторона» — `null`,
+ * потому что чтению не положено различать эти ответы (404 на оба, иначе
+ * ответ подтверждает существование чужой брони по угаданному id).
+ */
+export async function resolveBookingSide(
+  userId: string,
+  bookingId: string,
+): Promise<"CLIENT" | "PROVIDER" | null> {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    select: {
+      id: true,
+      clientUserId: true,
+      studioId: true,
+      provider: { select: { id: true, type: true, ownerUserId: true, studioId: true } },
+      masterProvider: { select: { ownerUserId: true } },
+    },
+  });
+  if (!booking) return null;
+
+  if (isClientOwner(userId, booking)) return "CLIENT";
+  if (isProviderOwner(userId, booking.provider) || isMasterOwner(userId, booking)) {
+    return "PROVIDER";
+  }
+  if (booking.studioId && (await isStudioAdmin(userId, booking.studioId))) return "PROVIDER";
+  return null;
+}
+
 export async function requireMasterOwner(userId: string, masterId: string): Promise<void> {
   const master = await prisma.provider.findUnique({
     where: { id: masterId },

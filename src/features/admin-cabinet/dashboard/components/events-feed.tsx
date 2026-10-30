@@ -14,13 +14,15 @@ import {
 } from "@/features/admin-cabinet/dashboard/components/event-parts";
 import { ADMIN_DASHBOARD_EVENTS } from "@/features/admin-cabinet/dashboard/lib/event-categories";
 import { useAdminEventsPoll } from "@/features/admin-cabinet/dashboard/lib/use-admin-events-poll";
-import type { AdminEventItem } from "@/features/admin-cabinet/dashboard/types";
+import type { AdminEventItem, AdminEventsResponse } from "@/features/admin-cabinet/dashboard/types";
 import { cn } from "@/lib/cn";
 
 const T = UI_TEXT.adminPanel.dashboard.feed;
 
 type Props = {
   initial: AdminEventItem[];
+  /** `asOfMs` серверного рендера — точка отсчёта опроса новых. */
+  initialAsOfMs: number;
 };
 
 /**
@@ -28,11 +30,9 @@ type Props = {
  * кем, время и сумма. Свежие события приходят опросом раз в 30 с; вся история
  * с разделами, подробностями и выгрузкой — `/admin/events`.
  */
-export function EventsFeed({ initial }: Props) {
+export function EventsFeed({ initial, initialAsOfMs }: Props) {
   const [items, setItems] = useState<AdminEventItem[]>(initial);
   const seenIds = useRef<Set<string>>(new Set(initial.map((item) => item.id)));
-
-  const latestMs = items.length > 0 ? items[0]!.timeMs : 0;
 
   const onFresh = useCallback((incoming: AdminEventItem[]) => {
     const fresh = incoming.filter((item) => !seenIds.current.has(item.id));
@@ -41,7 +41,18 @@ export function EventsFeed({ initial }: Props) {
     setItems((prev) => [...fresh, ...prev].slice(0, ADMIN_DASHBOARD_EVENTS));
   }, []);
 
-  useAdminEventsPoll({ category: "all", latestMs, onEvents: onFresh });
+  const onReset = useCallback((page: AdminEventsResponse) => {
+    seenIds.current = new Set(page.items.map((item) => item.id));
+    setItems(page.items.slice(0, ADMIN_DASHBOARD_EVENTS));
+  }, []);
+
+  useAdminEventsPoll({
+    category: "all",
+    initialAsOfMs,
+    pageSize: ADMIN_DASHBOARD_EVENTS,
+    onEvents: onFresh,
+    onReset,
+  });
 
   return (
     <section className="flex min-w-0 flex-col rounded-2xl border border-border-subtle bg-bg-card p-5 shadow-card">

@@ -1,7 +1,9 @@
+import { toAppError } from "@/lib/api/errors";
 import { fail, ok } from "@/lib/api/response";
 import { withRequestContext } from "@/lib/api/with-request-context";
 import { getSessionContext } from "@/lib/auth/session";
 import { revokeOtherSessionFamilies } from "@/lib/auth/session-families";
+import { getRequestId, logError } from "@/lib/logging/logger";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
 
 /**
@@ -17,13 +19,26 @@ import { recordSurfaceEvent } from "@/lib/monitoring/status";
  */
 export async function POST(req: Request) {
   return withRequestContext(req, async () => {
-    const session = await getSessionContext();
-    if (!session) {
-      return fail("Требуется вход в аккаунт.", 401, "UNAUTHORIZED");
-    }
+    try {
+      const session = await getSessionContext();
+      if (!session) {
+        return fail("Требуется вход в аккаунт.", 401, "UNAUTHORIZED");
+      }
 
-    const revoked = await revokeOtherSessionFamilies(session.user.id, session.familyId);
-    void recordSurfaceEvent({ surface: "auth", outcome: "success", operation: "session-revoke-others" });
-    return ok({ revoked }, { headers: { "Cache-Control": "no-store" } });
+      const revoked = await revokeOtherSessionFamilies(session.user.id, session.familyId);
+      void recordSurfaceEvent({ surface: "auth", outcome: "success", operation: "session-revoke-others" });
+      return ok({ revoked }, { headers: { "Cache-Control": "no-store" } });
+    } catch (error) {
+      // ERROR-ENVELOPE-NEW-ROUTES: сбой БД — конверт, а не HTML-страница 500.
+      const appError = toAppError(error);
+      if (appError.status >= 500) {
+        logError("POST /api/me/sessions/revoke-others failed", {
+          requestId: getRequestId(req),
+          route: "POST /api/me/sessions/revoke-others",
+          stack: error instanceof Error ? error.stack : undefined,
+        });
+      }
+      return fail(appError.message, appError.status, appError.code);
+    }
   });
 }

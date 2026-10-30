@@ -33,6 +33,8 @@ export type YookassaPaymentDetail = {
   id: string;
   status: YookassaPaymentStatus;
   amount?: { value: string; currency: string };
+  /** Сколько по платежу уже возвращено — сумма всех успешных возвратов (PARTIAL-REFUND-ACCOUNTING). */
+  refunded_amount?: { value: string; currency: string };
   metadata?: Record<string, unknown> | null;
   confirmation?: YookassaConfirmation;
   payment_method?: YookassaPaymentMethod;
@@ -42,6 +44,8 @@ export type YookassaRefundResponse = {
   id: string;
   status: "pending" | "succeeded" | "canceled";
   payment_id: string;
+  /** Сумма ЭТОГО возврата; у частичного она меньше суммы платежа. */
+  amount?: { value: string; currency: string };
 };
 
 const PAYMENTS_URL = "https://api.yookassa.ru/v3/payments";
@@ -204,9 +208,17 @@ export async function createRefund(input: CreateRefundInput) {
  *   - 404 → `null`. The id is unknown to YooKassa (forged/foreign
  *     notification) → the caller logs and drops, no state change.
  *   - transient failure (timeout / network / 5xx / any other non-OK) →
- *     THROWS. The queue retries the job (its 24h redelivery window +
- *     `DEFAULT_JOB_MAX_ATTEMPTS` are the safety net); we never silently
- *     treat a transient error as "no such payment".
+ *     THROWS; we never silently treat a transient error as "no such payment".
+ *
+ * Что страхует бросок (A-02, YOOKASSA-PENDING-SWEEP). Прежний текст называл
+ * сетью безопасности «24-часовое окно повторной доставки» ЮКассы и
+ * `DEFAULT_JOB_MAX_ATTEMPTS` — оба неверны для этого пути: ЮКасса повторяет
+ * уведомление только на не-2xx, а роут вебхука отвечает 200 сразу после
+ * постановки задачи; число повторов задачи этим полем не задавалось. На деле
+ * сетей две: повтор задачи `yookassa.webhook` по её строке таблицы
+ * `lib/queue/retry-policy.ts` (~23 ч) и свип PENDING-платежей воркера
+ * (`yookassa/pending-sweep.ts`, раз в 10 минут, платежи до 7 дней) — он же
+ * добирает уведомления, которые не дошли вовсе.
  */
 async function yookassaGet<T>(url: string): Promise<T | null> {
   const controller = new AbortController();

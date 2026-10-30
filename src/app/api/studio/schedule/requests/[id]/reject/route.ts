@@ -7,7 +7,9 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
 import { prisma } from "@/lib/prisma";
 import { loadScheduleRequestWithRelations, notifyScheduleRequestRejected } from "@/lib/notifications/studio-notifications";
+import { scheduleRequestProcessedError } from "@/lib/schedule/change-request-conflict";
 import { SCHEDULE_REQUEST_REJECT_COMMENT_MAX } from "@/features/studio-cabinet/schedule-requests/lib/reject-comment";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 export const runtime = "nodejs";
 
@@ -46,6 +48,8 @@ export async function POST(
       return jsonFail(403, "Этот раздел доступен администратору студии.", "FORBIDDEN");
     }
 
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const parsed = bodySchema.safeParse(await req.json().catch(() => null));
     if (!parsed.success) {
       const message = parsed.error.issues[0]?.message ?? COMMENT_REQUIRED;
@@ -60,14 +64,19 @@ export async function POST(
     });
 
     if (!request) return jsonFail(404, "Запрос не найден.", "NOT_FOUND");
-    if (request.status !== "PENDING") {
-      return jsonFail(400, "Запрос уже обработан.", "VALIDATION_ERROR");
-    }
+    if (request.status !== "PENDING") throw scheduleRequestProcessedError();
 
-    await prisma.scheduleChangeRequest.update({
-      where: { id: request.id },
+    // SCHEDULE-REQUEST-ATOMIC: статус меняется только у ещё открытой заявки.
+    // Проверка выше читает без блокировки, а между ней и записью заявку мог
+    // одобрить второй администратор — тогда расписание уже применено, и
+    // безусловная запись поставила бы «отклонена» поверх применённой заявки.
+    // UPDATE ждёт блокировку строки, взятую одобрением, и перепроверяет условие
+    // на свежей версии строки: проигравший получает 409.
+    const rejected = await prisma.scheduleChangeRequest.updateMany({
+      where: { id: request.id, status: "PENDING" },
       data: { status: "REJECTED", comment },
     });
+    if (rejected.count === 0) throw scheduleRequestProcessedError();
 
     try {
       const fullRequest = await loadScheduleRequestWithRelations(request.id);

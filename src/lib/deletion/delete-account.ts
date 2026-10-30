@@ -3,6 +3,7 @@ import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { collectAccountMedia } from "@/lib/media/purge";
+import { markAssetsDeletedTx } from "@/lib/media/soft-delete";
 import { enqueueMediaPurge } from "@/lib/deletion/enqueue-media-purge";
 import { alertWarning } from "@/lib/monitoring";
 import { deleteMasterCabinet } from "@/lib/deletion/delete-master";
@@ -175,6 +176,12 @@ export async function deleteUserAccount(userId: string, options: AccountDeletion
     // (`account-deletion-policy.ts`): уведомления — все (решение 26.2), прочее —
     // как сейчас, пока юрист не ответил.
     await applyPolicyAtDeletionTx(tx, userId, options, undefined, now);
+
+    // MEDIA-PURGE-MARK-DELETED: снимок медиа помечается удалённым здесь же —
+    // аватар перестаёт отдаваться с коммитом, а не после `media.purge`, которая
+    // при недоступном хранилище может не дойти до строки вовсе. Байты удаляют
+    // два независимых пути: задача (ниже) и ежечасная уборка хранилища.
+    await markAssetsDeletedTx(tx, mediaToPurge.map((asset) => asset.id), now);
 
     if (invites.inviteIds.length > 0) {
       await tx.studioInvite.deleteMany({

@@ -8,6 +8,7 @@ import { requireAdminAuth } from "@/lib/auth/admin";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { logInfo } from "@/lib/logging/logger";
 import { deliverNotification } from "@/lib/notifications/delivery";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -29,6 +30,8 @@ export async function POST(req: Request, ctx: RouteContext) {
 
     // Body is optional for backwards compatibility with the legacy UI
     // that didn't send one. New admin catalog UI always sends a reason.
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const rawBody = await req.json().catch(() => undefined);
     const parsed = bodySchema.safeParse(rawBody);
     if (!parsed.success) {

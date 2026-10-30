@@ -103,21 +103,32 @@ export async function scheduleBookingReminders(bookingId: string): Promise<void>
 
   const startAtIso = booking.startAtUtc.toISOString();
   await Promise.all(
-    schedule.map((item) =>
-      enqueue(
-        createBookingReminderJob(
-          {
-            bookingId,
-            kind: item.kind,
-            startAtUtc: startAtIso,
-          },
-          {
-            runAt: item.runAt.getTime(),
-          }
-        )
-      )
-    )
+    schedule.map((item) => {
+      const payload: BookingReminderPayload = {
+        bookingId,
+        kind: item.kind,
+        startAtUtc: startAtIso,
+      };
+      return enqueue(
+        createBookingReminderJob(payload, {
+          id: bookingReminderJobId(payload),
+          runAt: item.runAt.getTime(),
+        })
+      );
+    })
   );
+}
+
+/**
+ * QUEUE-DELAYED-ZSET — id напоминания выводится из того, что оно напоминает:
+ * запись, вид и время визита. Отложенная задача ставится `ZADD NX` по id,
+ * поэтому повторное планирование того же напоминания (подтверждение, отказ от
+ * переноса, ручная запись — каждый путь зовёт планировщик сам) не кладёт в
+ * очередь вторую копию. Перенос меняет `startAtUtc`, а значит и id: новое
+ * напоминание ставится, старое отбросит сверка времени при обработке.
+ */
+export function bookingReminderJobId(payload: BookingReminderPayload): string {
+  return `booking-reminder:${payload.bookingId}:${payload.kind}:${payload.startAtUtc}`;
 }
 
 /**

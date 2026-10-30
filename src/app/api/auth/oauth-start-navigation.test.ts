@@ -261,7 +261,6 @@ describe("FIX-C6 — каждая стартовая нога объявляет
       expect.arrayContaining([
         "src/app/api/auth/vk/start/route.ts",
         "src/app/api/auth/yandex/start/route.ts",
-        "src/app/api/integrations/vk/start/route.ts",
       ]),
     );
   });

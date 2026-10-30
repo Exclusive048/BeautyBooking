@@ -9,6 +9,7 @@ import { ok, fail, tooManyRequests } from "@/lib/api/response";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { formatZodError } from "@/lib/api/validation";
 import { slugifyCategory } from "@/lib/slug";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 const MAX_SLUG_LENGTH = 60;
 const PROPOSAL_RATE_LIMIT = {
@@ -53,6 +54,8 @@ export async function POST(req: Request) {
       );
     }
 
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = await req.json().catch(() => null);
     const parsed = proposeSchema.safeParse(body);
     if (!parsed.success) {

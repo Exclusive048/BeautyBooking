@@ -10,6 +10,7 @@ import { invalidateSlotsForMaster } from "@/lib/schedule/slotsCache";
 import { resolveScheduleActor, type ScheduleActorMode } from "@/lib/schedule/schedule-actor";
 import {
   applyScheduleSnapshotTx,
+  applyStudioProfileRules,
   buildScheduleSnapshot,
   normalizeBookingRules,
   normalizeExceptionInput,
@@ -33,9 +34,14 @@ import {
   submitStudioScheduleChange,
   type ScheduleChangeOutcome,
 } from "@/lib/schedule/change-requests";
+import {
+  hasStudioProfilePersonalRules,
+  splitStudioProfileRulesEdit,
+} from "@/lib/schedule/studio-profile-rules";
 import { weekSignature } from "@/lib/schedule/patterns";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { updateMasterProfile } from "@/lib/master/profile.service";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 export const runtime = "nodejs";
 
@@ -142,6 +148,21 @@ function settingsChanged(snapshot: ScheduleEditorSnapshot, patch: SettingsPatch)
   }
   return false;
 }
+
+/**
+ * STUDIO-PROFILE-PERSONAL-RULES (решение владельца 2026-10-30, уточняет
+ * STUDIO-PROFILE-RULES-TAB-STATE): личные правила профиля В СТУДИИ — шаг
+ * окошек, паузу, окно записи, автоподтверждение, дни видимости окошек и приём
+ * новых клиентов — мастер меняет сам, сразу и без заявки (`studio-profile-
+ * rules.ts`). Заявка по-прежнему согласует только рабочее время — неделю и
+ * дни календаря. Отказ остаётся лишь на общее для студии: отмену записи,
+ * горящие окошки и точность времени в каталоге — у профиля в студии они ни на
+ * что не влияют, и «Сохранено» за них было бы молчаливым откатом.
+ * Неизменённые значения проходят, поэтому клиент, присылающий снапшот целиком
+ * вместе с неделей, не ломается.
+ */
+const STUDIO_PROFILE_SETTINGS_LOCKED =
+  "Правила отмены записи и горящие окошки в студии задаёт студия — изменить их может её администратор.";
 
 function applyPatchToState(
   snapshot: ScheduleEditorSnapshot,
@@ -311,6 +332,8 @@ export async function PATCH(req: Request) {
     if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     const actor = await resolveScheduleActor(req, user.id);
 
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = (await req.json().catch(() => null)) as PatchBody | null;
     if (!body || typeof body !== "object") {
       throw new AppError("Проверьте правильность заполнения полей.", 400, "INVALID_BODY");
@@ -347,6 +370,19 @@ export async function PATCH(req: Request) {
     }
 
     const settingsChangedNow = settingsChanged(currentSnapshot, settingsPatch);
+    // Разбор — до любой записи: отказ на общее для студии поле не должен
+    // оставить применённой личную половину той же правки.
+    const studioProfileRules =
+      actor.mode === "STUDIO_MASTER"
+        ? splitStudioProfileRulesEdit(currentSnapshot, {
+            slotStepMin: nextState.slotStepMin,
+            bufferBetweenBookingsMin: nextState.bufferBetweenBookingsMin,
+            ...settingsPatch,
+          })
+        : null;
+    if (studioProfileRules?.lockedChanged) {
+      throw new AppError(STUDIO_PROFILE_SETTINGS_LOCKED, 403, "FORBIDDEN");
+    }
     const hasChanges =
       serializeScheduleState(currentState) !== serializeScheduleState(nextState) ||
       slotStepChanged ||
@@ -355,8 +391,8 @@ export async function PATCH(req: Request) {
 
     // Hot Slots are PRO+ only. Frontend hides the toggle for non-PRO plans
     // but the backend re-checks here in case the request was crafted by
-    // hand. STUDIO_MASTER never reaches this branch (their flow uses the
-    // change-request payload, which doesn't carry hotSlots).
+    // hand. STUDIO_MASTER never reaches this branch: a changed hotSlots is
+    // refused above (STUDIO-PROFILE-PERSONAL-RULES).
     const hotSlotsTouched =
       settingsPatch.hotSlots !== undefined &&
       JSON.stringify(settingsPatch.hotSlots) !== JSON.stringify(currentSnapshot.hotSlots);
@@ -389,8 +425,9 @@ export async function PATCH(req: Request) {
       }
       // SCHEDULE-STUDIO-PROFILE-CALENDAR: правки копятся в открытой заявке —
       // неделя «Часов» и изменённые «Особые дни» (как правки дней), а не
-      // заменяют её целиком. Правила записи и видимость профиля в студии
-      // заявкой не согласуются (раньше они молча выпадали из тела заявки).
+      // заменяют её целиком. Правила записи заявкой не согласуются: личные
+      // применяются ниже сразу, общие для студии отказаны выше
+      // (STUDIO-PROFILE-PERSONAL-RULES).
       const outcomes: ScheduleChangeOutcome[] = [];
       const route = "PATCH /api/cabinet/master/schedule";
       if (weekSignature(nextState.weekSchedule) !== weekSignature(currentState.weekSchedule)) {
@@ -423,6 +460,13 @@ export async function PATCH(req: Request) {
           }),
         );
       }
+      // После заявки: она может отказать 4xx на проверке, а личные правила —
+      // одна запись строки профиля.
+      const personal = studioProfileRules?.personal ?? {};
+      const personalApplied = hasStudioProfilePersonalRules(personal);
+      if (personalApplied) {
+        await applyStudioProfileRules(actor.providerId, personal);
+      }
       const data = await buildResponse({
         providerId: actor.providerId,
         mode: actor.mode,
@@ -430,7 +474,9 @@ export async function PATCH(req: Request) {
           ? "REQUEST_CREATED"
           : outcomes.some((outcome) => outcome !== "unchanged")
             ? "REQUEST_UPDATED"
-            : "NO_CHANGES",
+            : personalApplied
+              ? "APPLIED"
+              : "NO_CHANGES",
       });
       return jsonOk(data);
     }

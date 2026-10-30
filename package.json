@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": "20.20.2"
+    "node": "26.13.0"
   },
   "scripts": {
     "predev": "node scripts/check-node-version.mjs",
@@ -95,7 +95,7 @@
   "devDependencies": {
     "@next/bundle-analyzer": "^16.2.4",
     "@playwright/test": "^1.60.0",
-    "@types/node": "^20",
+    "@types/node": "^26.6.6",
     "@types/nodemailer": "^6.4.14",
     "@types/react": "^19",
     "@types/react-dom": "^19",

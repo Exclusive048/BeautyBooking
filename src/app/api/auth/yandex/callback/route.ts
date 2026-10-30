@@ -9,7 +9,7 @@ import {
   readMobileOAuthFlowCookie,
   type MobileOAuthFlow,
 } from "@/lib/auth/mobile-oauth-flow";
-import { linkOAuthIdentity, resolveOAuthLogin } from "@/lib/auth/oauth-login";
+import { linkOAuthIdentity, resolveOAuthLogin, webOAuthLoginRefusalPath } from "@/lib/auth/oauth-login";
 import { completeMobileOAuthCallback, mobileOAuthStateInvalid } from "@/lib/auth/oauth-mobile-callback";
 import { phoneVerifyResultPath, takePhoneVerifyReturn } from "@/lib/auth/phone-verify-return";
 import { getSessionUser, setSessionCookies } from "@/lib/auth/session";
@@ -181,7 +181,8 @@ export async function GET(req: Request) {
       // RKN-FIX-01 fail-safe — no consent, no account (inside `resolveOAuthLogin`).
       const resolution = await resolveOAuthLogin({ identity, consent });
       if (!resolution.ok) {
-        return nextRedirect(req, "/login?error=consent");
+        // RKN-FIX-01 (нет согласий) либо USER-BLOCKING-01 (аккаунт заблокирован).
+        return nextRedirect(req, webOAuthLoginRefusalPath(resolution.reason));
       }
       const { user } = resolution;
 

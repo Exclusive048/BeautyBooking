@@ -9,6 +9,7 @@ import { createStudioMasterSchema, studioServicesQuerySchema } from "@/lib/studi
 import { createStudioMaster, listStudioMasters } from "@/lib/studio/masters.service";
 import { parseBody, parseQuery } from "@/lib/validation";
 import { ensureStudioTeamLimit } from "@/lib/studio/team-limits";
+import { takeStudioInviteSendBudget } from "@/lib/studio/invite-send-limit";
 
 export const runtime = "nodejs";
 
@@ -53,10 +54,31 @@ export async function POST(req: Request) {
 
     await ensureStudioTeamLimit(body.studioId);
 
-    const data = await createStudioMaster({
-      ...body,
-      invitedByUserId: user.id,
-    });
+    // STUDIO-INVITE-LIMITS (D-03): попытку тратит новое приглашение, а не
+    // запрос. Бюджет берётся после проверки прав (чужой не выберет суточный
+    // бюджет студии) и возвращается, если приглашение не создано: отказ
+    // (мастер уже добавлен, предел неотвеченных) или повтор на тот же адрес.
+    const budget = await takeStudioInviteSendBudget(req, { studioId: body.studioId, userId: user.id });
+    if (!budget.ok) {
+      const { refusal } = budget;
+      const response = jsonFail(refusal.status, refusal.message, refusal.code, {
+        retryAfterSeconds: refusal.retryAfterSeconds,
+      });
+      response.headers.set("Retry-After", String(Math.ceil(refusal.retryAfterSeconds)));
+      return response;
+    }
+
+    let data: Awaited<ReturnType<typeof createStudioMaster>>;
+    try {
+      data = await createStudioMaster({
+        ...body,
+        invitedByUserId: user.id,
+      });
+    } catch (error) {
+      await budget.refund();
+      throw error;
+    }
+    if (!data.shouldNotifyInvite) await budget.refund();
 
     if (data.shouldNotifyInvite) {
       try {

@@ -1,7 +1,7 @@
 import "server-only";
 
-import type { Prisma } from "@prisma/client";
-import { AppError } from "@/lib/api/errors";
+import { Prisma } from "@prisma/client";
+import { AppError, toAppError } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import {
   loadScheduleRequestWithRelations,
@@ -9,11 +9,13 @@ import {
 } from "@/lib/notifications/studio-notifications";
 import { prisma } from "@/lib/prisma";
 import { paintScheduleDaysTx, calendarDayFromPlan } from "@/lib/schedule/calendar";
+import { scheduleRequestProcessedError } from "@/lib/schedule/change-request-conflict";
 import type { CalendarPaintAction } from "@/lib/schedule/calendar-shared";
 import { addDaysToDateKey } from "@/lib/schedule/dateKey";
 import { loadDayPlans } from "@/lib/schedule/day-plans";
 import {
   SCHEDULE_SNAPSHOT_TX_OPTIONS,
+  applyScheduleSnapshotTx,
   isScheduleEditorRequestPayload,
   normalizeExceptionInput,
   normalizeScheduleEditorRequestPayload,
@@ -50,6 +52,17 @@ import { toLocalDateKey } from "@/lib/schedule/timezone";
  * Прежние форматы (`EDITOR_V1` — неделя и полный список «Особых дней»,
  * `PATTERN_V1` — график) больше не создаются; открытая заявка такого формата
  * при следующей правке переносится в новый без потери содержимого.
+ *
+ * SCHEDULE-REQUEST-ATOMIC — правка мастера и решение студии меняют одну и ту
+ * же строку, и делают это разные люди одновременно. Раньше оба шли как
+ * «прочитать → посчитать → записать по id»: мастер дописывал день в заявку,
+ * которую администратор в этот момент применял, и заявка становилась
+ * «одобренной» вместе с днём, которого в расписании нет; два администратора
+ * применяли её дважды, а статус ставил тот, кто записал последним. Теперь
+ * обе стороны сначала берут блокировку строки заявки (`FOR UPDATE`), а
+ * читают и пишут уже под ней, одной транзакцией. Изоляция — обычная (Read
+ * Committed): каждый оператор после блокировки видит закоммиченное
+ * соперником, а Serializable здесь ничего не добавил бы, кроме ретраев.
  */
 
 type Db = Prisma.TransactionClient;
@@ -155,9 +168,58 @@ export async function loadPendingScheduleChanges(providerId: string): Promise<Sc
 export type ScheduleChangeOutcome = "created" | "updated" | "withdrawn" | "unchanged";
 
 /**
+ * Очередь сабмитов одного профиля — первым оператором транзакции. Блокировка
+ * строки заявки не закрывает случай, когда открытой заявки ЕЩЁ НЕТ: блокировать
+ * нечего, и два почти одновременных сабмита (две вкладки, приложение и сайт)
+ * оба создали бы по заявке — правило «одна открытая заявка на профиль»
+ * нарушено, а правки разъехались бы по двум заявкам. Частичный уникальный
+ * индекс по `providerId WHERE status = 'PENDING'` закрыл бы это на уровне БД,
+ * но это сырой SQL-объект вне датамодели (реестр, сторож дропов в миграциях) —
+ * транзакционная advisory-блокировка даёт ту же очередь без изменения схемы и
+ * снимается сама на коммите или откате. Ключ — строка с пространством имён:
+ * совпадение `hashtext` у двух профилей (32 бита) лишь заставит их сабмиты
+ * подождать друг друга, на корректность не влияет. Решение студии этой
+ * блокировки не берёт — его с сабмитом упорядочивает блокировка строки.
+ */
+async function lockProfileScheduleRequestsTx(tx: Db, providerId: string): Promise<void> {
+  const key = `schedule-request:${providerId}`;
+  // `$executeRaw`, а не `$queryRaw`: функция возвращает `void`, а такую колонку
+  // `$queryRaw` прочитать не умеет.
+  await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${key}::text))`);
+}
+
+type OpenRequest = { id: string; payloadJson: Prisma.JsonValue };
+
+/**
+ * Открытая заявка профиля под блокировкой строки. Если её в этот момент
+ * одобряет или отклоняет студия, оператор ждёт коммита решения, после чего
+ * строка уже не PENDING и в выборку не попадает (Postgres перепроверяет условие
+ * на свежей версии строки) — правка уходит в НОВУЮ заявку, а не дописывается в
+ * обработанную. Тело читается вторым оператором, уже после блокировки, —
+ * значит, с тем, что закоммитил соперник.
+ */
+async function lockOpenRequestTx(tx: Db, providerId: string): Promise<OpenRequest | null> {
+  const rows = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+    SELECT id FROM "ScheduleChangeRequest"
+    WHERE "providerId" = ${providerId} AND status = 'PENDING'
+    ORDER BY "createdAt" DESC
+    LIMIT 1
+    FOR UPDATE`);
+  const id = rows[0]?.id;
+  if (!id) return null;
+  return tx.scheduleChangeRequest.findUnique({ where: { id }, select: { id: true, payloadJson: true } });
+}
+
+/**
  * Правка мастера на профиле в студии → открытая заявка. Новая заявка
  * создаётся (студии — уведомление), существующая дополняется; правка, после
  * которой в заявке ничего не осталось, заявку отзывает.
+ *
+ * Прочитать заявку, слить правку и записать — одна транзакция под блокировкой
+ * строки заявки (SCHEDULE-REQUEST-ATOMIC): сабмит, совпавший с одобрением,
+ * дожидается его и создаёт новую заявку. Бюджет транзакции — как у одобрения
+ * (`SCHEDULE_SNAPSHOT_TX_OPTIONS`): ожидание блокировки входит в него, а
+ * одобрение держит строку, пока применяет расписание.
  */
 export async function submitStudioScheduleChange(input: {
   req: Request;
@@ -173,46 +235,62 @@ export async function submitStudioScheduleChange(input: {
   });
   if (!studio) throw new AppError("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
 
-  const pending = await prisma.scheduleChangeRequest.findFirst({
-    where: { providerId: input.providerId, status: "PENDING" },
-    orderBy: { createdAt: "desc" },
-    select: { id: true, payloadJson: true },
-  });
-  const payload = pending
-    ? await toScheduleChangesPayload(prisma, input.providerId, pending.payloadJson, input.now)
-    : emptyScheduleChanges();
+  const result = await prisma.$transaction(
+    async (tx: Db): Promise<{ outcome: ScheduleChangeOutcome; createdId?: string }> => {
+      await lockProfileScheduleRequestsTx(tx, input.providerId);
+      const pending = await lockOpenRequestTx(tx, input.providerId);
+      const payload = pending
+        ? await toScheduleChangesPayload(tx, input.providerId, pending.payloadJson, input.now)
+        : emptyScheduleChanges();
 
-  // «Как по графику» — изменение, только если у даты в расписании есть своя правка.
-  let overriddenDates = new Set<string>();
-  if (input.change.kind === "days" && input.change.dates.length > 0) {
-    const rows = await prisma.scheduleOverride.findMany({
-      where: {
-        providerId: input.providerId,
-        date: { in: input.change.dates.map((date) => parseDateKeyToUtcStart(date)) },
-      },
-      select: { date: true },
-    });
-    overriddenDates = new Set(rows.map((row) => row.date.toISOString().slice(0, 10)));
-  }
-  const merged = mergeScheduleChange(payload, input.change, { overriddenDates });
+      // «Как по графику» — изменение, только если у даты в расписании есть своя
+      // правка. Читается под блокировкой: если сабмит дождался одобрения, он
+      // видит уже применённые им дни.
+      let overriddenDates = new Set<string>();
+      if (input.change.kind === "days" && input.change.dates.length > 0) {
+        const rows = await tx.scheduleOverride.findMany({
+          where: {
+            providerId: input.providerId,
+            date: { in: input.change.dates.map((date) => parseDateKeyToUtcStart(date)) },
+          },
+          select: { date: true },
+        });
+        overriddenDates = new Set(rows.map((row) => row.date.toISOString().slice(0, 10)));
+      }
+      const merged = mergeScheduleChange(payload, input.change, { overriddenDates });
 
-  if (isEmptyScheduleChanges(merged)) {
-    if (!pending) return "unchanged";
-    await prisma.scheduleChangeRequest.delete({ where: { id: pending.id } });
-    return "withdrawn";
-  }
-  const payloadJson = merged as unknown as Prisma.InputJsonValue;
-  if (pending) {
-    await prisma.scheduleChangeRequest.update({ where: { id: pending.id }, data: { payloadJson } });
-    return "updated";
-  }
+      // Условие на статус — вторая страховка поверх блокировки: в обработанную
+      // заявку не пишем и обработанную не удаляем, даже если кто-то когда-то
+      // уберёт блокировку выше.
+      if (isEmptyScheduleChanges(merged)) {
+        if (!pending) return { outcome: "unchanged" };
+        const removed = await tx.scheduleChangeRequest.deleteMany({ where: { id: pending.id, status: "PENDING" } });
+        if (removed.count === 0) throw scheduleRequestProcessedError();
+        return { outcome: "withdrawn" };
+      }
+      const payloadJson = merged as unknown as Prisma.InputJsonValue;
+      if (pending) {
+        const updated = await tx.scheduleChangeRequest.updateMany({
+          where: { id: pending.id, status: "PENDING" },
+          data: { payloadJson },
+        });
+        if (updated.count === 0) throw scheduleRequestProcessedError();
+        return { outcome: "updated" };
+      }
 
-  const created = await prisma.scheduleChangeRequest.create({
-    data: { studioId: studio.id, providerId: input.providerId, payloadJson, status: "PENDING" },
-    select: { id: true },
-  });
+      const created = await tx.scheduleChangeRequest.create({
+        data: { studioId: studio.id, providerId: input.providerId, payloadJson, status: "PENDING" },
+        select: { id: true },
+      });
+      return { outcome: "created", createdId: created.id };
+    },
+    SCHEDULE_SNAPSHOT_TX_OPTIONS,
+  );
+
+  if (result.outcome !== "created" || !result.createdId) return result.outcome;
+  // Уведомление студии — после коммита: до него заявки для неё ещё нет.
   try {
-    const createdRequest = await loadScheduleRequestWithRelations(created.id);
+    const createdRequest = await loadScheduleRequestWithRelations(result.createdId);
     if (createdRequest) await notifyScheduleRequestSubmitted(createdRequest);
   } catch (error) {
     logError(`${input.route} request notification failed`, {
@@ -225,16 +303,24 @@ export async function submitStudioScheduleChange(input: {
 }
 
 /**
- * Одобрение заявки нового формата: неделя или график, затем дни — одной
- * транзакцией. Заявка могла пролежать: прошедшие дни пропускаются, дата начала
- * графика сдвигается на сегодня (`patternRequestForApproval`). Рабочий день
- * палитры, который удалили после отправки, — повод отправить заявку заново.
+ * Применение заявки нового формата (`CHANGES_V1`, а также `PATTERN_V1` — он
+ * переводится в набор правок с одним графиком, `toScheduleChangesPayload`):
+ * неделя или график, затем дни — внутри транзакции одобрения. Заявка могла
+ * пролежать: прошедшие дни пропускаются, дата начала графика сдвигается на
+ * сегодня (`patternRequestForApproval`). Рабочий день палитры, который удалили
+ * после отправки, — повод отправить заявку заново. Кэш окошек сбрасывает
+ * вызывающий после коммита.
  */
-export async function applyScheduleChangesRequest(providerId: string, raw: unknown, now = new Date()): Promise<void> {
-  const timezone = await loadTimezone(prisma, providerId);
+export async function applyScheduleChangesRequestTx(
+  tx: Db,
+  providerId: string,
+  raw: unknown,
+  now = new Date(),
+): Promise<void> {
+  const timezone = await loadTimezone(tx, providerId);
   const todayKey = toLocalDateKey(now, timezone);
   const lastKey = addDaysToDateKey(todayKey, SCHEDULE_HORIZON_DAYS);
-  const payload = await toScheduleChangesPayload(prisma, providerId, raw, now);
+  const payload = await toScheduleChangesPayload(tx, providerId, raw, now);
   const days = payload.days.filter((day) => day.date >= todayKey && day.date <= lastKey);
   const groups = new Map<string, { action: CalendarPaintAction; dates: string[] }>();
   for (const day of days) {
@@ -244,27 +330,105 @@ export async function applyScheduleChangesRequest(providerId: string, raw: unkno
     groups.set(key, group);
   }
 
-  await prisma.$transaction(async (tx: Db) => {
-    if (payload.week) await saveWeekAsPatternTx(tx, providerId, normalizeWeekScheduleInput(payload.week));
-    if (payload.pattern) {
-      await applyPatternRequestTx(tx, providerId, patternRequestForApproval(payload.pattern, todayKey), todayKey);
-    }
-    for (const group of groups.values()) {
-      if (group.action.kind === "template") {
-        const exists = await tx.scheduleTemplate.count({ where: { id: group.action.templateId, providerId } });
-        if (exists === 0) {
-          throw new AppError(
-            "Рабочий день из заявки удалён. Попросите мастера отправить заявку заново.",
-            422,
-            "INVALID_REQUEST_PAYLOAD",
-          );
-        }
+  if (payload.week) await saveWeekAsPatternTx(tx, providerId, normalizeWeekScheduleInput(payload.week));
+  if (payload.pattern) {
+    await applyPatternRequestTx(tx, providerId, patternRequestForApproval(payload.pattern, todayKey), todayKey);
+  }
+  for (const group of groups.values()) {
+    if (group.action.kind === "template") {
+      const exists = await tx.scheduleTemplate.count({ where: { id: group.action.templateId, providerId } });
+      if (exists === 0) {
+        throw new AppError(
+          "Рабочий день из заявки удалён. Попросите мастера отправить заявку заново.",
+          422,
+          "INVALID_REQUEST_PAYLOAD",
+        );
       }
-      await paintScheduleDaysTx(tx, providerId, group.dates, group.action);
     }
+    await paintScheduleDaysTx(tx, providerId, group.dates, group.action);
+  }
+}
+
+/**
+ * Тело заявки любого формата → расписание, внутри транзакции одобрения.
+ * `CHANGES_V1` и `PATTERN_V1` — одним путём (для графика это тот же вызов, что
+ * делало прежнее отдельное одобрение графика); `EDITOR_V1` — снапшотом, как
+ * раньше. Иной формат (`{ templates, weekly, overrides }` до
+ * SCHEDULE-PATTERNS-01) писал бы в недельную таблицу, которую у профиля с
+ * графиком движок не читает, — одобрение молча ничего бы не изменило, поэтому
+ * отказ.
+ *
+ * STUDIO-APPROVE-400-FIX-A: «тело запроса некорректно» (`INVALID_BODY`) честно
+ * с точки зрения сервера, но администратор студии заявку не писал — её писал
+ * мастер. Отказ становится 422 с понятным шагом: попросить мастера отправить
+ * заявку заново.
+ */
+async function applyScheduleRequestPayloadTx(tx: Db, providerId: string, raw: unknown, now: Date): Promise<void> {
+  try {
+    if (isScheduleChangesPayload(raw) || isPatternChangeRequestPayload(raw)) {
+      await applyScheduleChangesRequestTx(tx, providerId, raw, now);
+    } else if (isScheduleEditorRequestPayload(raw)) {
+      await applyScheduleSnapshotTx(tx, providerId, normalizeScheduleEditorRequestPayload(raw));
+    } else {
+      throw new AppError("Заявка в старом формате.", 400, "INVALID_BODY");
+    }
+  } catch (error) {
+    const appError = toAppError(error);
+    if (appError.status === 400 && appError.code === "INVALID_BODY") {
+      throw new AppError(
+        "Не удалось применить расписание: данные запроса повреждены или устарели. Попросите мастера отправить заявку заново.",
+        422,
+        "INVALID_REQUEST_PAYLOAD",
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Одобрение заявки студией — ОДНА транзакция (SCHEDULE-REQUEST-ATOMIC):
+ * блокировка строки заявки → статус и тело читаются заново, уже под ней →
+ * расписание → статус `APPROVED`. Порядок обязателен: условная смена статуса
+ * ПОСЛЕ применения ничего не дала бы — при проигрыше гонки расписание уже
+ * записано, и откатывать нечем.
+ *
+ * Что это даёт: сабмит мастера, начатый во время одобрения, ждёт его коммита и
+ * создаёт новую заявку (правка не дописывается в одобренную и не теряется);
+ * правка, закоммиченная до блокировки, попадает в одобряемое тело; второе
+ * «Одобрить» или «Отклонить» видит не PENDING и получает 409, а расписание
+ * применено один раз. Отозванная мастером заявка — 404, как несуществующая.
+ *
+ * Кэш окошек и версии расписания — после коммита: до него сбрасывать нечего,
+ * а откат оставил бы кэш вычищенным под старые данные. Уведомление мастеру
+ * шлёт вызывающий, тоже после коммита.
+ */
+export async function approveScheduleChangeRequest(input: {
+  requestId: string;
+  studioId: string;
+  now?: Date;
+}): Promise<{ id: string; providerId: string }> {
+  const now = input.now ?? new Date();
+  const approved = await prisma.$transaction(async (tx: Db) => {
+    const locked = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT id FROM "ScheduleChangeRequest"
+      WHERE id = ${input.requestId} AND "studioId" = ${input.studioId}
+      FOR UPDATE`);
+    if (locked.length === 0) throw new AppError("Запрос не найден.", 404, "NOT_FOUND");
+
+    const request = await tx.scheduleChangeRequest.findUnique({
+      where: { id: input.requestId },
+      select: { id: true, status: true, providerId: true, payloadJson: true },
+    });
+    if (!request) throw new AppError("Запрос не найден.", 404, "NOT_FOUND");
+    if (request.status !== "PENDING") throw scheduleRequestProcessedError();
+
+    await applyScheduleRequestPayloadTx(tx, request.providerId, request.payloadJson, now);
+    await tx.scheduleChangeRequest.update({ where: { id: request.id }, data: { status: "APPROVED" } });
+    return { id: request.id, providerId: request.providerId };
   }, SCHEDULE_SNAPSHOT_TX_OPTIONS);
 
-  await invalidateSlotsForMaster(providerId);
+  await invalidateSlotsForMaster(approved.providerId);
+  return approved;
 }
 
 /**

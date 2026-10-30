@@ -24,10 +24,8 @@
 /api/admin/app-settings
 /api/admin/billing
 /api/admin/billing/kpis
-/api/admin/billing/payments
 /api/admin/billing/plans/{id}
 /api/admin/billing/refund
-/api/admin/billing/subscriptions
 /api/admin/billing/subscriptions/{id}/cancel
 /api/admin/catalog
 /api/admin/catalog/categories
@@ -77,13 +75,11 @@
 /api/analytics/revenue/by-service
 /api/analytics/revenue/forecast
 /api/analytics/revenue/timeline
-/api/auth/account-type/set
 /api/auth/otp/email/request
 /api/auth/otp/email/verify
 /api/auth/otp/request
 /api/auth/otp/verify
 /api/auth/refresh
-/api/auth/roles/add
 /api/auth/telegram/link
 /api/auth/telegram/login
 /api/auth/telegram/unlink
@@ -127,7 +123,6 @@
 /api/home/portfolio/{id}
 /api/home/tags
 /api/hot-slots/subscribe
-/api/integrations/vk/settings
 /api/invites/{id}/accept
 /api/invites/{id}/reject
 /api/log-error

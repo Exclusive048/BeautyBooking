@@ -34,6 +34,11 @@ type Props = {
    * видимость страницы решается в личном расписании.
    */
   showPublished?: boolean;
+  /**
+   * STUDIO-PROFILE-PERSONAL-RULES: точность времени действует в каталоге, а
+   * профиля в студии в каталоге нет — строку не показываем.
+   */
+  showPrecision?: boolean;
 };
 
 /**
@@ -41,7 +46,12 @@ type Props = {
  * visible horizon. `isPublished = false` removes the provider from the
  * catalog (existing public-catalog behaviour).
  */
-export function SlotVisibilitySection({ visibility, onChange, showPublished = true }: Props) {
+export function SlotVisibilitySection({
+  visibility,
+  onChange,
+  showPublished = true,
+  showPrecision = true,
+}: Props) {
   return (
     <section className="rounded-2xl border border-border-subtle bg-bg-card p-5">
       <h2 className="mb-4 font-display text-lg text-text-main">{T.title}</h2>
@@ -62,17 +72,19 @@ export function SlotVisibilitySection({ visibility, onChange, showPublished = tr
             }
           />
         ) : null}
-        <SettingRow
-          title={T.precisionTitle}
-          subtitle={T.precisionSubtitle}
-          control={
-            <ChipGroup
-              value={visibility.slotPrecision}
-              onChange={(value) => onChange({ ...visibility, slotPrecision: value })}
-              options={PRECISION_OPTIONS}
-            />
-          }
-        />
+        {showPrecision ? (
+          <SettingRow
+            title={T.precisionTitle}
+            subtitle={T.precisionSubtitle}
+            control={
+              <ChipGroup
+                value={visibility.slotPrecision}
+                onChange={(value) => onChange({ ...visibility, slotPrecision: value })}
+                options={PRECISION_OPTIONS}
+              />
+            }
+          />
+        ) : null}
         <SettingRow
           title={T.daysTitle}
           subtitle={T.daysSubtitle}

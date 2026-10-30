@@ -38,6 +38,12 @@ import { exportedHandlerMethods } from "@/lib/testing/route-handlers";
  *      она идёт по тому же роуту, + пин с двумя именами);
  *   5. вернуть прокси статус 429 вместо 503 на ветке `unavailable` → 4 failed:
  *      все четыре представителя, «expected 429 to be 503».
+ *   6. (CRM-MOBILE-FAIL-CLOSED, 2026-10-30) убрать `"/api/cabinet/studio/clients"`
+ *      → 2 failed: представитель «(в) ПДн · мобильное чтение CRM» — «запрос
+ *      ушёл в обработчик…: expected true to be false» и пин «… GET
+ *      /api/cabinet/studio/clients, GET /api/cabinet/studio/clients/[clientKey]»;
+ *      убрать точный шаблон `"/api/cabinet/master/bookings/:id"` → 1 failed:
+ *      пин «… GET /api/cabinet/master/bookings/[id]».
  *
  * ⚠️ Ложный красный при постройке: первый прогон шёл с `--reporter=basic`
  * (в vitest 4 такого репортёра нет), и падение загрузчика читалось как
@@ -113,6 +119,13 @@ const CLASS_SUBTREES: Array<{ label: string; subtrees: string[] }> = [
       "/api/master/clients",
       "/api/chat/threads",
       "/api/integrations/vk",
+      // CRM-MOBILE-FAIL-CLOSED: мобильные чтения CRM, «История событий» админки
+      // и карточки записи приложения (точные шаблоны — список под ними fail-open).
+      "/api/cabinet/master/clients",
+      "/api/cabinet/studio/clients",
+      "/api/admin/dashboard/events",
+      "/api/cabinet/master/bookings/[id]",
+      "/api/cabinet/studio/bookings/[id]",
     ],
   },
   {
@@ -166,6 +179,8 @@ const REPRESENTATIVES: Array<{ label: string; method: string; pathname: string }
   { label: "(а) админские деньги", method: "POST", pathname: "/api/admin/billing/refund" },
   { label: "(б) booking-write вне /api/bookings", method: "POST", pathname: "/api/master/bookings" },
   { label: "(в) ПДн", method: "PATCH", pathname: "/api/master/clients/ck-client-1/card" },
+  // Чтение, а не запись: карточка клиента студии по ключу гостя (номер телефона).
+  { label: "(в) ПДн · мобильное чтение CRM", method: "GET", pathname: "/api/cabinet/studio/clients/79991234567" },
   { label: "(г) создание аккаунта / подписки", method: "POST", pathname: "/api/profiles/master" },
 ];
 
@@ -286,4 +301,17 @@ describe("FIX-B12 · производный пин: класс целиком fa
       ).toEqual([]);
     });
   }
+
+  it("контроль CRM-MOBILE-FAIL-CLOSED: списки записей приложения и панель админки остаются fail-open", () => {
+    // Карточки записи закрыты точными шаблонами, а не префиксом: под префиксом
+    // лежит список, на котором главные экраны приложения (телефона в нём нет).
+    // «История событий» закрыта своим поддеревом, а не всем `/api/admin/dashboard`.
+    for (const route of [
+      "/api/cabinet/master/bookings",
+      "/api/cabinet/studio/bookings",
+      "/api/admin/dashboard/health",
+    ]) {
+      expect(isSensitiveRouteKey(proxyKey("GET", route)), route).toBe(false);
+    }
+  });
 });

@@ -1,15 +1,16 @@
 # Версия Node — ровно та, что в .nvmrc: та же в CI и локально (NODE-VERSION-PIN-01,
 # сторож scripts/node-version.test.ts). Плавающий тег node:20-alpine приносил новый
-# ICU без ведома проекта — так пришёл час «24:00» (TZ-HOUR-CYCLE-H23).
+# ICU без ведома проекта — так пришёл час «24:00» (TZ-HOUR-CYCLE-H23). Node 26 — Active
+# LTS (поддержка до 30.04.2029), NODE-LTS-UPGRADE.
 # ─── Stage 1: Install ALL dependencies ───────────────────────────────────────
-FROM node:20.20.2-alpine AS deps
+FROM node:26.13.0-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 COPY package.json package-lock.json ./
 RUN npm ci
 
 # ─── Stage 2: Build ──────────────────────────────────────────────────────────
-FROM node:20.20.2-alpine AS builder
+FROM node:26.13.0-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -84,7 +85,7 @@ ENV NODE_OPTIONS=$BUILD_NODE_OPTIONS
 RUN npm run build
 
 # ─── Stage 3: Production runner ──────────────────────────────────────────────
-FROM node:20.20.2-alpine AS runner
+FROM node:26.13.0-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production \

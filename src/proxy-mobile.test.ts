@@ -119,6 +119,9 @@ describe("мобильные тиры лимитера", () => {
     "/api/mobile/v1/auth/oauth/exchange",
     "/api/mobile/v1/auth/oauth/vk/link-intent",
     "/api/mobile/v1/auth/oauth/yandex/link-intent",
+    // MOBILE-OAUTH-LINK-COMPLETE: шаг приложения, завершающий привязку
+    // (сегменты `link` / `complete` литеральные).
+    "/api/mobile/v1/auth/oauth/link/complete",
   ])("%s — тир mobileAuth, шаблон без :id", async (pathname) => {
     const result = await callProxy("POST", pathname);
     expect(result.passedThrough).toBe(true);
@@ -136,7 +139,11 @@ describe("мобильные тиры лимитера", () => {
     expect(result.body).toMatchObject({ ok: false, error: { code: "RATE_LIMITED" } });
   });
 
-  it.each(["/api/mobile/v1/auth/refresh", "/api/mobile/v1/auth/otp/verify"])(
+  it.each([
+    "/api/mobile/v1/auth/refresh",
+    "/api/mobile/v1/auth/otp/verify",
+    "/api/mobile/v1/auth/oauth/link/complete",
+  ])(
     "обрыв Redis: %s — 503 RATE_LIMIT_UNAVAILABLE, обработчик не вызван",
     async (pathname) => {
       redis.available = false;

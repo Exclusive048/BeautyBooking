@@ -61,7 +61,11 @@ describe("публичные поля отказывают на запрещён
 
 describe("отказ доходит до человека", () => {
   it("parseBody — 422 FORBIDDEN_WORDS и понятная строка", async () => {
-    const req = new Request("http://localhost/x", { method: "POST", body: JSON.stringify({ text: BAD }) });
+    const req = new Request("http://localhost/x", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: BAD }),
+    });
     const error = await parseBody(req, reviewReplySchema).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(AppError);
     expect((error as AppError).status).toBe(422);
