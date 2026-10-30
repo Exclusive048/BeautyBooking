@@ -139,18 +139,6 @@ export function formatDayLabel(date: Date): string {
   return `${weekday}, ${date.getDate()} ${month}`;
 }
 
-/** "14 — 20 апреля 2026" — week-range label for the page subtitle. */
-export function formatWeekRange(weekStart: Date): string {
-  const end = new Date(weekStart);
-  end.setDate(end.getDate() + 6);
-  const startMonth = MONTHS_GENITIVE[weekStart.getMonth()] ?? "";
-  const endMonth = MONTHS_GENITIVE[end.getMonth()] ?? "";
-  if (weekStart.getMonth() === end.getMonth()) {
-    return `${weekStart.getDate()} — ${end.getDate()} ${endMonth} ${end.getFullYear()}`;
-  }
-  return `${weekStart.getDate()} ${startMonth} — ${end.getDate()} ${endMonth} ${end.getFullYear()}`;
-}
-
 /** Convert a `HH:mm` working-time string into minutes-since-midnight. */
 export function hhmmToMinutes(hhmm: string): number {
   const [hStr, mStr] = hhmm.split(":");

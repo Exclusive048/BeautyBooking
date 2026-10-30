@@ -7,17 +7,23 @@ import { prisma } from "@/lib/prisma";
 import { isStudioMasterActive } from "@/lib/studio/master-eligibility";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { addDaysToDateKey, dateFromLocalDateKey } from "@/lib/schedule/dateKey";
+import {
+  FREE_WINDOW_FALLBACK_MIN,
+  computeFreeWindows,
+  freeWindowsCount,
+  nowMinuteForDay,
+  type FreeWindowsDay,
+  type MinuteRange,
+} from "@/lib/schedule/free-windows";
 import { bookingToneFromStatus } from "../lib/booking-status-display";
 import { mapProposedReschedule } from "../lib/reschedule-decision";
 import {
-  DAY_END_HOUR,
-  DAY_START_HOUR,
   parseDateKey,
   resolveGridWindow,
   salonMinuteOfDay,
   toDateKey,
 } from "../lib/time-grid";
-import { dayPlanHours, loadDayPlans } from "@/lib/schedule/day-plans";
+import { dayPlanHours, dayPlanWorkMinutes, loadDayPlans } from "@/lib/schedule/day-plans";
 import { timeToMinutes } from "@/lib/schedule/time";
 import type { DayPlan } from "@/lib/schedule/types";
 import type {
@@ -45,6 +51,11 @@ import { loadStudioWeekCells } from "./calendar-week.service";
  * operations. This service therefore reads/writes Booking and
  * TimeBlock tables directly; the approval queue lives on a separate
  * page (`/cabinet/studio/schedule-requests`).
+ *
+ * SCHEDULE-FLEX-DATE-NAV (2026-10-30): день и неделя собираются одной
+ * загрузкой диапазона (`loadRange`) — неделя теперь показывает записи
+ * мастеров, а не только проценты; показатели и свободные окошки считаются
+ * по плану дня движка (часы, перерывы, «Фиксированное время»).
  */
 
 const ACTIVE_BOOKING_STATUSES_NOTIN = [
@@ -53,7 +64,21 @@ const ACTIVE_BOOKING_STATUSES_NOTIN = [
   BookingStatus.NO_SHOW,
 ];
 
-const DAILY_CAPACITY = 5;
+const CONFIRMED_STATUSES: ReadonlySet<BookingStatus> = new Set([
+  BookingStatus.CONFIRMED,
+  BookingStatus.PREPAID,
+  BookingStatus.STARTED,
+  BookingStatus.IN_PROGRESS,
+  BookingStatus.FINISHED,
+]);
+
+const DAY_MINUTES = 24 * 60;
+/**
+ * Загрузка дня «Фиксированное время» в минутах не меряется (ёмкость — число
+ * начал). Для общего процента периода одно начало считается часом — так оно
+ * весит наравне с часом обычного дня.
+ */
+const FIXED_SLOT_WEIGHT_MIN = 60;
 
 function startOfUtcWeekMonday(now: Date): Date {
   const day = now.getUTCDay();
@@ -89,47 +114,114 @@ function salonDayBounds(dateKey: string, timeZone: string): { start: Date; end: 
   };
 }
 
-type DayBuild = {
-  day: ScheduleDayData;
-  /**
-   * MOBILE-STUDIO-C (ops): план дня каждого АКТИВНОГО мастера (id колонки →
-   * план движка на `dateKey`). Веб берёт из него только окно сетки; приложению
-   * нужны сами часы и перерывы колонок.
-   */
-  plans: Map<string, DayPlan>;
+/** Отрезок `[start, end)` в минутах дня салона `dayStart…dayEnd`; вне дня — `null`. */
+function clampToSalonDay(
+  startIso: string,
+  endIso: string,
+  bounds: { start: Date; end: Date },
+  timeZone: string,
+): MinuteRange | null {
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  if (end.getTime() <= bounds.start.getTime() || start.getTime() >= bounds.end.getTime()) return null;
+  const startMin = start.getTime() <= bounds.start.getTime() ? 0 : salonMinuteOfDay(start, timeZone);
+  const endMin = end.getTime() >= bounds.end.getTime() ? DAY_MINUTES : salonMinuteOfDay(end, timeZone);
+  return endMin > startMin ? { startMin, endMin } : null;
+}
+
+function parsePlanRange(range: { start: string; end: string }): MinuteRange | null {
+  const startMin = timeToMinutes(range.start);
+  const endMin = timeToMinutes(range.end);
+  if (startMin === null || endMin === null || endMin <= startMin) return null;
+  return { startMin, endMin };
+}
+
+const MASTER_SELECT = {
+  id: true,
+  name: true,
+  avatarUrl: true,
+  studioPaused: true,
+  ownerUserId: true,
+  ratingAvg: true,
+  ratingCount: true,
+  // SCHEDULE-FLEX-DATE-NAV: пауза между записями — граница свободного окошка.
+  bufferBetweenBookingsMin: true,
+  // STUDIO-RESCHEDULE-VALIDATION-A: surface enabled MasterService
+  // ids so the move dialog can gate the master picker. Disabled
+  // rows are excluded — same predicate the backend uses for
+  // `assertMasterPerformsService`.
+  // SCHEDULE-FLEX-DATE-NAV: длительности — самая короткая услуга мастера,
+  // промежуток короче неё в окошки не попадает.
+  masterServices: {
+    where: { isEnabled: true },
+    select: {
+      serviceId: true,
+      durationOverrideMin: true,
+      service: { select: { durationMin: true, isEnabled: true, isActive: true } },
+    },
+  },
+  // STUDIO-MASTER-PROFILES (этап 4): другие профили того же человека —
+  // его личная занятость рисуется в колонке профиля в студии.
+  owner: { select: { providers: { where: { type: ProviderType.MASTER }, select: { id: true } } } },
+} as const;
+
+type StudioMasterRow = {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  studioPaused: boolean;
+  ownerUserId: string | null;
+  ratingAvg: number | null;
+  ratingCount: number | null;
+  bufferBetweenBookingsMin?: number | null;
+  masterServices: Array<{
+    serviceId: string;
+    durationOverrideMin?: number | null;
+    service?: { durationMin: number; isEnabled: boolean; isActive: boolean } | null;
+  }>;
+  owner?: { providers: Array<{ id: string }> } | null;
 };
 
-async function buildDayData(
-  studioId: string,
-  providerId: string,
-  dateKey: string,
-  timeZone: string,
-): Promise<DayBuild> {
-  const { start: dayStart, end: dayEnd } = salonDayBounds(dateKey, timeZone);
+/** Самая короткая услуга мастера в студии; услуг нет — нижняя ступень сетки. */
+function shortestServiceMin(master: StudioMasterRow): number {
+  const durations = master.masterServices
+    .filter((link) => link.service?.isEnabled !== false && link.service?.isActive !== false)
+    .map((link) => link.durationOverrideMin ?? link.service?.durationMin ?? 0)
+    .filter((value) => value > 0);
+  return durations.length > 0 ? Math.min(...durations) : FREE_WINDOW_FALLBACK_MIN;
+}
 
-  const [masters, bookings, blocks] = await Promise.all([
+type RangeData = {
+  masters: StudioMasterRow[];
+  columns: ScheduleMasterColumn[];
+  /** Записи диапазона по времени начала. */
+  bookings: ScheduleBookingCell[];
+  breaks: ScheduleBreakCell[];
+  /** План дня активных мастеров: id колонки → дата → план. */
+  plans: Map<string, Map<string, DayPlan>>;
+};
+
+/**
+ * Мастера, записи и перерывы студии за `days` дней салона с `fromKey`, плюс
+ * план дня движка для активных мастеров. Общая загрузка дня и недели.
+ */
+async function loadRange(input: {
+  studioId: string;
+  providerId: string;
+  fromKey: string;
+  days: number;
+  timeZone: string;
+  now: Date;
+}): Promise<RangeData> {
+  const { studioId, providerId, timeZone } = input;
+  const toKeyExclusive = addDaysToDateKey(input.fromKey, input.days);
+  const rangeStart = dateFromLocalDateKey(input.fromKey, timeZone, 0, 0);
+  const rangeEnd = dateFromLocalDateKey(toKeyExclusive, timeZone, 0, 0);
+
+  const [masterRows, bookings, blocks] = await Promise.all([
     prisma.provider.findMany({
       where: { type: ProviderType.MASTER, studioId: providerId },
-      select: {
-        id: true,
-        name: true,
-        avatarUrl: true,
-        studioPaused: true,
-        ownerUserId: true,
-        ratingAvg: true,
-        ratingCount: true,
-        // STUDIO-RESCHEDULE-VALIDATION-A: surface enabled MasterService
-        // ids so the move dialog can gate the master picker. Disabled
-        // rows are excluded — same predicate the backend uses for
-        // `assertMasterPerformsService`.
-        masterServices: {
-          where: { isEnabled: true },
-          select: { serviceId: true },
-        },
-        // STUDIO-MASTER-PROFILES (этап 4): другие профили того же человека —
-        // его личная занятость рисуется в колонке профиля в студии.
-        owner: { select: { providers: { where: { type: ProviderType.MASTER }, select: { id: true } } } },
-      },
+      select: MASTER_SELECT,
       orderBy: { name: "asc" },
     }),
     prisma.booking.findMany({
@@ -162,7 +254,7 @@ async function buildDayData(
           // `Promise.all` с запросом мастеров.
           { masterProvider: { studioId: providerId } },
         ],
-        startAtUtc: { gte: dayStart, lt: dayEnd },
+        startAtUtc: { gte: rangeStart, lt: rangeEnd },
         status: { notIn: ACTIVE_BOOKING_STATUSES_NOTIN },
       },
       select: {
@@ -191,8 +283,8 @@ async function buildDayData(
     prisma.timeBlock.findMany({
       where: {
         studioId,
-        startAt: { lt: dayEnd },
-        endAt: { gt: dayStart },
+        startAt: { lt: rangeEnd },
+        endAt: { gt: rangeStart },
       },
       select: {
         id: true,
@@ -204,36 +296,41 @@ async function buildDayData(
       },
     }),
   ]);
+  const masters = masterRows as StudioMasterRow[];
 
-  // Per-master first-time-client detection — a single grouped query
-  // gives every client's earliest booking in the studio; the booking
-  // on the current day is "new" if its id matches the earliest.
   // STUDIO-MASTER-OWN-BOOKINGS-01: личная запись мастера — не запись студии.
   // Та же развилка, что у права на управление (`auth/ownership.ts`): студия
   // управляет записью её поверхности (`studioId` либо её `providerId`).
   const isPersonalBooking = (b: { studioId: string | null; providerId: string }) =>
     !isStudioSurfaceBooking(b, studioId);
 
+  // Per-master first-time-client detection — a single grouped query
+  // gives every client's earliest booking in the studio; the booking
+  // in the range is "new" if its id matches the earliest.
   const clientKeys = bookings
     .filter((booking) => !isPersonalBooking(booking))
     .map((booking) => booking.clientUserId)
     .filter((value): value is string => Boolean(value));
+  const activeIds = masters.filter((master) => isStudioMasterActive(master)).map((master) => master.id);
+
+  // SCHEDULE-PATTERNS-01: часы мастеров — из движка одним пакетом.
+  const [earliest, plans] = await Promise.all([
+    clientKeys.length > 0
+      ? prisma.booking.findMany({
+          where: {
+            ...studioBookingsWhere(studioId),
+            clientUserId: { in: Array.from(new Set(clientKeys)) },
+          },
+          orderBy: { startAtUtc: "asc" },
+          select: { id: true, clientUserId: true },
+        })
+      : Promise.resolve([] as Array<{ id: string; clientUserId: string | null }>),
+    loadDayPlans({ providerIds: activeIds, fromKey: input.fromKey, toKeyExclusive, now: input.now }),
+  ]);
   const earliestByClient = new Map<string, string>();
-  if (clientKeys.length > 0) {
-    const earliest = await prisma.booking.findMany({
-      where: {
-        ...studioBookingsWhere(studioId),
-        clientUserId: { in: clientKeys },
-      },
-      orderBy: { startAtUtc: "asc" },
-      select: { id: true, clientUserId: true },
-    });
-    for (const row of earliest) {
-      if (!row.clientUserId) continue;
-      if (!earliestByClient.has(row.clientUserId)) {
-        earliestByClient.set(row.clientUserId, row.id);
-      }
-    }
+  for (const row of earliest) {
+    if (!row.clientUserId) continue;
+    if (!earliestByClient.has(row.clientUserId)) earliestByClient.set(row.clientUserId, row.id);
   }
 
   // STUDIO-BUGS-FIX-A bug #5: INVITED masters (no ownerUserId) render as
@@ -317,32 +414,145 @@ async function buildDayData(
     note: block.note,
   }));
 
+  return { masters, columns, bookings: bookingCells, breaks: breakCells, plans };
+}
+
+/** Что считается по каждому «мастер × день» периода: окошки и загрузка. */
+type MasterDayStats = {
+  masterId: string;
+  dateKey: string;
+  isWorking: boolean;
+  free: FreeWindowsDay;
+  capacityMin: number;
+  bookedMin: number;
+};
+
+function buildMasterDayStats(input: {
+  range: RangeData;
+  dateKeys: readonly string[];
+  timeZone: string;
+  todayKey: string;
+  nowMinuteOfToday: number;
+}): MasterDayStats[] {
+  const { range, timeZone } = input;
+  const out: MasterDayStats[] = [];
+  for (const dateKey of input.dateKeys) {
+    const bounds = salonDayBounds(dateKey, timeZone);
+    for (const master of range.masters) {
+      if (!isStudioMasterActive(master)) continue;
+      const plan = range.plans.get(master.id)?.get(dateKey);
+      const bookings = range.bookings
+        .filter((cell) => cell.masterId === master.id)
+        .map((cell) => clampToSalonDay(cell.startAtUtc, cell.endAtUtc, bounds, timeZone))
+        .filter((value): value is MinuteRange => value !== null);
+      const blocks = range.breaks
+        .filter((cell) => cell.masterId === master.id)
+        .map((cell) => clampToSalonDay(cell.startAtUtc, cell.endAtUtc, bounds, timeZone))
+        .filter((value): value is MinuteRange => value !== null);
+      const isWorking = plan?.isWorking === true;
+      const fixedStarts = plan?.fixedStarts ?? null;
+      const free = computeFreeWindows({
+        isWorking,
+        workingIntervals: (plan?.workingIntervals ?? [])
+          .map(parsePlanRange)
+          .filter((value): value is MinuteRange => value !== null),
+        breaks: (plan?.breaks ?? []).map(parsePlanRange).filter((value): value is MinuteRange => value !== null),
+        fixedStarts,
+        bookings,
+        blocks,
+        bufferMin: master.bufferBetweenBookingsMin ?? 0,
+        minDurationMin: shortestServiceMin(master),
+        nowMinute: nowMinuteForDay(dateKey, input.todayKey, input.nowMinuteOfToday),
+      });
+
+      let capacityMin = 0;
+      let bookedMin = 0;
+      if (isWorking && fixedStarts) {
+        capacityMin = fixedStarts.length * FIXED_SLOT_WEIGHT_MIN;
+        bookedMin = Math.min(bookings.length, fixedStarts.length) * FIXED_SLOT_WEIGHT_MIN;
+      } else if (isWorking) {
+        capacityMin = Math.max(0, dayPlanWorkMinutes(plan) ?? 0);
+        bookedMin = bookings.reduce((sum, range) => sum + (range.endMin - range.startMin), 0);
+      }
+      out.push({ masterId: master.id, dateKey, isWorking, free, capacityMin, bookedMin });
+    }
+  }
+  return out;
+}
+
+function computeKpis(input: {
+  bookings: readonly ScheduleBookingCell[];
+  stats: readonly MasterDayStats[];
+}): ScheduleKpis {
+  // Записи и выручка — студийные; личные записи мастеров занимают время
+  // (загрузка и свободные окошки их учитывают), но записями студии не являются.
+  const studioBookings = input.bookings.filter((b) => !b.isPersonal);
+  const capacityMin = input.stats.reduce((sum, row) => sum + row.capacityMin, 0);
+  const bookedMin = input.stats.reduce((sum, row) => sum + row.bookedMin, 0);
+  const onShift = new Set(input.stats.filter((row) => row.isWorking).map((row) => row.masterId));
+
+  return {
+    bookingsCount: studioBookings.length,
+    bookingsConfirmedCount: studioBookings.filter((b) => CONFIRMED_STATUSES.has(b.status)).length,
+    revenueKopeks: studioBookings.reduce((sum, b) => sum + b.priceKopeks, 0),
+    occupancyPercent: capacityMin > 0 ? Math.min(100, Math.round((bookedMin / capacityMin) * 100)) : 0,
+    occupancyHoursDenominator: Math.round(capacityMin / 60),
+    mastersOnShift: onShift.size,
+    freeWindowsCount: input.stats.reduce((sum, row) => sum + freeWindowsCount(row.free), 0),
+  };
+}
+
+function freeWindowsByMaster(
+  range: RangeData,
+  stats: readonly MasterDayStats[],
+  todayKey: string,
+): StudioScheduleData["freeWindows"] {
+  return range.masters
+    .filter((master) => isStudioMasterActive(master))
+    .map((master) => ({
+      masterId: master.id,
+      masterName: master.name,
+      days: stats
+        .filter((row) => row.masterId === master.id)
+        .map((row) => ({
+          dateKey: row.dateKey,
+          isOff: !row.isWorking,
+          past: row.dateKey < todayKey,
+          windows: row.free.windows,
+          freeStarts: row.free.freeStarts,
+        })),
+    }));
+}
+
+function buildDay(range: RangeData, dateKey: string, timeZone: string): ScheduleDayData {
+  const { start: dayStart, end: dayEnd } = salonDayBounds(dateKey, timeZone);
+  const inDay = <T extends { startAtUtc: string; endAtUtc: string }>(cell: T) =>
+    new Date(cell.startAtUtc).getTime() < dayEnd.getTime() && new Date(cell.endAtUtc).getTime() > dayStart.getTime();
+  const bookings = range.bookings.filter(
+    (cell) => new Date(cell.startAtUtc).getTime() >= dayStart.getTime() && new Date(cell.startAtUtc).getTime() < dayEnd.getTime(),
+  );
+  const breaks = range.breaks.filter(inDay);
+
   // BOOKING-FLOW-AUDIT-RESIDUALS: сетка дня раздвигается под часы активных
   // мастеров, записи и перерывы этого дня (минимум — 09–21). Интервал через
   // полночь салона прижимается к краю суток.
   const minuteOfSalonDay = (instant: Date): number => {
     if (instant.getTime() <= dayStart.getTime()) return 0;
-    if (instant.getTime() >= dayEnd.getTime()) return 24 * 60;
+    if (instant.getTime() >= dayEnd.getTime()) return DAY_MINUTES;
     return salonMinuteOfDay(instant, timeZone);
   };
-  // SCHEDULE-PATTERNS-01: часы мастеров — из движка одним пакетом (раньше —
-  // по два запроса на мастера мимо «Особых дней»). День с фиксированным
-  // временем хранится как 00:00–23:55; сетке нужны выбранные начала, а не сутки.
-  const dayPlans = await loadDayPlans({
-    providerIds: masters.filter((master) => isStudioMasterActive(master)).map((master) => master.id),
-    fromKey: dateKey,
-    toKeyExclusive: addDaysToDateKey(dateKey, 1),
-  });
+  // День с фиксированным временем хранится как 00:00–23:55; сетке нужны
+  // выбранные начала, а не сутки.
   const gridMinutes: number[] = [];
-  for (const plans of dayPlans.values()) {
-    const plan = plans.get(dateKey);
+  for (const byDate of range.plans.values()) {
+    const plan = byDate.get(dateKey);
     if (!plan?.isWorking) continue;
     if (plan.fixedStarts) {
       const starts = plan.fixedStarts
         .map((value) => timeToMinutes(value))
         .filter((value): value is number => value !== null);
       if (starts.length === 0) continue;
-      gridMinutes.push(Math.min(...starts), Math.min(24 * 60, Math.max(...starts) + 60));
+      gridMinutes.push(Math.min(...starts), Math.min(DAY_MINUTES, Math.max(...starts) + 60));
       continue;
     }
     const hours = dayPlanHours(plan);
@@ -351,113 +561,47 @@ async function buildDayData(
     if (start === null || end === null) continue;
     gridMinutes.push(start, end);
   }
-  for (const cell of [...bookingCells, ...breakCells]) {
-    gridMinutes.push(
-      minuteOfSalonDay(new Date(cell.startAtUtc)),
-      minuteOfSalonDay(new Date(cell.endAtUtc)),
-    );
-  }
-
-  const plans = new Map<string, DayPlan>();
-  for (const [masterId, byDate] of dayPlans) {
-    const plan = byDate.get(dateKey);
-    if (plan) plans.set(masterId, plan);
+  for (const cell of [...bookings, ...breaks]) {
+    gridMinutes.push(minuteOfSalonDay(new Date(cell.startAtUtc)), minuteOfSalonDay(new Date(cell.endAtUtc)));
   }
 
   return {
-    day: {
-      dateKey,
-      dayStartIso: dayStart.toISOString(),
-      gridWindow: resolveGridWindow(gridMinutes),
-      columns,
-      bookings: bookingCells,
-      breaks: breakCells,
-    },
-    plans,
-  };
-}
-
-function computeKpis(day: ScheduleDayData): ScheduleKpis {
-  // Записи и выручка — студийные; личные записи мастеров занимают время
-  // (загрузка и свободные окошки их учитывают), но записями студии не являются.
-  const studioBookings = day.bookings.filter((b) => !b.isPersonal);
-  const completed = studioBookings.filter(
-    (b) =>
-      b.status === BookingStatus.CONFIRMED ||
-      b.status === BookingStatus.PREPAID ||
-      b.status === BookingStatus.STARTED ||
-      b.status === BookingStatus.IN_PROGRESS ||
-      b.status === BookingStatus.FINISHED,
-  );
-  const confirmedCount = completed.length;
-  const totalCount = studioBookings.length;
-  const occupiedCount = day.bookings.length;
-  const revenue = studioBookings.reduce(
-    (sum, b) => sum + b.priceKopeks,
-    0,
-  );
-
-  const onShift = day.columns.filter((column) => column.isAvailable);
-  const occupancyDenominator = onShift.length * DAILY_CAPACITY;
-  const occupancy =
-    occupancyDenominator > 0
-      ? Math.min(Math.round((occupiedCount / occupancyDenominator) * 100), 100)
-      : 0;
-
-  return {
-    bookingsCount: totalCount,
-    bookingsConfirmedCount: confirmedCount,
-    revenueKopeks: revenue,
-    occupancyPercent: occupancy,
-    occupancyHoursDenominator: occupancyDenominator,
-    mastersOnShift: onShift.length,
-    freeWindowsCount: Math.max(occupancyDenominator - occupiedCount, 0),
+    dateKey,
+    dayStartIso: dayStart.toISOString(),
+    gridWindow: resolveGridWindow(gridMinutes),
+    columns: range.columns,
+    bookings,
+    breaks,
   };
 }
 
 const WEEKDAY_SHORT_RU = ["ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ", "ВС"] as const;
 
-async function buildWeekData(
-  studioId: string,
-  providerId: string,
-  dateKey: string,
+async function buildWeek(input: {
+  studioId: string;
+  range: RangeData;
+  weekStartKey: string;
   // EXP-020: "today" resolved in the STUDIO's own tz (YYYY-MM-DD), not the UTC
   // calendar day — so the highlighted column matches the master/client cabinets
   // (which all key "today" off `toLocalDateKey(now, entityTz)`).
-  studioTodayKey: string,
-  timeZone: string,
-): Promise<ScheduleWeekData> {
-  // Неделя — календарная арифметика над ключами дат, границы — в поясе салона.
-  const weekStartKey = toDateKey(startOfUtcWeekMonday(parseDateKey(dateKey)));
-
-  const masters = await prisma.provider.findMany({
-      where: { type: ProviderType.MASTER, studioId: providerId },
-      select: {
-        id: true,
-        name: true,
-        avatarUrl: true,
-        studioPaused: true,
-        ownerUserId: true,
-        ratingAvg: true,
-        ratingCount: true,
-        masterServices: {
-          where: { isEnabled: true },
-          select: { serviceId: true },
-        },
-      },
-      orderBy: { name: "asc" },
-  });
+  todayKey: string;
+  timeZone: string;
+  stats: readonly MasterDayStats[];
+  now: Date;
+}): Promise<ScheduleWeekData> {
+  const { range, weekStartKey, timeZone } = input;
 
   // MOBILE-POLISH: ячейки — по НАСТОЯЩЕМУ графику мастера, тем же расчётом,
   // что неделя приложения (`GET /api/cabinet/studio/calendar/week`): ёмкость —
   // рабочие минуты без перерывов (или фиксированные начала), выходной — по
-  // графику. Раньше — «5 записей = 100%» и выходной только у неактивного.
+  // графику. Планы дня — те же, что у окошек (второй раз движок не зовётся).
   const cellsByMaster = await loadStudioWeekCells({
-    studioId,
+    studioId: input.studioId,
     timezone: timeZone,
     from: weekStartKey,
-    masters: masters.map((master) => ({ id: master.id, active: isStudioMasterActive(master) })),
-    now: new Date(),
+    masters: range.masters.map((master) => ({ id: master.id, active: isStudioMasterActive(master) })),
+    now: input.now,
+    plans: range.plans,
   });
 
   const days: ScheduleWeekDay[] = Array.from({ length: 7 }, (_, index) => {
@@ -466,37 +610,47 @@ async function buildWeekData(
       dateKey: key,
       weekdayLabel: WEEKDAY_SHORT_RU[index],
       dayNumber: Number(key.slice(8, 10)),
-      isToday: key === studioTodayKey,
+      isToday: key === input.todayKey,
+      isPast: key < input.todayKey,
     };
   });
+
+  const bookingsByCell = new Map<string, ScheduleWeekData["rows"][number]["cells"][number]["bookings"]>();
+  for (const cell of range.bookings) {
+    const key = `${cell.masterId}|${toLocalDateKey(new Date(cell.startAtUtc), timeZone)}`;
+    const list = bookingsByCell.get(key) ?? [];
+    list.push({
+      id: cell.id,
+      startAtUtc: cell.startAtUtc,
+      endAtUtc: cell.endAtUtc,
+      status: cell.status,
+      tone: cell.tone,
+      clientName: cell.clientName,
+      serviceTitle: cell.serviceTitle,
+      isPersonal: cell.isPersonal,
+    });
+    bookingsByCell.set(key, list);
+  }
+  const freeByCell = new Map(input.stats.map((row) => [`${row.masterId}|${row.dateKey}`, row.free]));
+  const NO_FREE: FreeWindowsDay = { windows: [], freeStarts: null };
 
   // STUDIO-BUGS-FIX-A bug #5: INVITED masters get zero capacity + isDayOff
   // across the whole week. They surface in the grid so admin sees they
   // exist, but with no schedulable hours.
-  const rows: ScheduleWeekRow[] = masters.map((master) => {
-    const active = isStudioMasterActive(master);
-    const cells = cellsByMaster.get(master.id) ?? [];
-    return {
-      master: {
-        id: master.id,
-        name: master.name,
-        avatarUrl: master.avatarUrl ?? null,
-        rating: master.ratingAvg ?? 0,
-        reviewsCount: master.ratingCount ?? 0,
-        isAvailable: active,
-        serviceIds: master.masterServices.map((row) => row.serviceId),
-      },
-      cells: cells.map((cell) => ({
-        dateKey: cell.date,
-        booked: cell.booked,
-        bookedMinutes: cell.bookedMinutes,
-        capacityMinutes: cell.capacityMinutes,
-        fixedSlots: cell.fixedSlots,
-        percent: cell.percent,
-        isDayOff: cell.isDayOff,
-      })),
-    };
-  });
+  const rows: ScheduleWeekRow[] = range.masters.map((master, index) => ({
+    master: range.columns[index]!,
+    cells: (cellsByMaster.get(master.id) ?? []).map((cell) => ({
+      dateKey: cell.date,
+      booked: cell.booked,
+      bookedMinutes: cell.bookedMinutes,
+      capacityMinutes: cell.capacityMinutes,
+      fixedSlots: cell.fixedSlots,
+      percent: cell.percent,
+      isDayOff: cell.isDayOff,
+      bookings: bookingsByCell.get(`${master.id}|${cell.date}`) ?? [],
+      freeWindows: freeByCell.get(`${master.id}|${cell.date}`) ?? NO_FREE,
+    })),
+  }));
 
   return { days, rows };
 }
@@ -550,6 +704,7 @@ export async function loadStudioScheduleData(input: {
   // resolved in the STUDIO's tz (not the UTC/host calendar day).
   dateKey?: string;
   view: "day" | "week";
+  now?: Date;
 }): Promise<StudioScheduleData> {
   const studio = await prisma.studio.findUnique({
     where: { id: input.studioId },
@@ -559,33 +714,51 @@ export async function loadStudioScheduleData(input: {
     throw new Error(`Studio not found: ${input.studioId}`);
   }
 
-  const studioTimezone = studio.provider.timezone;
-  const studioTodayKey = toLocalDateKey(new Date(), studioTimezone);
-  const effectiveDateKey = input.dateKey ?? studioTodayKey;
+  const now = input.now ?? new Date();
+  const timeZone = studio.provider.timezone;
+  const todayKey = toLocalDateKey(now, timeZone);
+  const effectiveDateKey = input.dateKey ?? todayKey;
+  // Неделя — календарная арифметика над ключами дат, границы — в поясе салона.
+  const fromKey =
+    input.view === "week" ? toDateKey(startOfUtcWeekMonday(parseDateKey(effectiveDateKey))) : effectiveDateKey;
+  const dayCount = input.view === "week" ? 7 : 1;
 
-  const [{ day }, services, week] = await Promise.all([
-    buildDayData(studio.id, studio.providerId, effectiveDateKey, studioTimezone),
+  const [range, services] = await Promise.all([
+    loadRange({ studioId: studio.id, providerId: studio.providerId, fromKey, days: dayCount, timeZone, now }),
     loadServices(studio.id, studio.providerId),
-    input.view === "week"
-      ? buildWeekData(studio.id, studio.providerId, effectiveDateKey, studioTodayKey, studioTimezone)
-      : Promise.resolve(null),
   ]);
+  const dateKeys = Array.from({ length: dayCount }, (_, index) => addDaysToDateKey(fromKey, index));
+  const stats = buildMasterDayStats({
+    range,
+    dateKeys,
+    timeZone,
+    todayKey,
+    nowMinuteOfToday: salonMinuteOfDay(now, timeZone),
+  });
+
+  const week =
+    input.view === "week"
+      ? await buildWeek({ studioId: studio.id, range, weekStartKey: fromKey, todayKey, timeZone, stats, now })
+      : null;
 
   return {
     dateKey: effectiveDateKey,
     view: input.view,
-    timezone: studioTimezone,
-    day,
-    kpis: computeKpis(day),
+    timezone: timeZone,
+    todayKey,
+    // День — выбранная дата: на неё смотрят диалоги («Перерывы», новая запись).
+    day: buildDay(range, effectiveDateKey, timeZone),
+    kpis: computeKpis({ bookings: range.bookings, stats }),
     week,
+    freeWindows: freeWindowsByMaster(range, stats, todayKey),
     services,
   };
 }
 
 /**
  * MOBILE-STUDIO-C (ops) — день календаря студии для приложения: та же сборка
- * дня, что у веба (`buildDayData` + `computeKpis`), плюс план дня каждого
- * активного мастера из движка расписания. Без каталога услуг и недели.
+ * дня, что у веба (`loadRange` + `buildDay` + `computeKpis`), плюс план дня
+ * каждого активного мастера из движка расписания. Без каталога услуг и недели.
  */
 export async function loadStudioScheduleDay(input: {
   studioId: string;
@@ -605,11 +778,37 @@ export async function loadStudioScheduleDay(input: {
   });
   if (!studio) return null;
 
+  const now = input.now ?? new Date();
   const timezone = studio.provider.timezone;
-  const todayKey = toLocalDateKey(input.now ?? new Date(), timezone);
-  const { day, plans } = await buildDayData(studio.id, studio.providerId, input.dateKey ?? todayKey, timezone);
-  return { studioId: studio.id, timezone, todayKey, day, kpis: computeKpis(day), plans };
-}
+  const todayKey = toLocalDateKey(now, timezone);
+  const dateKey = input.dateKey ?? todayKey;
+  const range = await loadRange({
+    studioId: studio.id,
+    providerId: studio.providerId,
+    fromKey: dateKey,
+    days: 1,
+    timeZone: timezone,
+    now,
+  });
+  const stats = buildMasterDayStats({
+    range,
+    dateKeys: [dateKey],
+    timeZone: timezone,
+    todayKey,
+    nowMinuteOfToday: salonMinuteOfDay(now, timezone),
+  });
 
-void DAY_START_HOUR;
-void DAY_END_HOUR;
+  const plans = new Map<string, DayPlan>();
+  for (const [masterId, byDate] of range.plans) {
+    const plan = byDate.get(dateKey);
+    if (plan) plans.set(masterId, plan);
+  }
+  return {
+    studioId: studio.id,
+    timezone,
+    todayKey,
+    day: buildDay(range, dateKey, timezone),
+    kpis: computeKpis({ bookings: range.bookings, stats }),
+    plans,
+  };
+}

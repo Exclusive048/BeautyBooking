@@ -273,15 +273,11 @@ export const studioCabinet = {
     },
   },
   scheduleV2: {
+    // SCHEDULE-FLEX-DATE-NAV: вид, стрелки, «Сегодня» и выбор даты — общий
+    // `DateNavigator` (`UI_TEXT.schedule.dateNav`); подпись дня и сводка под
+    // заголовком ушли — дату показывает навигатор, числа — показатели.
     header: {
-      viewAria: "Вид календаря",
-      captionTemplate: "{weekday} · {day} {month} {year}",
       title: "Расписание студии",
-      subtitleTemplate: "{bookings} записей · {masters} мастеров на смене · загрузка {occupancy}%",
-      views: { day: "День", week: "Неделя" },
-      prev: "Назад",
-      next: "Вперёд",
-      today: "Сегодня",
       refresh: "Обновить",
       refreshedAtTemplate: "обновлено {time}",
       addBooking: "Добавить запись",
@@ -308,15 +304,28 @@ export const studioCabinet = {
       empty: "На этот день перерывов нет.",
       noMasters: "Сегодня нет доступных мастеров",
     },
+    // SCHEDULE-FLEX-DATE-NAV: показатели — выбранного ПЕРИОДА (день или
+    // неделя), загрузка и окошки — по графику мастеров.
     kpis: {
-      bookingsToday: "Записей сегодня",
+      bookingsDay: "Записей за день",
+      bookingsWeek: "Записей за неделю",
       bookingsConfirmedTemplate: "{count} подтверждено",
-      revenue: "Выручка дня (план)",
+      revenueDay: "Выручка дня (план)",
+      revenueWeek: "Выручка недели (план)",
       revenueSubtitle: "сумма по записям",
       occupancy: "Загрузка",
-      occupancyContextTemplate: "{masters} мастеров на смене",
+      occupancyContextTemplate: "мастеров по графику: {masters}",
       freeWindows: "Свободные окошки",
-      freeWindowsHint: "до конца дня",
+      freeWindowsHintNow: "с текущего времени",
+      freeWindowsHintPeriod: "промежутки по графику",
+      // Свёрнутые показатели — одна строка: «12 записей · 45 000 ₽ · загрузка 62% · 8 окошек».
+      summaryBookingOne: "запись",
+      summaryBookingFew: "записи",
+      summaryBookingMany: "записей",
+      summaryLoadTemplate: "загрузка {pct}%",
+      summaryWindowOne: "окошко",
+      summaryWindowFew: "окошка",
+      summaryWindowMany: "окошек",
     },
     legend: {
       confirmed: "Подтверждено",
@@ -414,13 +423,22 @@ export const studioCabinet = {
       occupancyPercent: "{percent}%",
       occupancyTitleMinutes: "Записей: {booked} · занято {bookedTime} из {capacityTime}",
       occupancyTitleSlots: "Записей: {booked} · окон по графику: {slots}",
-      durationHours: "{h} ч",
-      durationHoursMinutes: "{h} ч {m} мин",
-      durationMinutes: "{m} мин",
       // Ячейка дня узкая (7 в ряд) — полное слово налезало на соседнюю. Полное — в `title`.
       dayOff: "Вых.",
       dayOffFull: "Выходной",
       empty: "В этой студии пока нет мастеров.",
+      // SCHEDULE-FLEX-DATE-NAV: в ячейке недели — записи мастера, дальше «ещё N».
+      bookingsMore: "ещё {n}",
+      freeTime: "свободно {time}",
+      freeStarts: "свободно начал: {n}",
+      // Неделя на телефоне — списком по дням.
+      agendaEmpty: "Записей нет",
+      agendaNobodyWorks: "По графику никто не работает",
+      agendaBookingOne: "запись",
+      agendaBookingFew: "записи",
+      agendaBookingMany: "записей",
+      agendaFreeMaster: "{master} — свободно {time}",
+      agendaFreeStartsMaster: "{master} — свободно начал: {n}",
     },
     empty: {
       noMasters: "Сегодня нет мастеров на смене.",

@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import { FooterHint } from "@/features/master/components/schedule/footer-hint";
 import { RefreshButton } from "@/features/master/components/schedule/refresh-button";
 import { ScheduleControls } from "@/features/master/components/schedule/schedule-controls";
-import { ScheduleKpiCards } from "@/features/master/components/schedule/schedule-kpi-cards";
+import { ScheduleKpiCards, ScheduleKpiSummary } from "@/features/master/components/schedule/schedule-kpi-cards";
+import { WeekAgenda } from "@/features/master/components/schedule/week-agenda";
+import { KpiPanel } from "@/features/schedule-nav/components/kpi-panel";
 import { ScheduleLegend } from "@/features/master/components/schedule/schedule-legend";
 import { DayView, type DayStripItem } from "@/features/master/components/schedule/day-view";
 import { parseScheduleView } from "@/features/master/components/schedule/schedule-view-state";
@@ -15,27 +17,11 @@ import { getSessionUserId } from "@/lib/auth/session";
 import { getCurrentMasterProviderId, getMasterWorkProfiles } from "@/lib/master/access";
 import { getMasterScheduleWeek } from "@/lib/master/schedule.service";
 import { resolveDefaultScheduleView } from "@/lib/master/schedule-view";
-import {
-  formatWeekRange,
-  parseWeekStart,
-  toIsoDateKey,
-} from "@/lib/master/schedule-utils";
+import { parseWeekStart, toIsoDateKey } from "@/lib/master/schedule-utils";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
-import { UI_FMT } from "@/lib/ui/fmt";
 import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster;
-
-const formatRub = (kopeks: number) => UI_FMT.priceLabel(kopeks);
-
-function pluralizeBookings(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return T.schedule.bookingsLabelOne;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14))
-    return T.schedule.bookingsLabelFew;
-  return T.schedule.bookingsLabelMany;
-}
 
 type Props = {
   searchParams: { weekStart?: string; view?: string; day?: string };
@@ -66,14 +52,6 @@ export async function MasterSchedulePage({ searchParams }: Props) {
   const todayIso = toLocalDateKey(new Date(), data.timezone);
   const weekStartIso = toIsoDateKey(weekStart);
 
-  const subtitle = T.schedule.subtitleTemplate
-    .replace("{range}", formatWeekRange(weekStart))
-    .replace(
-      "{bookingsLabel}",
-      `${data.totalBookings} ${pluralizeBookings(data.totalBookings)}`,
-    )
-    .replace("{revenue}", formatRub(data.weekRevenue));
-
   return (
     <>
       <MasterPageHeader
@@ -82,7 +60,6 @@ export async function MasterSchedulePage({ searchParams }: Props) {
           { label: T.schedule.breadcrumb },
         ]}
         title={T.schedule.title}
-        subtitle={subtitle}
         actions={
           <>
             <ScheduleSettingsLink />
@@ -93,9 +70,22 @@ export async function MasterSchedulePage({ searchParams }: Props) {
       />
 
       <div className="space-y-4 px-4 py-6 md:px-6 lg:px-8">
-        <ScheduleControls weekStartIso={weekStartIso} todayIso={todayIso} view={view} />
-        <ScheduleKpiCards stats={data.kpi} showWorkContext={data.showWorkContext} />
-        <ScheduleLegend showWorkContext={data.showWorkContext} />
+        <ScheduleControls
+          weekStartIso={weekStartIso}
+          todayIso={todayIso}
+          view={view}
+          timezone={data.timezone}
+          freeDays={data.days.map((d) => ({
+            dateKey: d.iso,
+            isOff: d.isOff,
+            past: d.isPast,
+            windows: d.freeWindows.windows,
+            freeStarts: d.freeWindows.freeStarts,
+          }))}
+        />
+        <KpiPanel storageKey="mr-schedule-kpi-master" summary={<ScheduleKpiSummary stats={data.kpi} />}>
+          <ScheduleKpiCards stats={data.kpi} showWorkContext={data.showWorkContext} />
+        </KpiPanel>
         {view === "day" ? (
           <DayView
             weekStartIso={weekStartIso}
@@ -130,13 +120,28 @@ export async function MasterSchedulePage({ searchParams }: Props) {
             )}
           />
         ) : (
-          <WeekGrid
-            days={data.days}
-            hourRange={data.hourRange}
-            timezone={data.timezone}
-            showWorkContext={data.showWorkContext}
-          />
+          <>
+            <div className="hidden md:block">
+              <WeekGrid
+                days={data.days}
+                hourRange={data.hourRange}
+                timezone={data.timezone}
+                showWorkContext={data.showWorkContext}
+              />
+            </div>
+            <div className="md:hidden">
+              <WeekAgenda
+                days={data.days}
+                timezone={data.timezone}
+                weekStartIso={weekStartIso}
+                showWorkContext={data.showWorkContext}
+              />
+            </div>
+          </>
         )}
+        {/* SCHEDULE-FLEX-DATE-NAV: легенда — справка под сеткой; период, записи
+            и выручка недели — в строке показателей (подзаголовок их дублировал). */}
+        <ScheduleLegend showWorkContext={data.showWorkContext} />
         <FooterHint fetchedAt={data.fetchedAt} timezone={data.timezone} />
       </div>
     </>

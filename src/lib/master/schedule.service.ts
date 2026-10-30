@@ -5,6 +5,13 @@ import { countClientFreeSlotsToday } from "@/lib/master/free-today";
 import { prisma } from "@/lib/prisma";
 import { ScheduleEngine } from "@/lib/schedule/engine";
 import { localDayRangeUtc } from "@/lib/schedule/dateKey";
+import {
+  FREE_WINDOW_FALLBACK_MIN,
+  computeFreeWindows,
+  nowMinuteForDay,
+  type FreeWindowsDay,
+} from "@/lib/schedule/free-windows";
+import { resolveProfileServiceDurations } from "@/lib/schedule/resolveDuration";
 import { getLocalTimeParts, toLocalDateKey } from "@/lib/schedule/timezone";
 import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import {
@@ -83,6 +90,14 @@ export type ScheduleDay = {
   fixedStarts: string[] | null;
   bookings: ScheduleBookingItem[];
   timeBlocks: ScheduleTimeBlockItem[];
+  /**
+   * SCHEDULE-FLEX-DATE-NAV: свободные промежутки дня (минуты салона) —
+   * рабочие часы личного профиля минус записи всех профилей мастера (время у
+   * человека одно), перерывы и блокировки; короче самой короткой услуги — нет.
+   */
+  freeWindows: FreeWindowsDay;
+  /** День прошёл по часам салона. */
+  isPast: boolean;
 };
 
 export type ScheduleKpi = {
@@ -214,7 +229,7 @@ export const getMasterScheduleWeek = cache(
 
     const master = await prisma.provider.findUnique({
       where: { id: input.masterId },
-      select: { id: true, timezone: true, studioId: true },
+      select: { id: true, timezone: true, studioId: true, bufferBetweenBookingsMin: true },
     });
     if (!master) {
       throw new Error(`Master not found: ${input.masterId}`);
@@ -245,7 +260,7 @@ export const getMasterScheduleWeek = cache(
       },
     });
 
-    const [dayPlans, bookingRows, timeBlockRows] = await Promise.all([
+    const [dayPlans, bookingRows, timeBlockRows, serviceDurations] = await Promise.all([
       Promise.all(weekDays.map((d) => ScheduleEngine.getDayPlanFromContext(ctx, d.iso))),
       prisma.booking.findMany({
         where: {
@@ -288,6 +303,7 @@ export const getMasterScheduleWeek = cache(
           note: true,
         },
       }),
+      resolveProfileServiceDurations(master.id),
     ]);
 
     const clientUserIds = Array.from(
@@ -367,18 +383,39 @@ export const getMasterScheduleWeek = cache(
       timeBlocksByDay.set(iso, list);
     }
 
+    // SCHEDULE-FLEX-DATE-NAV: промежуток короче самой короткой услуги профиля
+    // не поместит ничего; услуг нет — нижняя ступень сетки длительностей.
+    const shortestServiceMin = serviceDurations.length > 0 ? Math.min(...serviceDurations) : FREE_WINDOW_FALLBACK_MIN;
+    const nowMinuteOfToday = minuteOfDay(now, master.timezone);
+
     const days: ScheduleDay[] = weekDays.map((wd, i) => {
       const plan = dayPlans[i]!;
       const intervals = plan.workingIntervals.map((w) => parseInterval(w.start, w.end));
+      const breaks = plan.breaks.map((b) => parseInterval(b.start, b.end));
+      const fixedStarts = plan.fixedStarts ?? null;
+      const bookings = bookingsByDay.get(wd.iso) ?? [];
+      const timeBlocks = timeBlocksByDay.get(wd.iso) ?? [];
       return {
         iso: wd.iso,
         weekDay: wd,
         isOff: !plan.isWorking,
         workingIntervals: intervals,
-        breaks: plan.breaks.map((b) => parseInterval(b.start, b.end)),
-        fixedStarts: plan.fixedStarts ?? null,
-        bookings: bookingsByDay.get(wd.iso) ?? [],
-        timeBlocks: timeBlocksByDay.get(wd.iso) ?? [],
+        breaks,
+        fixedStarts,
+        bookings,
+        timeBlocks,
+        freeWindows: computeFreeWindows({
+          isWorking: plan.isWorking,
+          workingIntervals: intervals,
+          breaks,
+          fixedStarts,
+          bookings: bookings.map((b) => ({ startMin: b.startMinuteOfDay, endMin: b.endMinuteOfDay })),
+          blocks: timeBlocks.map((tb) => ({ startMin: tb.startMinuteOfDay, endMin: tb.endMinuteOfDay })),
+          bufferMin: master.bufferBetweenBookingsMin,
+          minDurationMin: shortestServiceMin,
+          nowMinute: nowMinuteForDay(wd.iso, todayIso, nowMinuteOfToday),
+        }),
+        isPast: wd.iso < todayIso,
       };
     });
 

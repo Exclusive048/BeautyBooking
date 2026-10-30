@@ -7,6 +7,7 @@ import { UI_FMT } from "@/lib/ui/fmt";
 import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.schedule.kpi;
+const TS = UI_TEXT.cabinetMaster.schedule;
 
 const formatRub = (kopeks: number) => UI_FMT.priceLabel(kopeks);
 
@@ -16,6 +17,35 @@ function pluralizeSlots(n: number): string {
   if (mod10 === 1 && mod100 !== 11) return T.freeTodaySlotOne;
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return T.freeTodaySlotFew;
   return T.freeTodaySlotMany;
+}
+
+function pluralizeBookings(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return TS.bookingsLabelOne;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return TS.bookingsLabelFew;
+  return TS.bookingsLabelMany;
+}
+
+/**
+ * SCHEDULE-FLEX-DATE-NAV — свёрнутые показатели одной строкой (телефон по
+ * умолчанию): «12 записей · 45 000 ₽ · загрузка 64% · 3 окошка».
+ */
+export function ScheduleKpiSummary({ stats }: { stats: ScheduleKpi }) {
+  const free =
+    stats.freeSlotsToday === 0
+      ? T.freeTodayNone
+      : `${stats.freeSlotsToday} ${pluralizeSlots(stats.freeSlotsToday)}`;
+  return (
+    <p className="truncate text-sm tabular-nums text-text-main">
+      {[
+        `${UI_FMT.count(stats.weekBookingsCount)} ${pluralizeBookings(stats.weekBookingsCount)}`,
+        formatRub(stats.weekRevenue),
+        T.summaryLoadTemplate.replace("{pct}", String(stats.loadPct)),
+        free,
+      ].join(" · ")}
+    </p>
+  );
 }
 
 type Props = {

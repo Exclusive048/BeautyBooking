@@ -1,4 +1,6 @@
 import type { BookingStatus, TimeBlockType } from "@prisma/client";
+import type { FreeWindowsDayItem } from "@/features/schedule-nav/lib/free-windows-text";
+import type { FreeWindowsDay } from "@/lib/schedule/free-windows";
 import type { BookingStatusTone } from "../lib/booking-status-display";
 import type { GridWindow } from "../lib/time-grid";
 
@@ -77,13 +79,23 @@ export type ScheduleDayData = {
   breaks: ScheduleBreakCell[];
 };
 
+/**
+ * Показатели периода календаря (день либо неделя). SCHEDULE-FLEX-DATE-NAV:
+ * загрузка и окошки — по НАСТОЯЩЕМУ графику мастеров (план дня движка), а не
+ * «5 записей на мастера = 100%».
+ */
 export type ScheduleKpis = {
+  /** Записи студии периода (личные записи мастеров не считаются). */
   bookingsCount: number;
   bookingsConfirmedCount: number;
   revenueKopeks: number;
+  /** Занятое время активных мастеров из рабочего по графику, целые %. */
   occupancyPercent: number;
+  /** Рабочие часы активных мастеров по графику за период (знаменатель загрузки). */
   occupancyHoursDenominator: number;
+  /** Активные мастера, у которых в периоде есть рабочий день. */
   mastersOnShift: number;
+  /** Свободные окошки (промежутки либо свободные фиксированные начала) с «сейчас». */
   freeWindowsCount: number;
 };
 
@@ -92,7 +104,15 @@ export type ScheduleWeekDay = {
   weekdayLabel: string;
   dayNumber: number;
   isToday: boolean;
+  /** День салона уже прошёл. */
+  isPast: boolean;
 };
+
+/** Запись в ячейке недели: ровно то, что нужно строке списка. */
+export type ScheduleWeekBooking = Pick<
+  ScheduleBookingCell,
+  "id" | "startAtUtc" | "endAtUtc" | "status" | "tone" | "clientName" | "serviceTitle" | "isPersonal"
+>;
 
 export type ScheduleWeekRow = {
   master: ScheduleMasterColumn;
@@ -112,6 +132,10 @@ export type ScheduleWeekRow = {
     fixedSlots: number | null;
     percent: number;
     isDayOff: boolean;
+    /** SCHEDULE-FLEX-DATE-NAV: записи мастера в этот день (с личными — занятостью), по времени. */
+    bookings: ScheduleWeekBooking[];
+    /** Свободное время мастера в этот день (с «сейчас»). */
+    freeWindows: FreeWindowsDay;
   }>;
 };
 
@@ -133,6 +157,13 @@ export type StudioScheduleData = {
   day: ScheduleDayData;
   kpis: ScheduleKpis;
   week: ScheduleWeekData | null;
+  /** Сегодня в поясе салона. */
+  todayKey: string;
+  /**
+   * SCHEDULE-FLEX-DATE-NAV: свободные окошки периода (день либо неделя) по
+   * активным мастерам — для окна «Свободные окошки» и его выгрузки.
+   */
+  freeWindows: Array<{ masterId: string; masterName: string; days: FreeWindowsDayItem[] }>;
   /** Service catalogue passed to the create-booking dialog. */
   services: Array<{
     id: string;

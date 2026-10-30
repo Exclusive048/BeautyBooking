@@ -69,3 +69,15 @@ export const BOOKING_CELL_CLASS: Record<BookingStatusTone, string> = {
   done: "border border-border-subtle bg-bg-input/70 text-text-sec",
   muted: "border border-border-subtle bg-bg-input/40 text-text-sec",
 };
+
+/**
+ * SCHEDULE-FLEX-DATE-NAV — точка статуса у строки записи в неделе (таблица на
+ * ПК, список на телефоне): те же цвета, что у карточки в сетке дня и легенды.
+ */
+export const BOOKING_DOT_CLASS: Record<BookingStatusTone, string> = {
+  confirmed: "bg-accent-text",
+  pending: "bg-warning",
+  new: "bg-success",
+  done: "bg-border-subtle",
+  muted: "bg-border-subtle",
+};

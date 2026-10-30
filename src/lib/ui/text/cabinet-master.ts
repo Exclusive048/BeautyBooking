@@ -1464,21 +1464,13 @@ export const cabinetMaster = {
   schedule: {
     breadcrumb: "Расписание",
     title: "Расписание",
-    subtitleTemplate: "{range} · {bookingsLabel} · {revenue}",
     bookingsLabelOne: "запись",
     bookingsLabelFew: "записи",
     bookingsLabelMany: "записей",
     controls: {
-      // PWA-UX-BATCH-01: «Месяц» снят (был заглушкой, выглядел нажимаемым);
-      // день — рабочий вид, для телефона — по умолчанию.
-      viewDay: "День",
-      viewWeek: "Неделя",
-      prevWeek: "Предыдущая неделя",
-      nextWeek: "Следующая неделя",
-      prevDay: "Предыдущий день",
-      nextDay: "Следующий день",
+      // SCHEDULE-FLEX-DATE-NAV: вид, стрелки и «Сегодня» — общий навигатор
+      // дат (`UI_TEXT.schedule.dateNav`), здесь — только своё мастеру.
       dayStripAria: "Дни недели",
-      today: "Сегодня",
       refresh: "Обновить",
       // PWA-FIX-05 — подписанная кнопка входа в настройки со страницы
       // расписания (CTA-инфинитив: действие со страницы, не имя раздела).
@@ -1498,6 +1490,8 @@ export const cabinetMaster = {
       freeTodaySlotMany: "окошек",
       freeTodayAfterTemplate: "ближайшее в {time}",
       freeTodayNone: "нет окошек",
+      // SCHEDULE-FLEX-DATE-NAV: свёрнутые показатели — одна строка.
+      summaryLoadTemplate: "загрузка {pct}%",
     },
     legend: {
       confirmed: "Подтверждено",
@@ -1506,6 +1500,8 @@ export const cabinetMaster = {
       blocked: "Закрыто",
     },
     dayOff: "Выходной",
+    // SCHEDULE-FLEX-DATE-NAV: неделя на телефоне — списком по дням.
+    agendaEmpty: "Записей нет",
     timeBlockBreak: "Перерыв",
     timeBlockBlocked: "Закрыто",
     footerHintCreate: "Нажмите на свободное место, чтобы добавить запись",

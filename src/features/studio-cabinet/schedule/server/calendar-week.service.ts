@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { addDaysToDateKey, dateFromLocalDateKey } from "@/lib/schedule/dateKey";
 import { dayPlanWorkMinutes, loadDayPlans } from "@/lib/schedule/day-plans";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
+import type { DayPlan } from "@/lib/schedule/types";
 import { studioBookingsWhere } from "@/lib/studio/booking-scope";
 import { isStudioMasterActive } from "@/lib/studio/master-eligibility";
 import { buildStudioWeekCell, type StudioWeekCell } from "../lib/week-capacity";
@@ -58,6 +59,12 @@ export async function loadStudioWeekCells(input: {
   from: string;
   masters: Array<{ id: string; active: boolean }>;
   now: Date;
+  /**
+   * SCHEDULE-FLEX-DATE-NAV: планы дня недели, уже загруженные вызывающим
+   * (веб-неделя считает по ним и свободные окошки) — второй раз движок не
+   * зовётся. Без них — загрузка здесь.
+   */
+  plans?: Map<string, Map<string, DayPlan>>;
 }): Promise<Map<string, StudioWeekCell[]>> {
   const toExclusive = addDaysToDateKey(input.from, 7);
   const weekStart = dateFromLocalDateKey(input.from, input.timezone, 0, 0);
@@ -73,7 +80,9 @@ export async function loadStudioWeekCells(input: {
       },
       select: { masterProviderId: true, providerId: true, startAtUtc: true, endAtUtc: true },
     }),
-    loadDayPlans({ providerIds: activeIds, fromKey: input.from, toKeyExclusive: toExclusive, now: input.now }),
+    input.plans
+      ? Promise.resolve(input.plans)
+      : loadDayPlans({ providerIds: activeIds, fromKey: input.from, toKeyExclusive: toExclusive, now: input.now }),
   ]);
 
   // master → date → { booked, minutes }
