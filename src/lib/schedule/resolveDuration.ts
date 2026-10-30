@@ -109,6 +109,55 @@ export async function resolveServiceDuration(masterId: string, serviceId: string
 }
 
 /**
+ * SLOTS-GAP-PACKING (2026-10-30) — длительности ВСЕХ услуг, на которые к
+ * профилю можно записаться: свои услуги и (у профиля в студии) услуги студии
+ * со связью `MasterService`. Решает то же `decideServiceDuration`, что и
+ * длительность одной услуги, — отбор окошек и запись не могут разойтись в
+ * том, что профиль продаёт. Нужны движку окошек (`buildSlotsForDay.packingDurationsMin`):
+ * чем ещё можно заполнить свободный промежуток. Без строк — пустой список.
+ */
+export async function resolveProfileServiceDurations(masterId: string): Promise<number[]> {
+  const master = await prisma.provider.findUnique({ where: { id: masterId }, select: MASTER_SELECT });
+  if (!master || master.type !== ProviderType.MASTER) return [];
+
+  const [ownServices, links] = await Promise.all([
+    prisma.service.findMany({
+      where: { providerId: master.id, isEnabled: true, isActive: true },
+      select: SERVICE_SELECT,
+    }),
+    master.studioId
+      ? prisma.masterService.findMany({
+          where: {
+            masterProviderId: master.id,
+            isEnabled: true,
+            service: { providerId: master.studioId, isEnabled: true, isActive: true },
+          },
+          select: {
+            durationOverrideMin: true,
+            isEnabled: true,
+            service: { select: SERVICE_SELECT },
+          },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const durations = new Set<number>();
+  for (const service of ownServices) {
+    const decided = decideServiceDuration({ master, service, override: null });
+    if (decided.ok) durations.add(decided.data);
+  }
+  for (const link of links) {
+    const decided = decideServiceDuration({
+      master,
+      service: link.service,
+      override: { durationOverrideMin: link.durationOverrideMin, isEnabled: link.isEnabled },
+    });
+    if (decided.ok) durations.add(decided.data);
+  }
+  return Array.from(durations).sort((a, b) => a - b);
+}
+
+/**
  * PERF-08 — та же длительность для НАБОРА мастеров и ОДНОЙ услуги.
  *
  * Публичный виджет студии звал поштучную версию в цикле по мастерам, то есть

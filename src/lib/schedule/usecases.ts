@@ -30,6 +30,7 @@ import { createScheduleContext, getScheduleWindow } from "@/lib/schedule/engine-
 import { withSingleFlight } from "@/lib/cache/single-flight";
 import { buildBookingOverlapWhere } from "@/lib/schedule/overlap";
 import { bucketRangesByDateKey, loadTimeBlockRanges } from "@/lib/schedule/time-blocks";
+import { resolveProfileServiceDurations } from "@/lib/schedule/resolveDuration";
 
 type RangeInput = {
   from: Date;
@@ -258,11 +259,20 @@ export async function listAvailabilitySlotsPaginated(
      * ключ кэша ТОЛЬКО своего дня: остальные дни делят общий кэш.
      */
     extraStartsUtc?: Date[];
+    /**
+     * SLOTS-GAP-PACKING (2026-10-30, решение владельца): отбор начал «без
+     * дыр» по услугам профиля (`buildSlotsForDay.packingDurationsMin`). По
+     * умолчанию включён — так окошки видит клиент и так их проверяет запись.
+     * Выключает только окно оператора (ручная запись мастера и студии,
+     * перенос из кабинета студии): там время выбирает человек, знающий день.
+     */
+    packing?: boolean;
   }
 ): Promise<Result<AvailabilitySlotsPageResult>> {
   const startedAt = Date.now();
   const excludeBookingId = input.excludeBookingId ?? null;
   const extraStartsUtc = input.extraStartsUtc ?? [];
+  const packing = input.packing ?? true;
   const bypassCache = excludeBookingId !== null;
 
   if (!Number.isInteger(durationMin) || durationMin <= 0 || durationMin % 5 !== 0) {
@@ -355,6 +365,7 @@ export async function listAvailabilitySlotsPaginated(
         scheduleVersion: scheduleWindow.scheduleVersion,
         publishedUntilLocal: scheduleWindow.publishedUntilLocal,
         extraStartMinutes: extraMinutesByDateKey.get(cursorKey),
+        packing,
       }),
     });
   }
@@ -458,6 +469,10 @@ export async function listAvailabilitySlotsPaginated(
         computeToKeyExclusive,
       );
 
+      // SLOTS-GAP-PACKING: чем ещё профиль может заполнить промежуток. Читается
+      // только на промахе — в ключ кэша набор не входит (см. `buildSlotsCacheKey`).
+      const packingDurationsMin = packing ? await resolveProfileServiceDurations(providerId) : undefined;
+
       for (const day of missingDays) {
         const dayPlan = await ScheduleEngine.getDayPlanFromContext(ctx, day.dateKey);
         const daySlots = buildSlotsForDay({
@@ -471,6 +486,7 @@ export async function listAvailabilitySlotsPaginated(
           now,
           slotStepMin,
           extraStartsUtc,
+          packingDurationsMin,
         });
         computed.set(day.dateKey, daySlots);
         // RESCHEDULE-SELF-SLOT: выдача без одной брони — не то, что лежит в
@@ -495,7 +511,7 @@ export async function listAvailabilitySlotsPaginated(
           // параметры сетки, версия расписания и непокрытый отрезок. Запросы с
           // разными отрезками друг друга не блокируют. Дополнительные начала —
           // тоже часть работы (их дни пишутся под своими ключами).
-          lockKey: `sf:slots:${providerId}:${serviceId}:${durationMin}:${bufferMin}:${slotStepMin}:${timezone}:${scheduleWindow.scheduleVersion}:${missingDays[0].dateKey}:${missingDays[missingDays.length - 1].dateKey}${extraLockSuffix(missingDays)}`,
+          lockKey: `sf:slots:${providerId}:${serviceId}:${durationMin}:${bufferMin}:${slotStepMin}:${timezone}:${scheduleWindow.scheduleVersion}:${missingDays[0].dateKey}:${missingDays[missingDays.length - 1].dateKey}${packing ? ":pk" : ""}${extraLockSuffix(missingDays)}`,
           read: async () => {
             const values = await Promise.all(missingDays.map((day) => getCachedSlots(day.cacheKey)));
             // Частично заполненный набор — ещё не результат: победитель пишет дни по
