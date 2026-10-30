@@ -2,6 +2,13 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { AppError } from "@/lib/api/errors";
 import { env } from "@/lib/env";
 
+/**
+ * Пара кук одного флоу: ставит только `beginOAuthAuthorization`
+ * (`lib/auth/oauth-providers.ts` — веб- и мобильный старт входа), читает только
+ * `/api/auth/vk/callback`. Второй писатель и читатель — кабинетная нога
+ * `/api/integrations/vk/{start,callback}` — удалён VK-INTEGRATIONS-ROUTES-ORPHANED,
+ * поэтому разносить имена по флоу (VK-SHARED-COOKIE-NAMES) больше незачем.
+ */
 export const VK_ID_STATE_COOKIE = "vk_id_state";
 export const VK_ID_VERIFIER_COOKIE = "vk_id_verifier";
 export const VK_ID_STATE_TTL_SECONDS = 10 * 60;

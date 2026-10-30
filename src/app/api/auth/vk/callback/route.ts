@@ -120,7 +120,7 @@ async function completeVkMobileCallback(req: Request, cookieStore: CookieStore, 
         code: parsedCallback.code,
         codeVerifier,
         deviceId: parsedCallback.device_id,
-        redirectUri: requireVkRedirectUri("auth"),
+        redirectUri: requireVkRedirectUri(),
         state: parsedCallback.state,
       });
       const profile = await fetchVkProfile(token.accessToken);
@@ -178,7 +178,7 @@ export async function GET(req: Request) {
         userAgent: req.headers.get("user-agent"),
       };
 
-      const redirectUri = requireVkRedirectUri("auth");
+      const redirectUri = requireVkRedirectUri();
       const token = await exchangeVkCodeForToken({
         code: parsedCallback.code,
         codeVerifier,

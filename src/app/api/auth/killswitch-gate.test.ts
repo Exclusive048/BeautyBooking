@@ -3,8 +3,8 @@ import { NextRequest } from "next/server";
 
 /**
  * AUTH-KILLSWITCH-ENFORCE-01 — server-side enabled-flag gating on the auth
- * provider routes (VK / Yandex OAuth start+callback, VK integrations connect,
- * Telegram connect link). Proves the FZ-199 kill-switch is enforced at the
+ * provider routes (VK / Yandex OAuth start+callback, Telegram connect link;
+ * the VK integrations connect pair was removed by VK-INTEGRATIONS-ROUTES-ORPHANED). Proves the FZ-199 kill-switch is enforced at the
  * ROUTE, not just hidden in the UI:
  *  - flag DISABLED → the route refuses (503 / redirect) and the foreign-auth
  *    mechanism (OAuth exchange, hash verify, link, session) is NEVER invoked,
@@ -134,8 +134,6 @@ vi.mock("@/lib/telegram/links", () => ({ getTelegramLinkSummary: vi.fn(async () 
 import { GET as vkStart } from "@/app/api/auth/vk/start/route";
 import { GET as vkCallback } from "@/app/api/auth/vk/callback/route";
 import { POST as vkUnlink } from "@/app/api/auth/vk/unlink/route";
-import { GET as vkIntStart } from "@/app/api/integrations/vk/start/route";
-import { GET as vkIntCallback } from "@/app/api/integrations/vk/callback/route";
 import { GET as yandexStart } from "@/app/api/auth/yandex/start/route";
 import { GET as yandexCallback } from "@/app/api/auth/yandex/callback/route";
 import { GET as tgLinkGet } from "@/app/api/auth/telegram/link/route";
@@ -143,9 +141,6 @@ import { GET as tgConnectLink } from "@/app/api/telegram/link/route";
 
 function req(url = "http://localhost/api/test"): Request {
   return new Request(url);
-}
-async function code(res: Response): Promise<string> {
-  return JSON.stringify(await res.json());
 }
 
 describe("AUTH-KILLSWITCH-ENFORCE-01 — route-level enabled-flag gating", () => {
@@ -181,23 +176,9 @@ describe("AUTH-KILLSWITCH-ENFORCE-01 — route-level enabled-flag gating", () =>
       expect(spies.setSessionCookies).not.toHaveBeenCalled();
     });
 
-    // FIX-B14: у кабинетной ноги аудитория — уже вошедший пользователь, поэтому
-    // адрес возврата не /login, а страница, с которой он нажал «подключить»
-    // (Referer; без него — дефолт /cabinet/profile). Исход тот же.
-    it("integrations start disabled → back to the connect surface with vk=provider_unavailable", async () => {
-      const res = await vkIntStart(req("http://localhost/api/integrations/vk/start"));
-      expect(res.headers.get("location")).toContain("vk=provider_unavailable");
-      expect([302, 307, 308]).toContain(res.status);
-      expect(spies.buildVkAuthorizeUrl).not.toHaveBeenCalled();
-      expect(spies.getSessionUser).not.toHaveBeenCalled();
-    });
-
-    it("integrations callback disabled → 503, no link (payload present)", async () => {
-      const payload = encodeURIComponent(JSON.stringify({ code: "c", state: "s", device_id: "d" }));
-      const res = await vkIntCallback(req(`http://localhost/api/integrations/vk/callback?payload=${payload}`));
-      expect(res.status).toBe(503);
-      expect(spies.exchangeVkCodeForToken).not.toHaveBeenCalled();
-    });
+    // VK-INTEGRATIONS-ROUTES-ORPHANED (2026-10-30): кабинетная нога
+    // `/api/integrations/vk/{start,callback}` удалена — у VK остался один вход
+    // (`/api/auth/vk/*`), и гейт на нём проверен выше.
 
     it("enabled → NOT short-circuited (redirects to VK, gate doesn't leak)", async () => {
       flags.vk = true;

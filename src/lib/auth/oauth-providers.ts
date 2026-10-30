@@ -104,7 +104,7 @@ export async function beginOAuthAuthorization(
   if (provider === "vk") {
     const codeVerifier = generateVkCodeVerifier();
     const codeChallenge = generateVkCodeChallenge(codeVerifier);
-    const redirectUri = requireVkRedirectUri("auth");
+    const redirectUri = requireVkRedirectUri();
     const authorizeUrl = buildVkAuthorizeUrl({ state, codeChallenge, redirectUri });
 
     const cookieStore = await cookies();

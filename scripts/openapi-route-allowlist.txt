@@ -127,7 +127,6 @@
 /api/home/portfolio/{id}
 /api/home/tags
 /api/hot-slots/subscribe
-/api/integrations/vk/settings
 /api/invites/{id}/accept
 /api/invites/{id}/reject
 /api/log-error

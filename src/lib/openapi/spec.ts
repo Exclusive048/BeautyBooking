@@ -1880,7 +1880,7 @@ export const openApiSpec = {
               { $ref: "#/components/schemas/TelegramSettingsData" },
               { $ref: "#/components/schemas/TelegramWebhookData" },
               { $ref: "#/components/schemas/VkStatusData" },
-              { $ref: "#/components/schemas/VkDisableData" },
+              { $ref: "#/components/schemas/VkSettingsData" },
               { $ref: "#/components/schemas/MediaAssetData" },
               { $ref: "#/components/schemas/MediaAssetListData" },
               { $ref: "#/components/schemas/ReviewData" },
@@ -2696,7 +2696,14 @@ export const openApiSpec = {
           token: { type: "string", description: "Ключ доступа сообщества ВКонтакте, 20–512 символов" },
         },
       },
-      VkDisableData: {
+      VkSettingsInput: {
+        type: "object",
+        required: ["enabled"],
+        properties: {
+          enabled: { type: "boolean", description: "Получать уведомления ВКонтакте" },
+        },
+      },
+      VkSettingsData: {
         type: "object",
         required: ["enabled"],
         properties: {
@@ -4537,7 +4544,7 @@ export const openApiSpec = {
           deliveryEnabled: {
             type: "boolean",
             description:
-              "Уведомления через VK включены. Выключает `POST /api/integrations/vk/disable`; " +
+              "Уведомления через VK включены. Включает и выключает `PATCH /api/integrations/vk/settings`; " +
               "`POST /api/auth/vk/unlink` удаляет связку целиком (`linked = false`).",
           },
           connectedAt: { type: "string", format: "date-time", nullable: true },
@@ -6999,33 +7006,6 @@ export const openApiSpec = {
         },
       },
     },
-    "/api/integrations/vk/start": {
-      get: {
-        summary: "Start VK ID integration linking",
-        description:
-          "FIX-B14: тоже навигация (кабинетная кнопка «подключить»), конверта ошибки нет. Аудитория — " +
-          "уже вошедший пользователь, поэтому адрес возврата не /login, а страница-источник (Referer, " +
-          "прогнанный через sanitizeInternalPath; дефолт /cabinet/profile) с ?vk=<исход>. " +
-          "Исключение — отсутствие сессии: /login?next=<страница-источник>.",
-        tags: ["integrations", "vk"],
-        responses: {
-          "307": { description: "Redirect to VK ID, back to the connect surface with ?vk=<исход>, or /login" },
-        },
-      },
-    },
-    "/api/integrations/vk/callback": {
-      get: {
-        summary: "VK ID integration callback",
-        tags: ["integrations", "vk"],
-        responses: {
-          "307": { description: "Redirect to cabinet" },
-          "400": errorResponse("Validation error"),
-          "401": errorResponse("Unauthorized"),
-          "409": errorResponse("Conflict"),
-          "500": errorResponse("Internal error"),
-        },
-      },
-    },
     "/api/integrations/vk/status": {
       get: {
         summary: "Get VK integration status",
@@ -7037,15 +7017,26 @@ export const openApiSpec = {
         },
       },
     },
-    "/api/integrations/vk/disable": {
-      post: {
-        summary: "Disable VK integration",
-        tags: ["integrations", "vk"],
+    "/api/integrations/vk/settings": {
+      patch: {
+        operationId: "integrationsVkSettings",
+        summary: "Turn VK notifications on or off",
+        description:
+          "Включает и выключает уведомления ВКонтакте у привязанного VK (`VkLink.isEnabled`). " +
+          "Выключение при непривязанном VK — `200 { enabled: false }`, включение — `409 VK_NOT_LINKED`. " +
+          "VK-INTEGRATIONS-ROUTES-ORPHANED: заменяет удалённый `POST /api/integrations/vk/disable`. " +
+          "Привязка и отвязка VK — `/api/auth/vk/{start,unlink}`. Bearer или кука.",
+        tags: ["mobile", "integrations", "vk"],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/VkSettingsInput" } } },
+        },
         responses: {
-          "200": okResponse({ $ref: "#/components/schemas/VkDisableData" }),
-          "401": errorResponse("Unauthorized"),
-          "409": errorResponse("Conflict"),
-          "500": errorResponse("Internal error"),
+          "200": okResponse({ $ref: "#/components/schemas/VkSettingsData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "409": errorResponse("VK_NOT_LINKED"),
+          "500": errorResponse("INTERNAL_ERROR"),
         },
       },
     },

@@ -59,8 +59,10 @@ describe("provider links — source level", () => {
   const ROUTES = [
     "src/app/api/auth/vk/callback/route.ts",
     "src/app/api/auth/yandex/callback/route.ts",
-    "src/app/api/integrations/vk/callback/route.ts",
-    "src/app/api/integrations/vk/disable/route.ts",
+    // VK-INTEGRATIONS-ROUTES-ORPHANED: `integrations/vk/{callback,disable}`
+    // удалены; уведомления ВК выключает `integrations/vk/settings` через
+    // `lib/vk/links.ts` — токенов он не касается (колонок нет).
+    "src/lib/vk/links.ts",
     "src/app/api/auth/vk/unlink/route.ts",
     "src/app/api/auth/yandex/unlink/route.ts",
     // MOBILE-AUTH-A2: запись связок (веб и приложение) переехала из колбэков

@@ -5,18 +5,23 @@ import { describe, it, expect, vi } from "vitest";
  *
  * VK had ZERO OAuth-lib coverage. This pins the cleanly-testable VK surfaces the
  * abstraction must not silently change: the authorize-URL params (incl. PKCE
- * S256 + `scope=email phone`), the login-vs-integration redirect-URI rewrite
- * (`buildRedirectUri`/`requireVkRedirectUri` — a VK-specific quirk), and the
+ * S256 + `scope=email phone`), the redirect-URI resolution
+ * (`buildRedirectUri`/`requireVkRedirectUri` — since VK-INTEGRATIONS-ROUTES-ORPHANED
+ * the login callback is the only one), and the
  * PKCE helpers. Token/profile fetches (network) + the inline callback
  * account-linking/409 branch are NOT covered here — see the Phase-0 report
  * (they need a Phase-1 extraction/route-harness). `@/lib/vk/config` is mocked so
  * the tests are deterministic without env-load timing.
  */
 
+const getVkRedirectUriMock = vi.hoisted(() =>
+  vi.fn((): string | null => "https://example.test/api/auth/vk/callback"),
+);
+
 vi.mock("@/lib/vk/config", () => ({
   getVkClientId: vi.fn(() => "test-vk-client"),
   getVkClientSecret: vi.fn(() => "test-vk-secret"),
-  getVkRedirectUri: vi.fn(() => "https://example.test/api/auth/vk/callback"),
+  getVkRedirectUri: getVkRedirectUriMock,
 }));
 
 import { buildVkAuthorizeUrl, requireVkRedirectUri } from "@/lib/vk/oauth";
@@ -44,15 +49,21 @@ describe("buildVkAuthorizeUrl — authorize params (characterization)", () => {
   });
 });
 
-describe("requireVkRedirectUri — login vs integration path rewrite (VK-specific quirk)", () => {
-  it('mode "auth" keeps the /api/auth/vk/callback path', () => {
-    expect(requireVkRedirectUri("auth")).toBe("https://example.test/api/auth/vk/callback");
+describe("requireVkRedirectUri — единственный колбэк VK (вход)", () => {
+  it("login callback base is kept as is", () => {
+    expect(requireVkRedirectUri()).toBe("https://example.test/api/auth/vk/callback");
   });
 
-  it('mode "integrations" rewrites to /api/integrations/vk/callback', () => {
-    expect(requireVkRedirectUri("integrations")).toBe(
-      "https://example.test/api/integrations/vk/callback",
-    );
+  // VK-INTEGRATIONS-ROUTES-ORPHANED: интеграционный колбэк удалён. Env со
+  // старым адресом сводится к колбэку входа, а голый origin дописывается им же.
+  it("legacy integrations base → the login callback", () => {
+    getVkRedirectUriMock.mockReturnValueOnce("https://example.test/api/integrations/vk/callback");
+    expect(requireVkRedirectUri()).toBe("https://example.test/api/auth/vk/callback");
+  });
+
+  it("bare origin → the login callback appended", () => {
+    getVkRedirectUriMock.mockReturnValueOnce("https://example.test/");
+    expect(requireVkRedirectUri()).toBe("https://example.test/api/auth/vk/callback");
   });
 });
 
