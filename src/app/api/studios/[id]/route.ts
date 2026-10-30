@@ -11,6 +11,7 @@ import { BOOKING_RULE_LIMITS } from "@/lib/schedule/editor-shared";
 import { NextResponse } from "next/server";
 import { z, type ZodError } from "zod";
 import { findForbiddenWordsIssue, rejectForbiddenWords } from "@/lib/moderation/zod";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 type RouteContext = {
   params: Promise<{ id: string }> | { id: string };
@@ -237,6 +238,8 @@ export async function PATCH(req: Request, ctx: RouteContext) {
   const accessError = await ensureStudioAdmin(id, auth.user.id);
   if (accessError) return accessError;
 
+  const nonJson = nonJsonBodyRefusal(req);
+  if (nonJson) return nonJson;
   const body = await req.json().catch(() => null);
   const parsedBody = updateSchema.safeParse(body);
   if (!parsedBody.success) {

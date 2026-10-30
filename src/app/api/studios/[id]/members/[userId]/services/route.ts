@@ -7,6 +7,7 @@ import {
   resolveStudioMasterProvider,
   setStudioMemberServiceEnabled,
 } from "@/lib/studios/member-services";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 const toggleSchema = z.object({
   toggles: z.array(
@@ -59,6 +60,8 @@ export async function PATCH(
     return fail(masterProvider.message, masterProvider.status, masterProvider.code);
   }
 
+  const nonJson = nonJsonBodyRefusal(req);
+  if (nonJson) return nonJson;
   const body = await req.json().catch(() => null);
   const parsed = toggleSchema.safeParse(body);
   if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");

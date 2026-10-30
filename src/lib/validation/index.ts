@@ -1,6 +1,12 @@
 import { z, ZodError } from "zod";
 import { AppError } from "@/lib/api/errors";
 import { MAX_JSON_BODY_BYTES, readBodyTextCapped } from "@/lib/http/body-limit";
+import {
+  NON_JSON_BODY_CODE,
+  NON_JSON_BODY_MESSAGE,
+  NON_JSON_BODY_STATUS,
+  shouldRejectNonJsonBody,
+} from "@/lib/http/json-content-type";
 import { findForbiddenWordsIssue } from "@/lib/moderation/zod";
 
 type ValidationIssue = {
@@ -26,11 +32,26 @@ function validationError(message: string, details: ValidationDetails): AppError 
   return new AppError(message, 400, "VALIDATION_ERROR", details);
 }
 
+/**
+ * CSRF-CONTENT-TYPE-LAYER — третий слой CSRF: JSON-тело только с
+ * `Content-Type: application/json` (кроме `Authorization: Bearer`). Почему
+ * тип — `lib/http/json-content-type.ts`. Бросает 415 `UNSUPPORTED_MEDIA_TYPE`.
+ */
+export function assertJsonContentType(req: Request): void {
+  if (shouldRejectNonJsonBody(req.headers)) {
+    throw new AppError(NON_JSON_BODY_MESSAGE, NON_JSON_BODY_STATUS, NON_JSON_BODY_CODE);
+  }
+}
+
 export async function parseBody<T>(
   req: Request,
   schema: z.ZodType<T>,
   maxBytes: number = MAX_JSON_BODY_BYTES,
 ): Promise<T> {
+  // CSRF-CONTENT-TYPE-LAYER: тип проверяется ДО чтения — тело простого
+  // межсайтового запроса (`text/plain`, форма) не читается вовсе.
+  assertJsonContentType(req);
+
   // SEC-16, слой 2: считаем фактические байты. Zod ограничивает поля только
   // после разбора, а `Content-Length` (слой 1 в `proxy.ts`) может отсутствовать
   // или лгать — поэтому граница обязана быть и здесь.

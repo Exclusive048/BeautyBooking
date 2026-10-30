@@ -7,6 +7,7 @@ import { getSessionContext } from "@/lib/auth/session";
 import { readSessionDeviceMeta } from "@/lib/auth/session-client-meta";
 import { logError } from "@/lib/logging/logger";
 import { registerPushDevice, unregisterPushDevice } from "@/lib/notifications/native-push/devices";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 /**
  * MOBILE-B2 — push-токен установки нативного приложения.
@@ -87,6 +88,8 @@ export async function POST(req: Request) {
       return fail(CLIENT_HEADERS_MESSAGE, 400, "VALIDATION_ERROR", { missingHeaders: missing });
     }
 
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const parsed = registerBodySchema.safeParse(await req.json().catch(() => null));
     if (!parsed.success) {
       const issue = parsed.error.issues[0];

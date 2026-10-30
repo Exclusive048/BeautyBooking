@@ -6,6 +6,7 @@ import { providerIdParamSchema } from "@/lib/providers/schemas";
 import { ensureStudioAccess } from "@/lib/studios/access";
 import { resolveStudioMasterProvider } from "@/lib/studios/member-services";
 import { updateStudioMasterProfile } from "@/lib/studios/member-profile";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 type RouteContext = {
   params: Promise<{ id: string }> | { id: string };
@@ -38,6 +39,8 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     return fail(masterProvider.message, masterProvider.status, masterProvider.code);
   }
 
+  const nonJson = nonJsonBodyRefusal(req);
+  if (nonJson) return nonJson;
   const body = await req.json().catch(() => null);
   const parsedBody = updateSchema.safeParse(body);
   if (!parsedBody.success) {

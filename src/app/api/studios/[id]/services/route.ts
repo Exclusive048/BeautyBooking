@@ -12,6 +12,7 @@ import { ensureStudioAdmin } from "@/lib/studios/access";
 import { SubscriptionScope } from "@prisma/client";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { cheapestPlanTierWithFeature } from "@/lib/billing/required-plan";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 const createSchema = z.object({
   name: z.string().trim().min(1),
@@ -68,6 +69,8 @@ export async function POST(
   const accessError = await ensureStudioAdmin(p.id, auth.user.id);
   if (accessError) return accessError;
 
+  const nonJson = nonJsonBodyRefusal(req);
+  if (nonJson) return nonJson;
   const body = await req.json().catch(() => null);
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
@@ -89,6 +92,8 @@ export async function PATCH(
   const accessError = await ensureStudioAdmin(p.id, auth.user.id);
   if (accessError) return accessError;
 
+  const nonJson = nonJsonBodyRefusal(req);
+  if (nonJson) return nonJson;
   const body = await req.json().catch(() => null);
   const parsed = toggleSchema.safeParse(body);
   if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
@@ -110,6 +115,8 @@ export async function PUT(
   const accessError = await ensureStudioAdmin(p.id, auth.user.id);
   if (accessError) return accessError;
 
+  const nonJson = nonJsonBodyRefusal(req);
+  if (nonJson) return nonJson;
   const body = await req.json().catch(() => null);
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
@@ -147,6 +154,8 @@ export async function DELETE(
   const accessError = await ensureStudioAdmin(p.id, auth.user.id);
   if (accessError) return accessError;
 
+  const nonJson = nonJsonBodyRefusal(req);
+  if (nonJson) return nonJson;
   const body = await req.json().catch(() => null);
   const parsed = deleteSchema.safeParse(body);
   if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");

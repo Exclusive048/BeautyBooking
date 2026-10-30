@@ -7,6 +7,7 @@ import { createBillingNotification } from "@/lib/billing/notifications";
 import { NotificationType } from "@prisma/client";
 import { isCurrentMasterManagedByStudio } from "@/lib/master/access";
 import { invalidatePlanCache } from "@/lib/billing/get-current-plan";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 export const runtime = "nodejs";
 
@@ -19,6 +20,8 @@ export async function PATCH(req: Request) {
   const user = await getSessionUser();
   if (!user) return fail("Войдите в аккаунт, чтобы продолжить.", 401, "UNAUTHORIZED");
 
+  const nonJson = nonJsonBodyRefusal(req);
+  if (nonJson) return nonJson;
   const body = await req.json().catch(() => null);
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {

@@ -132,6 +132,9 @@ const ERROR_CODES = [
   "REFERENCE_PHOTO_USED",
   // SEC-16: тело запроса перевалило за планку размера (`lib/http/body-limit.ts`)
   "REQUEST_BODY_TOO_LARGE",
+  // CSRF-CONTENT-TYPE-LAYER: JSON-тело пришло не как `application/json`
+  // (третий слой CSRF, `lib/http/json-content-type.ts`) — 415.
+  "UNSUPPORTED_MEDIA_TYPE",
   // MOBILE-POLISH (App Store 1.2): жалоба на собственный контент
   // (своя страница, свой отзыв, своя работа, своё предложение, своё сообщение).
   "REPORT_OWN_CONTENT",
