@@ -2,6 +2,8 @@ import { MediaKind, Prisma } from "@prisma/client";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { requireAdminAuth } from "@/lib/auth/admin";
+import { createAdminAuditLogSafe } from "@/lib/audit/admin-audit";
+import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
 import { enqueue } from "@/lib/queue/queue";
@@ -21,12 +23,24 @@ export async function POST(req: Request) {
     // re-index actually runs (needed e.g. after a dimension migration). Without
     // the reset the guard would silently no-op already-indexed assets (audit F1).
     const force = new URL(req.url).searchParams.get("force") === "true";
+    // Инв. #19: задачи уже в очереди и снять их нечем — журнал после постановки.
+    // Каждая задача — платные вызовы (инв. #44), поэтому след нужен.
+    const audit = (details: { enqueued: number; forced: boolean; batchLimited: boolean }) =>
+      createAdminAuditLogSafe({
+        adminUserId: auth.user.id,
+        action: "VISUAL_SEARCH_REINDEX_REQUESTED",
+        targetType: "visual-search",
+        details,
+        context: getAdminAuditContext(req),
+      });
 
     // Без `force` — общий путь «фото без категории» (он же разовый прогон
     // воркера после смены конвейера, `lib/visual-search/reindex.ts`).
     if (!force) {
       const result = await requeueUncategorizedPortfolio();
-      return jsonOk({ enqueued: result.enqueued, forced: false, batchLimited: result.batchLimited });
+      const summary = { enqueued: result.enqueued, forced: false, batchLimited: result.batchLimited };
+      await audit(summary);
+      return jsonOk(summary);
     }
 
     const assets = await prisma.mediaAsset.findMany({
@@ -58,13 +72,15 @@ export async function POST(req: Request) {
       assets.map((asset) => enqueue(createVisualSearchIndexJob({ assetId: asset.id })))
     );
 
-    return jsonOk({
+    const summary = {
       enqueued: assets.length,
       forced: force,
       // A full re-index across >BATCH_SIZE assets needs the CLI backfill script
       // (scripts/backfill-visual-embeddings.ts) — this route caps at one batch.
       batchLimited: assets.length === REINDEX_BATCH_SIZE,
-    });
+    };
+    await audit(summary);
+    return jsonOk(summary);
   } catch (error) {
     const appError = toAppError(error);
     if (appError.status >= 500) {

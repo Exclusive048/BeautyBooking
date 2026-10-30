@@ -1,5 +1,7 @@
 import { fail, ok } from "@/lib/api/response";
 import { requireAdminAuth } from "@/lib/auth/admin";
+import { createAdminAuditLogSafe } from "@/lib/audit/admin-audit";
+import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 import { deleteDeadJobByIndex, retryDeadJobByIndex } from "@/lib/queue/queue";
 
 export const runtime = "nodejs";
@@ -11,7 +13,7 @@ function parseIndex(value: string): number | null {
 }
 
 export async function PATCH(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ index: string }> }
 ) {
   const auth = await requireAdminAuth();
@@ -27,12 +29,21 @@ export async function PATCH(
   if (!moved) {
     return fail("Задача в очереди не найдена.", 404, "NOT_FOUND");
   }
+  // Инв. #19: задача уже вернулась в очередь (Redis) — журнал после, его сбой
+  // ответ не роняет.
+  await createAdminAuditLogSafe({
+    adminUserId: auth.user.id,
+    action: "QUEUE_JOB_RETRIED",
+    targetType: "queue-dead-letter",
+    details: { index },
+    context: getAdminAuditContext(request),
+  });
 
   return ok({ ok: true, index });
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ index: string }> }
 ) {
   const auth = await requireAdminAuth();
@@ -48,6 +59,13 @@ export async function DELETE(
   if (!removed) {
     return fail("Задача в очереди не найдена.", 404, "NOT_FOUND");
   }
+  await createAdminAuditLogSafe({
+    adminUserId: auth.user.id,
+    action: "QUEUE_JOB_DELETED",
+    targetType: "queue-dead-letter",
+    details: { index },
+    context: getAdminAuditContext(request),
+  });
 
   return ok({ ok: true, index });
 }

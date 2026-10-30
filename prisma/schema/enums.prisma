@@ -519,6 +519,20 @@ enum AdminAuditAction {
   CONTENT_REPORT_RESOLVED
 
   CONTENT_REPORT_DISMISSED
+
+  // Служебные действия админки (ADMIN-AUDIT-COVERAGE: до них эти мутации
+  // жили исключениями сторожа полноты аудита)
+  CATEGORY_CREATED
+
+  HOT_SLOTS_RUN
+
+  MEDIA_CLEANUP_RUN
+
+  QUEUE_JOB_RETRIED
+
+  QUEUE_JOB_DELETED
+
+  VISUAL_SEARCH_REINDEX_REQUESTED
 }
 
 /// RKN-FIX-10 — кто выполнил массовое чтение ПДн. Не роль пользователя, а

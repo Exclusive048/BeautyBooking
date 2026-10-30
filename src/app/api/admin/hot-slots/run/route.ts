@@ -1,5 +1,7 @@
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
+import { createAdminAuditLogSafe } from "@/lib/audit/admin-audit";
+import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 import { getSessionUser } from "@/lib/auth/session";
 import { hasAdminRole } from "@/lib/auth/guards";
 import { getRequestId, logError } from "@/lib/logging/logger";
@@ -14,6 +16,15 @@ export async function POST(req: Request) {
     if (!hasAdminRole(user)) return jsonFail(403, "Доступ запрещён.", "FORBIDDEN");
 
     const stats = await runHotSlotsJob();
+    // Инв. #19: расчёт уже записал окошки и откатить его нечем — журнал
+    // пишется после, и его сбой ответ не роняет.
+    await createAdminAuditLogSafe({
+      adminUserId: user.id,
+      action: "HOT_SLOTS_RUN",
+      targetType: "hot-slots",
+      details: { stats },
+      context: getAdminAuditContext(req),
+    });
     return jsonOk({ stats });
   } catch (error) {
     const appError = toAppError(error);

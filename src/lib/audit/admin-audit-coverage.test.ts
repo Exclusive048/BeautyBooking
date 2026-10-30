@@ -55,6 +55,11 @@ import { exportedHandlerMethods } from "@/lib/testing/route-handlers";
  *     появляется в схеме: миграция и запись аудита идут одним изменением.
  * Исключение, обработчик которого уже пишет аудит или исчез, — протухшее.
  *
+ * @probe 2026-10-30 (ADMIN-AUDIT-ACTIONS-COVERAGE) — миграция добавила шесть
+ *        значений, а аудит очереди ещё не был записан и исключения стояли.
+ *        Наблюдалось: «значение AdminAuditAction.QUEUE_JOB_RETRIED уже в схеме —
+ *        запишите аудит в src/app/api/admin/queue/[index]/route.ts#PATCH и
+ *        снимите исключение». Аудит записан, исключения сняты — зелёный.
  * @probe 2026-10-30 — `cities/route.ts` POST: убран вызов `createAdminAuditLog`
  *        из транзакции. Наблюдалось: «мутирующий обработчик админки без
  *        AdminAuditLog: src/app/api/admin/cities/route.ts#POST». Возвращено — зелёный.
@@ -313,7 +318,7 @@ type Exemption =
   | { kind: "awaiting-enum"; action: string; reason: string };
 
 const retired = (reason: string): Exemption => ({ kind: "retired", reason });
-const awaitingEnum = (action: string, reason: string): Exemption => ({ kind: "awaiting-enum", action, reason });
+// Новое исключение «ждёт значения»: `{ kind: "awaiting-enum", action, reason }`.
 
 /**
  * Посайтовые исключения `файл#МЕТОД`. Не «файл целиком»: соседний обработчик
@@ -326,30 +331,6 @@ const EXEMPT: Record<string, Exemption> = {
   "src/app/api/admin/reviews/[id]/route.ts#PATCH": retired("ADMIN-AUDIT-COVERAGE: снять жалобу — /approve с аудитом REVIEW_APPROVED"),
   "src/app/api/admin/reviews/[id]/route.ts#DELETE": retired("ADMIN-AUDIT-COVERAGE: удалить отзыв — /delete с аудитом REVIEW_DELETED"),
 
-  "src/app/api/admin/catalog/categories/route.ts#POST": awaitingEnum(
-    "CATEGORY_CREATED",
-    "создание категории; CATEGORY_EDITED подписан «Изменил категорию» и выдал бы создание за правку",
-  ),
-  "src/app/api/admin/hot-slots/run/route.ts#POST": awaitingEnum(
-    "HOT_SLOTS_RUN",
-    "ручной запуск расчёта горящих окошек — служебное действие, подходящего значения нет",
-  ),
-  "src/app/api/admin/media/broken/route.ts#POST": awaitingEnum(
-    "MEDIA_CLEANUP_RUN",
-    "ручная очистка битых и зависших медиа — подходящего значения нет",
-  ),
-  "src/app/api/admin/queue/[index]/route.ts#PATCH": awaitingEnum(
-    "QUEUE_JOB_RETRIED",
-    "повтор задачи dead-letter — подходящего значения нет",
-  ),
-  "src/app/api/admin/queue/[index]/route.ts#DELETE": awaitingEnum(
-    "QUEUE_JOB_DELETED",
-    "удаление задачи dead-letter — подходящего значения нет",
-  ),
-  "src/app/api/admin/visual-search/reindex/route.ts#POST": awaitingEnum(
-    "VISUAL_SEARCH_REINDEX_REQUESTED",
-    "переиндексация поиска по фото (платные вызовы, инв. #44) — подходящего значения нет",
-  ),
 };
 
 const real = createAnalyzer(diskLoader);

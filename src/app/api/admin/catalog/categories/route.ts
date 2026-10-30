@@ -3,6 +3,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api/response";
 import { requireAdminAuth } from "@/lib/auth/admin";
+import { createAdminAuditLog } from "@/lib/audit/admin-audit";
+import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { formatZodError } from "@/lib/api/validation";
 import { CATEGORY_ICON_MAX_LENGTH, isCategoryIcon } from "@/lib/catalog/category-icon";
@@ -235,29 +237,42 @@ export async function POST(req: Request) {
     }
 
     const uniqueSlug = normalizedSlug ? normalizedSlug : await ensureUniqueSlug(generated);
-    const created = await prisma.globalCategory.create({
-      data: {
-        name: title,
-        slug: uniqueSlug,
-        icon,
-        parentId,
-        status: CategoryStatus.APPROVED,
-        reviewedAt: new Date(),
-        proposedBy: null,
-        proposedAt: null,
-        isSystem: false,
-        visibleToAll: true,
-      },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        icon: true,
-        parentId: true,
-        status: true,
-        usageCount: true,
-        createdAt: true,
-      },
+    const created = await prisma.$transaction(async (tx) => {
+      const row = await tx.globalCategory.create({
+        data: {
+          name: title,
+          slug: uniqueSlug,
+          icon,
+          parentId,
+          status: CategoryStatus.APPROVED,
+          reviewedAt: new Date(),
+          proposedBy: null,
+          proposedAt: null,
+          isSystem: false,
+          visibleToAll: true,
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          icon: true,
+          parentId: true,
+          status: true,
+          usageCount: true,
+          createdAt: true,
+        },
+      });
+      // Инв. #18: запись журнала — в той же транзакции, без неё категории нет.
+      await createAdminAuditLog({
+        tx,
+        adminUserId: auth.user.id,
+        action: "CATEGORY_CREATED",
+        targetType: "category",
+        targetId: row.id,
+        details: { categorySlug: row.slug, parentId: row.parentId },
+        context: getAdminAuditContext(req),
+      });
+      return row;
     });
 
     return ok(

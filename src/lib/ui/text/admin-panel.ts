@@ -175,6 +175,12 @@ export const adminPanel = {
           SETTINGS_APP_SETTING_UPDATED: "Изменил настройку",
           CONTENT_REPORT_RESOLVED: "Принял меры по жалобе",
           CONTENT_REPORT_DISMISSED: "Отклонил жалобу",
+          CATEGORY_CREATED: "Добавил категорию",
+          HOT_SLOTS_RUN: "Запустил расчёт горящих окошек",
+          MEDIA_CLEANUP_RUN: "Запустил очистку медиа",
+          QUEUE_JOB_RETRIED: "Повторил задачу очереди",
+          QUEUE_JOB_DELETED: "Удалил задачу очереди",
+          VISUAL_SEARCH_REINDEX_REQUESTED: "Запустил переиндексацию поиска по фото",
         },
       },
       details: {
