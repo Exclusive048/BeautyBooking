@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
+import { resetProcessEnv } from "@/lib/testing/process-env";
 
 /**
  * QA-003 → ENV-SPLIT-01 — «прод + вход по телефону + SMS не настроен» больше
@@ -45,18 +46,12 @@ const originalEnv = { ...process.env };
 
 async function loadEnv(overrides: Record<string, string | undefined>) {
   vi.resetModules();
-  for (const key of Object.keys(process.env)) delete process.env[key];
-  Object.assign(process.env, BASE);
-  for (const [key, value] of Object.entries(overrides)) {
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
-  }
+  resetProcessEnv({ ...BASE, ...overrides });
   return import("@/lib/env");
 }
 
 afterEach(() => {
-  for (const key of Object.keys(process.env)) delete process.env[key];
-  Object.assign(process.env, originalEnv);
+  resetProcessEnv(originalEnv);
   vi.resetModules();
 });
 

@@ -28,6 +28,9 @@ export default defineConfig({
     // Item 4 (vitest hygiene): `.qa/**` holds Playwright specs (own runner via
     // playwright.config.ts). Vitest was mis-collecting them → false file-level
     // failures. Keep vitest's defaults and exclude the Playwright harness.
-    exclude: [...configDefaults.exclude, ".qa/**"],
+    // `.claude/**`: agent worktrees live under `.claude/worktrees/*` — full
+    // checkouts of the repo — so without it a run in the main tree also ran
+    // every agent's copy of the suite.
+    exclude: [...configDefaults.exclude, ".qa/**", ".claude/**"],
   },
 });

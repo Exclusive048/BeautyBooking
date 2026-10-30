@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
+import { resetProcessEnv } from "@/lib/testing/process-env";
 
 /**
  * AUTH-GATE-01 → ENV-SPLIT-01 — `isPhoneAuthEnabled` выводится из конфигурации,
@@ -52,12 +53,7 @@ const originalEnv = { ...process.env };
 
 async function loadEnv(overrides: Record<string, string | undefined>) {
   vi.resetModules();
-  for (const key of Object.keys(process.env)) delete process.env[key];
-  Object.assign(process.env, BASE_ENV);
-  for (const [key, value] of Object.entries(overrides)) {
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
-  }
+  resetProcessEnv({ ...BASE_ENV, ...overrides });
   return import("@/lib/env");
 }
 
@@ -67,8 +63,7 @@ async function loadFlag(overrides: Record<string, string | undefined>): Promise<
 }
 
 afterEach(() => {
-  for (const key of Object.keys(process.env)) delete process.env[key];
-  Object.assign(process.env, originalEnv);
+  resetProcessEnv(originalEnv);
   vi.resetModules();
 });
 

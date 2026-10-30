@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
+import { resetProcessEnv } from "@/lib/testing/process-env";
 
 /**
  * VK-CLIENT-ID-ALIAS-GATE-MISMATCH — the gate and the runtime resolver must
@@ -34,20 +35,14 @@ const originalEnv = { ...process.env };
 
 async function loadWithEnv(overrides: Record<string, string | undefined>) {
   vi.resetModules();
-  for (const key of Object.keys(process.env)) delete process.env[key];
-  Object.assign(process.env, BASE_ENV);
-  for (const [key, value] of Object.entries(overrides)) {
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
-  }
+  resetProcessEnv({ ...BASE_ENV, ...overrides });
   const env = await import("@/lib/env");
   const config = await import("@/lib/vk/config");
   return { isVkAuthEnabled: env.isVkAuthEnabled, getVkClientId: config.getVkClientId };
 }
 
 afterEach(() => {
-  for (const key of Object.keys(process.env)) delete process.env[key];
-  Object.assign(process.env, originalEnv);
+  resetProcessEnv(originalEnv);
   vi.resetModules();
 });
 
@@ -110,8 +105,8 @@ describe("VK client-id alias — gate and resolver agree", () => {
 describe("VK start route with alias-only creds", () => {
   it("does NOT answer 503 (the flow can actually begin)", async () => {
     vi.resetModules();
-    for (const key of Object.keys(process.env)) delete process.env[key];
-    Object.assign(process.env, BASE_ENV, {
+    resetProcessEnv({
+      ...BASE_ENV,
       VK_ID_CLIENT_ID: "54447",
       VK_ID_CLIENT_SECRET: "secret",
       VK_ID_REDIRECT_URI: "https://example.com/api/auth/vk/callback",
