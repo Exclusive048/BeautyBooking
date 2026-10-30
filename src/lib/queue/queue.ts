@@ -17,6 +17,12 @@ const PROCESSING_HEARTBEAT_KEY = "queue:processing:heartbeat";
 // hasn't been refreshed for this long — a live long-running job (heartbeated by
 // the worker) is never re-queued.
 const PROCESSING_TIMEOUT_MS = 5 * 60 * 1000;
+// QUEUE-RETRY-POLICY-PER-TYPE: предел — на ВОССТАНОВЛЕНИЯ (`_recoveries`), а не
+// на `attempts`. С длинными расписаниями повторов (`yookassa.webhook` — до 12
+// попыток) счёт по `attempts` убивал бы задачу, у которой просто прошло
+// несколько обычных повторов, на первом же падении воркера посреди неё — а
+// падения воркера при автодеплое штатны. `attempts` восстановление по-прежнему
+// увеличивает: упавшее исполнение — тоже исполнение.
 const MAX_RECOVERY_ATTEMPTS = 3;
 const allowMemoryQueueFallback = !isProduction;
 
@@ -531,20 +537,32 @@ export async function recoverStuckJobs(): Promise<number> {
 
         memoryHeartbeat.delete(job.id);
         const attempts = (job.attempts ?? 0) + 1;
-        if (attempts <= MAX_RECOVERY_ATTEMPTS) {
+        const recoveries = (job._recoveries ?? 0) + 1;
+        if (recoveries <= MAX_RECOVERY_ATTEMPTS) {
           placeMemoryJob(
-            normalizeJobMeta({ ...withoutProcessingTimestamp(job), attempts, _recoveredAt: now }),
+            normalizeJobMeta({
+              ...withoutProcessingTimestamp(job),
+              attempts,
+              _recoveries: recoveries,
+              _recoveredAt: now,
+            }),
             "head"
           );
           recovered += 1;
-          logError("Recovered stuck job", { jobId: job.id, attempts, __skipAlert: true });
+          logError("Recovered stuck job", { jobId: job.id, attempts, recoveries, __skipAlert: true });
         } else {
           memoryDead.push(
-            normalizeJobMeta({ ...withoutProcessingTimestamp(job), attempts, failedAt: now })
+            normalizeJobMeta({
+              ...withoutProcessingTimestamp(job),
+              attempts,
+              _recoveries: recoveries,
+              failedAt: now,
+            })
           );
           logError("Job permanently failed — too many attempts", {
             jobId: job.id,
             attempts,
+            recoveries,
             __skipAlert: true,
           });
         }
@@ -620,27 +638,31 @@ export async function recoverStuckJobs(): Promise<number> {
       await runQueueRedisCommand("recoverStuckJobs:hDel", client.hDel(PROCESSING_HEARTBEAT_KEY, job.id));
 
       const attempts = (job.attempts ?? 0) + 1;
-      if (attempts <= MAX_RECOVERY_ATTEMPTS) {
+      const recoveries = (job._recoveries ?? 0) + 1;
+      if (recoveries <= MAX_RECOVERY_ATTEMPTS) {
         const recoveredJob = normalizeJobMeta({
           ...withoutProcessingTimestamp(job),
           attempts,
+          _recoveries: recoveries,
           _recoveredAt: now,
         });
         // QUEUE-DELAYED-ZSET: будущая задача (застряла посреди самомиграции) —
         // в ZSET, готовая — в голову списка, как и прежде.
         await placeJob(client, "recoverStuckJobs", recoveredJob, "head");
         recovered += 1;
-        logError("Recovered stuck job", { jobId: job.id, attempts, __skipAlert: true });
+        logError("Recovered stuck job", { jobId: job.id, attempts, recoveries, __skipAlert: true });
       } else {
         const deadJob = normalizeJobMeta({
           ...withoutProcessingTimestamp(job),
           attempts,
+          _recoveries: recoveries,
           failedAt: now,
         });
         await runQueueRedisCommand("recoverStuckJobs:rPushDead", client.rPush(DEAD_KEY, JSON.stringify(deadJob)));
         logError("Job permanently failed — too many attempts", {
           jobId: job.id,
           attempts,
+          recoveries,
           __skipAlert: true,
         });
       }

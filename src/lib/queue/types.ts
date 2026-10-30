@@ -119,6 +119,8 @@ type JobMeta = {
   createdAt?: number;
   _processingStartedAt?: number;
   _recoveredAt?: number;
+  /** Сколько раз задачу вернули из «зависших» (QUEUE-RETRY-POLICY-PER-TYPE). */
+  _recoveries?: number;
   failedAt?: number;
 };
 
@@ -361,6 +363,7 @@ export function isJob(value: unknown): value is Job {
     return false;
   }
   if (typeof value._recoveredAt !== "undefined" && typeof value._recoveredAt !== "number") return false;
+  if (typeof value._recoveries !== "undefined" && typeof value._recoveries !== "number") return false;
 
   if (value.type === TELEGRAM_SEND_JOB_TYPE) {
     return isTelegramSendPayload(value.payload);

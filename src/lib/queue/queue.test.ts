@@ -323,6 +323,41 @@ describe("queue — LOGIC-15 (восстановление ровно один �
   });
 });
 
+/**
+ * QUEUE-RETRY-POLICY-PER-TYPE: предел восстановлений считается по `_recoveries`.
+ *
+ * @probe Вернул условие `attempts <= MAX_RECOVERY_ATTEMPTS` в Redis-ветку
+ * `recoverStuckJobs` — первый тест краснеет: «expected 0 to be 1» (задача с
+ * пятью обычными повторами ушла в мёртвые на первом же падении воркера).
+ */
+describe("queue — QUEUE-RETRY-POLICY-PER-TYPE (предел восстановлений)", () => {
+  it("задача с несколькими обычными повторами восстанавливается, а не умирает", async () => {
+    await enqueue({ ...mediaJob("long"), attempts: 5 } as Job);
+    await dequeue();
+    now += LEASE_MS + 1000;
+
+    const recovered = await recoverStuckJobs();
+    expect(recovered).toBe(1);
+    const requeued = JSON.parse(fake.lists.get(QUEUE)![0]);
+    expect(requeued.attempts).toBe(6);
+    expect(requeued._recoveries).toBe(1);
+    expect(fake.listLen("queue:dead")).toBe(0);
+  });
+
+  it("четвёртое восстановление уводит задачу в мёртвые", async () => {
+    await enqueue({ ...mediaJob("poison"), _recoveries: 3 } as Job);
+    await dequeue();
+    now += LEASE_MS + 1000;
+
+    const recovered = await recoverStuckJobs();
+    expect(recovered).toBe(0);
+    expect(fake.listLen(QUEUE)).toBe(0);
+    const dead = JSON.parse(fake.lists.get("queue:dead")![0]);
+    expect(dead.id).toBe("poison");
+    expect(dead._recoveries).toBe(4);
+  });
+});
+
 function futureJob(id: string, runAt: number): Job {
   return { ...mediaJob(id), runAt, scheduledAt: runAt } as Job;
 }

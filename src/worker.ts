@@ -25,11 +25,11 @@ import { initServerObservability } from "@/lib/observability/server";
 import { flushReports, reportError } from "@/lib/observability/report";
 import { processBookingReminder, reconcileBookingReminders } from "@/lib/bookings/reminders";
 import { detectPdAccessAnomalies } from "@/lib/audit/pd-access-anomaly";
+import { decideRetry } from "@/lib/queue/retry-policy";
 import type { Job } from "@/lib/queue/types";
 import {
   AVAILABLE_TODAY_RECOMPUTE_JOB_TYPE,
   BOOKING_REMINDER_JOB_TYPE,
-  DEFAULT_JOB_MAX_ATTEMPTS,
   MEDIA_CLEANUP_JOB_TYPE,
   MEDIA_PURGE_JOB_TYPE,
   MRR_SNAPSHOT_DAILY_JOB_TYPE,
@@ -131,7 +131,6 @@ const QUEUE_STATS_CHECK_EVERY_JOBS = 100;
 const QUEUE_PENDING_OVERLOAD_THRESHOLD = 1000;
 const QUEUE_DEAD_THRESHOLD = 10;
 const QUEUE_PROCESSING_THRESHOLD = 50;
-const WORKER_RETRY_MAX_ATTEMPTS = 3;
 
 process.on("uncaughtException", (error) => {
   logError("Worker uncaughtException", {
@@ -411,8 +410,25 @@ function startPeriodicJobs() {
   }, 60 * 60 * 1000);
 }
 
-function getRetryDelaySeconds(attempts: number): number {
-  return Math.min(60, 2 ** attempts);
+/**
+ * Отказ, который обработчик признал временным (`telegram.send`, `vk.send`,
+ * `push.native.send`): повтор по таблице типа либо мёртвые задачи. Обработчики,
+ * которые бросают, идут тем же решением из общего `catch` в `processJob`.
+ */
+async function retryOrDeadLetter(job: Job): Promise<void> {
+  const decision = decideRetry(job);
+  if (decision.kind === "retry") {
+    await enqueueRetry({ ...job, attempts: decision.attempts }, decision.delayMs);
+    return;
+  }
+
+  await moveToDeadQueue({ ...job, attempts: decision.attempts });
+  logError("Worker dead letter job", {
+    jobId: job.id,
+    type: job.type,
+    attempts: decision.attempts,
+    __skipAlert: true,
+  });
 }
 
 async function enqueueRetry(job: Job, delayMs: number): Promise<void> {
@@ -473,10 +489,6 @@ function getJobAttempts(job: Job): number {
   return job.attempts ?? 0;
 }
 
-function getJobMaxAttempts(job: Job): number {
-  return job.maxAttempts ?? DEFAULT_JOB_MAX_ATTEMPTS;
-}
-
 function getJobScheduleAt(job: Job): number | null {
   const scheduleAt = job.scheduledAt ?? job.runAt;
   return typeof scheduleAt === "number" ? scheduleAt : null;
@@ -514,27 +526,7 @@ async function processTelegramSend(
   const ok = await sendTelegramMessage(job.payload.chatId, job.payload.text);
   if (ok) return;
 
-  const nextAttempts = getJobAttempts(job) + 1;
-  if (nextAttempts < getJobMaxAttempts(job)) {
-    const delaySeconds = getRetryDelaySeconds(nextAttempts);
-    await enqueueRetry(
-      {
-        ...job,
-        attempts: nextAttempts,
-      },
-      delaySeconds * 1000
-    );
-    return;
-  }
-
-  await moveToDeadQueue({ ...job, attempts: nextAttempts });
-  logError("Worker dead letter job", {
-    jobId: job.id,
-    type: job.type,
-    attempts: nextAttempts,
-    maxAttempts: getJobMaxAttempts(job),
-    __skipAlert: true,
-  });
+  await retryOrDeadLetter(job);
 }
 
 async function processBookingReminderJob(
@@ -549,27 +541,21 @@ async function processBookingReminderJob(
   try {
     await processBookingReminder(job.payload);
   } catch (error) {
-    const attempts = getJobAttempts(job);
-    if (attempts < WORKER_RETRY_MAX_ATTEMPTS) {
+    const decision = decideRetry(job);
+    if (decision.kind === "retry") {
       logError("Reminder job failed, will retry", {
         jobId: job.id,
-        attempts,
+        attempts: decision.attempts,
         error: error instanceof Error ? error.message : String(error),
       });
-      await enqueueRetry(
-        {
-          ...job,
-          attempts: attempts + 1,
-        },
-        60_000 * (attempts + 1)
-      );
+      await enqueueRetry({ ...job, attempts: decision.attempts }, decision.delayMs);
       return;
     }
 
-    await moveToDeadQueue({ ...job, attempts }, error);
-    logError("Reminder job permanently failed after 3 attempts", {
+    await moveToDeadQueue({ ...job, attempts: decision.attempts }, error);
+    logError("Reminder job permanently failed", {
       jobId: job.id,
-      attempts,
+      attempts: decision.attempts,
       error: error instanceof Error ? error.message : String(error),
       __skipAlert: true,
     });
@@ -607,26 +593,18 @@ async function processVisualSearchIndexJob(
       return;
     }
 
-    const nextAttempts = getJobAttempts(job) + 1;
-    if (isVisualSearchRetryableError(error) && nextAttempts < getJobMaxAttempts(job)) {
-      const delaySeconds = getRetryDelaySeconds(nextAttempts);
-      await enqueueRetry(
-        {
-          ...job,
-          attempts: nextAttempts,
-        },
-        delaySeconds * 1000
-      );
+    const decision = decideRetry(job);
+    if (isVisualSearchRetryableError(error) && decision.kind === "retry") {
+      await enqueueRetry({ ...job, attempts: decision.attempts }, decision.delayMs);
       return;
     }
 
-    await moveToDeadQueue({ ...job, attempts: nextAttempts }, error);
+    await moveToDeadQueue({ ...job, attempts: decision.attempts }, error);
     logError("Worker visual search job failed", {
       jobId: job.id,
       type: job.type,
       assetId: job.payload.assetId,
-      attempts: nextAttempts,
-      maxAttempts: getJobMaxAttempts(job),
+      attempts: decision.attempts,
       error: error instanceof Error ? error.message : String(error),
       __skipAlert: true,
     });
@@ -688,8 +666,10 @@ async function processMediaCleanupJob(
  * DELETION-02 — удаление медиа из хранилища при удалении аккаунта/кабинета.
  *
  * Намеренно НЕ глотает ошибку: `runMediaPurge` бросает, если хоть один объект
- * не удалился, и это поднимает штатные ретраи очереди (до 3 попыток → dead
- * letter). Недоудалённая ПДн обязана быть заметной — в отличие от
+ * не удалился, и это поднимает штатные ретраи очереди — для этого типа часами
+ * (QUEUE-RETRY-POLICY-PER-TYPE, ≈24 ч, затем dead letter: хранилище, лежащее
+ * дольше шести минут прежнего расписания, — норма, а не исключение). Недоудалённая
+ * ПДн обязана быть заметной — в отличие от
  * `media.cleanup`, где речь о мусорных PENDING-загрузках и best-effort уместен.
  */
 async function processMediaPurgeJob(
@@ -778,20 +758,7 @@ async function processVkSend(
   const outcome = await processVkSendPayload(job.payload);
   if (outcome !== "retry") return;
 
-  const nextAttempts = getJobAttempts(job) + 1;
-  if (nextAttempts < getJobMaxAttempts(job)) {
-    await enqueueRetry({ ...job, attempts: nextAttempts }, getRetryDelaySeconds(nextAttempts) * 1000);
-    return;
-  }
-
-  await moveToDeadQueue({ ...job, attempts: nextAttempts });
-  logError("Worker dead letter job", {
-    jobId: job.id,
-    type: job.type,
-    attempts: nextAttempts,
-    maxAttempts: getJobMaxAttempts(job),
-    __skipAlert: true,
-  });
+  await retryOrDeadLetter(job);
 }
 
 /**
@@ -811,21 +778,7 @@ async function processNativePushSend(
   const result = await processNativePushPayload(job.payload);
   if (result.status !== "done" || result.retryDeviceIds.length === 0) return;
 
-  const nextAttempts = getJobAttempts(job) + 1;
-  const retryJob = { ...job, attempts: nextAttempts, payload: { ...job.payload, deviceIds: result.retryDeviceIds } };
-  if (nextAttempts < getJobMaxAttempts(job)) {
-    await enqueueRetry(retryJob, getRetryDelaySeconds(nextAttempts) * 1000);
-    return;
-  }
-
-  await moveToDeadQueue(retryJob);
-  logError("Worker dead letter job", {
-    jobId: job.id,
-    type: job.type,
-    attempts: nextAttempts,
-    maxAttempts: getJobMaxAttempts(job),
-    __skipAlert: true,
-  });
+  await retryOrDeadLetter({ ...job, payload: { ...job.payload, deviceIds: result.retryDeviceIds } });
 }
 
 async function processJob(job: Job): Promise<void> {
@@ -869,20 +822,14 @@ async function processJob(job: Job): Promise<void> {
       error: error instanceof Error ? error.message : String(error),
     });
 
-    const attempts = getJobAttempts(job);
-    if (attempts < WORKER_RETRY_MAX_ATTEMPTS) {
-      const nextAttempts = attempts + 1;
-      const retryDelayMs = 60_000 * nextAttempts;
-      await enqueue(
-        normalizeJobMeta({
-          ...job,
-          attempts: nextAttempts,
-          scheduledAt: Date.now() + retryDelayMs,
-          runAt: Date.now() + retryDelayMs,
-        })
-      );
+    // QUEUE-RETRY-POLICY-PER-TYPE: сколько и когда — по таблице типа
+    // (`lib/queue/retry-policy.ts`); у типов без своей строки — прежние
+    // 60/120/180 с.
+    const decision = decideRetry(job);
+    if (decision.kind === "retry") {
+      await enqueueRetry({ ...job, attempts: decision.attempts }, decision.delayMs);
     } else {
-      await moveToDeadQueue({ ...job, attempts }, error);
+      await moveToDeadQueue({ ...job, attempts: decision.attempts }, error);
     }
   }
 
