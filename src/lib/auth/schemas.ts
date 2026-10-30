@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { AccountType } from "@prisma/client";
 import { normalizePhone } from "@/lib/auth/otp";
 import { consentFlagsSchema } from "@/lib/legal/consent-flags-schema";
 
@@ -57,14 +56,6 @@ export const telegramLoginSchema = z.object({
   photo_url: z.string().url().optional(),
   auth_date: telegramAuthDateSchema,
   hash: z.string().trim().min(1, "Hash is required"),
-});
-
-export const accountTypeQuerySchema = z.object({
-  type: z.nativeEnum(AccountType),
-});
-
-export const roleQuerySchema = z.object({
-  role: z.nativeEnum(AccountType),
 });
 
 export const emptyBodySchema = z.object({}).strict();

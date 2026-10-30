@@ -27,7 +27,7 @@
  * остаётся `/api/bookings/:id/cancel`. Это пиннится тестом.
  */
 const API_STATIC_SEGMENTS: ReadonlySet<string> = new Set([
-  "accept", "account", "account-type", "add", "address",
+  "accept", "account", "address",
   "admin", "advisor", "analytics", "api", "app-settings",
   "applications", "apply", "approve", "assign-master",
   "at-risk", "attachment", "attention", "auth", "auto-publish-stories", "auto-renew",
@@ -57,9 +57,9 @@ const API_STATIC_SEGMENTS: ReadonlySet<string> = new Set([
   "refresh", "refund", "reindex", "reject", "remove",
   "renew", "reorder", "reply", "report", "reports", "request",
   "request-verify", "requests", "resend", "reschedule", "reschedule-context", "resolve", "retention",
-  "revenue", "review", "review-summary", "reviews", "revoke-others", "roles",
+  "revenue", "review", "review-summary", "reviews", "revoke-others",
   "rule", "run", "schedule", "schedule-requests", "search", "seen",
-  "segments", "service-packages", "services", "sessions", "set", "setup-guide",
+  "segments", "service-packages", "services", "sessions", "setup-guide",
   "settings", "slots", "snapshot", "start", "stats",
   "status", "stories", "stream", "studio", "studios",
   "subscribe", "subscriptions", "suggest", "suggest-description",

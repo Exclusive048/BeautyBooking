@@ -75,13 +75,11 @@
 /api/analytics/revenue/by-service
 /api/analytics/revenue/forecast
 /api/analytics/revenue/timeline
-/api/auth/account-type/set
 /api/auth/otp/email/request
 /api/auth/otp/email/verify
 /api/auth/otp/request
 /api/auth/otp/verify
 /api/auth/refresh
-/api/auth/roles/add
 /api/auth/telegram/link
 /api/auth/telegram/login
 /api/auth/telegram/unlink
