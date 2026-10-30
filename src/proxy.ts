@@ -12,6 +12,7 @@ import { accessTokenSubject, readCookie } from "@/lib/rate-limit/subject";
 import { isBearerAuthorization, parseBearerToken } from "@/lib/auth/bearer";
 import { startApiMetricsFlusher } from "@/lib/monitoring/api-metrics";
 import { installHttpApiMetricsHook } from "@/lib/monitoring/http-metrics-hook";
+import { startWorkerLivenessWatch } from "@/lib/monitoring/worker-liveness-alert";
 
 /**
  * ADMIN-HEALTH-01 — замер длительности `/api/*` и heartbeat процесса для
@@ -26,10 +27,15 @@ import { installHttpApiMetricsHook } from "@/lib/monitoring/http-metrics-hook";
  * чтобы таймер флашера не ходил в Redis из-под vitest (`process.env` здесь
  * намеренно: тесты прокси мокают `@/lib/env` частично, а этот файл — в
  * списке исключений rule 11).
+ *
+ * WORKER-LIVENESS-ALERT — отсюда же наблюдатель воркера очереди: о своей
+ * смерти воркер сообщить не может, поэтому раз в минуту его отметку читают
+ * процессы приложения (`monitoring/worker-liveness-alert.ts`).
  */
 if (process.env.NODE_ENV !== "test") {
   installHttpApiMetricsHook();
   startApiMetricsFlusher();
+  startWorkerLivenessWatch();
 }
 
 /**
