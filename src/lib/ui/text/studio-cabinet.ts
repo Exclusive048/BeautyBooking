@@ -15,7 +15,6 @@ export const studioCabinet = {
   scheduleTeam: {
     breadcrumb: "Студия · Расписание",
     title: "График команды",
-    subtitle: "Кто и когда работает. Нажмите на день мастера, чтобы изменить его, или выберите кисть.",
     masterColumn: "Мастер",
     endingSoon: (date: string) => `Настроено до ${date}`,
     coverageLabel: "Работают",
@@ -192,8 +191,6 @@ export const studioCabinet = {
   scheduleSettings: {
     breadcrumb: "Настройки расписания",
     title: "Настройки расписания",
-    studioSubtitle:
-      "График, календарь на 3 месяца и правила записи — отдельно для каждого мастера студии.",
     noMastersTitle: "Нет активных мастеров",
     noMastersHint:
       "Чтобы настроить расписание, добавьте в студию хотя бы одного мастера и допустите его к записи.",
@@ -471,8 +468,6 @@ export const studioCabinet = {
     header: {
       caption: "ПРАЙС · {services} услуг в {categories} категориях",
       title: "Услуги студии",
-      subtitle:
-        "Общий прайс. Мастера могут добавлять свои услуги поверх общих и менять цены.",
       addService: "Добавить услугу",
     },
     kpis: {
@@ -653,7 +648,6 @@ export const studioCabinet = {
     header: {
       caption: "ВСЕ ЗАПИСИ · {count} на экране",
       title: "Журнал записей",
-      subtitle: "Все записи всех мастеров. Отбирайте по мастеру, времени и состоянию записи.",
       newBooking: "Новая запись",
     },
     kpis: {
@@ -731,8 +725,6 @@ export const studioCabinet = {
     header: {
       caption: "НАСТРОЙКИ СТУДИИ",
       title: "Настройки",
-      subtitle:
-        "Карточка студии, команда, уведомления и правила. Часть разделов появится по мере развития платформы.",
     },
     nav: {
       sectionsLabel: "Разделы",
@@ -850,7 +842,6 @@ export const studioCabinet = {
     header: {
       caption: "АНАЛИТИКА · последние {days} дней",
       title: "Бизнес-показатели",
-      subtitle: "Сравните периоды, мастеров и услуги. Доступно на тарифах PRO и PREMIUM.",
     },
     periodLabel: "Период",
     periods: { d7: "7 дней", d30: "30 дней", d90: "Квартал", d365: "Год" },
@@ -924,20 +915,15 @@ export const studioCabinet = {
     header: {
       caption: "УВЕДОМЛЕНИЯ · {unread} непрочитано из {total}",
       title: "Уведомления",
-      subtitle:
-        "Всё по студии в одной ленте. Уведомления о записях к мастеру приходят и в его личный кабинет.",
     },
     kpis: {
       unread: "Непрочитанных",
-      unreadTemplate: "{count} из {total}",
+      unreadTemplate: "из {total}",
       today: "Сегодня",
-      todayTemplate: "{count} уведомлений",
       needsDecision: "Ждут решения",
-      needsDecisionTemplate: "{count} от владельца",
       push: "Уведомления на телефон",
       pushEnabled: "Включены",
       pushDisabled: "Выключены",
-      pushHint: "Приходят автоматически",
     },
     filters: {
       aria: "Какие уведомления показать",
@@ -956,9 +942,6 @@ export const studioCabinet = {
       markAllRead: "Прочитать всё",
       markAllReadFailed: "Не удалось отметить уведомления. Попробуйте ещё раз.",
     },
-    infoBanner:
-      "Кому из команды приходят уведомления на телефон — настраивается в {settingsLink}. Уведомления о записях к мастеру приходят и в его личный кабинет.",
-    infoBannerLink: "Настройках студии",
     card: {
       relatesTo: "Касается",
       unreadAria: "Непрочитанное уведомление",
@@ -991,7 +974,6 @@ export const studioCabinet = {
     header: {
       caption: "ОТЗЫВЫ · {total} всего · из них {noReply} без ответа",
       title: "Отзывы клиентов",
-      subtitle: "Все отзывы по всем мастерам в одном месте. Отвечайте от имени студии.",
     },
     stats: {
       avgTitle: "Средний рейтинг студии",
@@ -1048,7 +1030,6 @@ export const studioCabinet = {
     header: {
       caption: "КЛИЕНТСКАЯ БАЗА · {total} человек · {filtered} отфильтровано",
       title: "Клиенты студии",
-      subtitle: "Общая база. Каждый мастер видит только своих, владелец — всех.",
       addClient: "Клиент",
     },
     kpis: {
@@ -1285,7 +1266,6 @@ export const studioCabinet = {
   },
   scheduleRequests: {
     title: "Заявки на расписание",
-    subtitle: "Мастера студии запрашивают изменения графика — подтвердите или отклоните.",
     pendingTitle: "Ожидают решения",
     pendingCount: "Всего: {count}",
     resolvedTitle: "Недавние решения",

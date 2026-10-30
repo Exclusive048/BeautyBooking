@@ -15,6 +15,10 @@ type Props = {
   kpi: StudioNotificationsKpi;
 };
 
+/**
+ * CABINET-COMPACT: подпись под значением — только у «Непрочитанных» («из 7»).
+ * У остальных она повторяла число словами («2» → «2 от владельца»).
+ */
 export function NotificationsKpiRow({ kpi }: Props) {
   return (
     <StatTileGrid columns={4}>
@@ -22,29 +26,24 @@ export function NotificationsKpiRow({ kpi }: Props) {
         icon={Bell}
         label={T.unread}
         value={String(kpi.unreadCount)}
-        sub={T.unreadTemplate
-          .replace("{count}", String(kpi.unreadCount))
-          .replace("{total}", String(kpi.totalCount))}
+        sub={T.unreadTemplate.replace("{total}", String(kpi.totalCount))}
         accent={kpi.unreadCount > 0}
       />
       <Tile
         icon={Calendar}
         label={T.today}
         value={String(kpi.todayCount)}
-        sub={T.todayTemplate.replace("{count}", String(kpi.todayCount))}
       />
       <Tile
         icon={CheckCircle2}
         label={T.needsDecision}
         value={String(kpi.needsDecisionCount)}
-        sub={T.needsDecisionTemplate.replace("{count}", String(kpi.needsDecisionCount))}
         accent={kpi.needsDecisionCount > 0}
       />
       <Tile
         icon={Smartphone}
         label={T.push}
         value={kpi.pushEnabled ? T.pushEnabled : T.pushDisabled}
-        sub={T.pushHint}
       />
     </StatTileGrid>
   );
@@ -66,7 +65,7 @@ function Tile({
   icon: LucideIcon;
   label: string;
   value: string;
-  sub: string;
+  sub?: string;
   accent?: boolean;
 }) {
   return (

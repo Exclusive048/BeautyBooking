@@ -1,4 +1,5 @@
 import * as UI_TEXT from "@/lib/ui/text";
+import { StudioPageHeader } from "@/features/studio-cabinet/components/studio-page-header";
 import type { StudioAnalyticsViewData } from "../lib/types";
 import { AnalyticsControls } from "./analytics-controls";
 import { AnalyticsKpiBar } from "./analytics-kpi-bar";
@@ -32,15 +33,10 @@ export function StudioAnalyticsPage({ data }: Props) {
 
   return (
     <div className="space-y-5 lg:space-y-6">
-      <header className="min-w-0">
-        <p className="mb-1 eyebrow">
-          {T.header.caption.replace("{days}", String(days))}
-        </p>
-        <h1 className="font-display text-2xl font-bold tracking-tight text-text-main md:text-3xl">
-          {T.header.title}
-        </h1>
-        <p className="mt-1 max-w-xl text-sm text-text-sec">{T.header.subtitle}</p>
-      </header>
+      <StudioPageHeader
+        caption={T.header.caption.replace("{days}", String(days))}
+        title={T.header.title}
+      />
 
       <AnalyticsControls period={data.period} view={data.view} compare={data.compare} />
 

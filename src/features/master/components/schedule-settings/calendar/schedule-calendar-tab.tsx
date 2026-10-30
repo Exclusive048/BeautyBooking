@@ -318,9 +318,13 @@ export function ScheduleCalendarTab({
             </Button>
           )}
         </div>
-        <p className="text-xs text-text-sec">
-          {brushName ? T.brushHint(brushName) : requestMode ? T.requestHint : T.hint}
-        </p>
+        {/* CABINET-COMPACT: подсказка — что сделает нажатие с выбранной кистью
+            и что правки уходят заявкой; общая «как пользоваться» снята. */}
+        {brushName || requestMode ? (
+          <p className="text-xs text-text-sec">
+            {brushName ? T.brushHint(brushName) : T.requestHint}
+          </p>
+        ) : null}
       </div>
 
       {requestMode && pending && pendingNotEmpty ? (

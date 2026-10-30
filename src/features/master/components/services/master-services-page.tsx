@@ -62,7 +62,6 @@ export async function MasterServicesPage({ searchParams }: Props) {
           { label: T.servicesPage.breadcrumb },
         ]}
         title={T.servicesPage.title}
-        subtitle={T.servicesPage.subtitle}
         actions={
           isFullyEmpty ? null : (
             <div className="flex flex-wrap items-center gap-2">
@@ -76,7 +75,7 @@ export async function MasterServicesPage({ searchParams }: Props) {
         }
       />
 
-      <div className="space-y-6 px-4 py-6 md:px-6 lg:px-8">
+      <div className="space-y-4 px-4 py-4 md:space-y-6 md:px-6 md:py-6 lg:px-8">
         {isFullyEmpty ? (
           <ServicesEmptyState
             categories={view.availableCategories}

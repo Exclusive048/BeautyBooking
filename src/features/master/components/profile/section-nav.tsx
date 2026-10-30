@@ -34,6 +34,10 @@ const ROOT_MARGIN = "-30% 0px -55% 0px";
  * section has nothing visible (e.g. a long Services list scrolls past
  * the trigger), the IO threshold is loose enough that the next section
  * still picks up the active state when its top reaches ~30% from top.
+ *
+ * CABINET-COMPACT: до `lg` колонки нет, и список стоял над формой столбцом
+ * в шесть строк — там это строка с прокруткой вбок, заголовок только для
+ * чтения с экрана.
  */
 export function SectionNav({ bySection }: Props) {
   const headingId = useId();
@@ -76,24 +80,24 @@ export function SectionNav({ bySection }: Props) {
   // `aria-labelledby`, а не выдумываем вторую формулировку в `UI_TEXT`:
   // доступное имя обязано совпадать с тем, что читает зрячий.
   return (
-    <nav aria-labelledby={headingId} className="rounded-2xl border border-border-subtle bg-bg-card p-2">
+    <nav aria-labelledby={headingId} className="rounded-2xl border border-border-subtle bg-bg-card p-1.5 lg:p-2">
       <p
         id={headingId}
-        className="px-2 pb-2 pt-1 eyebrow"
+        className="px-2 pb-2 pt-1 eyebrow max-lg:sr-only"
       >
         {T.sidebar.sectionsHeading}
       </p>
-      <ul className="space-y-0.5">
+      <ul className="flex gap-0.5 overflow-x-auto lg:block lg:space-y-0.5">
         {ITEMS.map((item) => {
           const Icon = item.icon;
           const isActive = activeId === item.id;
           const isComplete = Boolean(bySection[item.id]);
           return (
-            <li key={item.id}>
+            <li key={item.id} className="shrink-0">
               <a
                 href={`#profile-${item.id}`}
                 className={cn(
-                  "flex items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors",
+                  "flex items-center gap-2 whitespace-nowrap rounded-lg px-2 py-2 text-sm transition-colors",
                   isActive
                     ? "bg-primary/10 text-accent-text"
                     : "text-text-main hover:bg-bg-input"

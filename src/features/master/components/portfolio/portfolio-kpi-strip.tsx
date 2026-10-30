@@ -16,7 +16,7 @@ type Props = {
  */
 export function PortfolioKpiStrip({ kpi }: Props) {
   return (
-    <StatTileGrid columns={3}>
+    <StatTileGrid columns={3} mobileColumns={3}>
       <StatTile icon={ImageIcon} label={T.totalLabel} value={String(kpi.totalCount)} />
       <StatTile
         icon={Sparkles}

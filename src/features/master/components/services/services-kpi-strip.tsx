@@ -15,7 +15,7 @@ type Props = {
  */
 export function ServicesKpiStrip({ kpi }: Props) {
   return (
-    <StatTileGrid columns={3}>
+    <StatTileGrid columns={3} mobileColumns={3}>
       <StatTile icon={Layers} label={T.servicesLabel} value={String(kpi.servicesCount)} />
       <StatTile icon={Package} label={T.bundlesLabel} value={String(kpi.bundlesCount)} />
       <StatTile

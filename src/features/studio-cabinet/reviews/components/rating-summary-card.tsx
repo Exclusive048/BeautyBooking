@@ -23,11 +23,13 @@ export function RatingSummaryCard({ averageRating, totalReviews, positivePercent
       <p className="eyebrow">
         {T.avgTitle}
       </p>
-      <div className="mt-2 flex items-baseline gap-2">
-        <span className="font-display text-3xl font-bold text-text-main">{value}</span>
-        <span className="text-sm text-text-sec">/ 5.0</span>
-      </div>
-      <div className="mt-2">
+      {/* CABINET-COMPACT: звёзды в строку с числом — на телефоне это
+          отдельная строка карточки меньше. */}
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="flex items-baseline gap-2">
+          <span className="font-display text-3xl font-bold text-text-main">{value}</span>
+          <span className="text-sm text-text-sec">/ 5.0</span>
+        </span>
         <RatingStars value={averageRating} size="md" />
       </div>
       <p className="mt-2 text-[12px] text-text-sec">

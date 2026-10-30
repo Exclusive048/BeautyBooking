@@ -33,7 +33,7 @@ export function NotificationCard({ notification, now }: Props) {
   return (
     <article
       className={cn(
-        "relative overflow-hidden rounded-2xl border bg-bg-card p-4 transition-colors",
+        "relative overflow-hidden rounded-2xl border bg-bg-card p-3 transition-colors sm:p-4",
         isUnread ? "border-primary/30 bg-primary/5" : "border-border-subtle"
       )}
     >
@@ -44,10 +44,13 @@ export function NotificationCard({ notification, now }: Props) {
         />
       ) : null}
 
-      <div className="flex flex-wrap items-start gap-3">
+      {/* CABINET-COMPACT: на телефоне без квадрата-значка — тип уже назван
+          «бровью» и цветной полосой, а его 48px сдвигали «Подтвердить» и
+          «Отклонить» в столбец. */}
+      <div className="flex items-start gap-3">
         <span
           className={cn(
-            "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+            "hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:inline-flex",
             config.iconBg
           )}
           aria-hidden
