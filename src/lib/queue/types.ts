@@ -32,6 +32,22 @@ export type NativePushSendPayload = {
   deviceIds?: string[];
 };
 
+/**
+ * NOTIFICATION-EMAIL-QUEUE (A-06) — письмо-уведомление важного типа. В payload
+ * нет ни адреса, ни заголовка, ни текста: текст уведомления несёт ПДн (имя
+ * клиента, услуга, время визита), а задача лежит в Redis и в мёртвых задачах.
+ * Воркер перечитывает строку `Notification` и получателя в момент отправки,
+ * поэтому выключенная почта или снятое подтверждение адреса останавливают уже
+ * поставленную задачу. `link` — уже внешняя ссылка (`toExternalSafeLink`:
+ * раздел без внутренних id), `null` — письмо без кнопки. `type` — только для
+ * лога.
+ */
+export type EmailSendPayload = {
+  notificationId: string;
+  type: string;
+  link: string | null;
+};
+
 export type BookingReminderKind = "REMINDER_24H" | "REMINDER_2H";
 
 export type BookingReminderPayload = {
@@ -142,6 +158,12 @@ export type NativePushSendJob = {
   payload: NativePushSendPayload;
 } & JobMeta;
 
+export type EmailSendJob = {
+  id: string;
+  type: "email.send";
+  payload: EmailSendPayload;
+} & JobMeta;
+
 export type BookingReminderJob = {
   id: string;
   type: "booking.reminder";
@@ -200,6 +222,7 @@ export type Job =
   | TelegramSendJob
   | VkSendJob
   | NativePushSendJob
+  | EmailSendJob
   | BookingReminderJob
   | VisualSearchIndexJob
   | SlotFreedJob
@@ -213,6 +236,7 @@ export type Job =
 export const TELEGRAM_SEND_JOB_TYPE = "telegram.send";
 export const VK_SEND_JOB_TYPE = "vk.send";
 export const NATIVE_PUSH_SEND_JOB_TYPE = "push.native.send";
+export const EMAIL_SEND_JOB_TYPE = "email.send";
 export const BOOKING_REMINDER_JOB_TYPE = "booking.reminder";
 export const VISUAL_SEARCH_INDEX_JOB_TYPE = "visual_search_index";
 export const SLOT_FREED_JOB_TYPE = "slot.freed";
@@ -278,6 +302,16 @@ function isNativePushSendPayload(value: unknown): value is NativePushSendPayload
     typeof message.body === "string" &&
     typeof message.androidChannelId === "string" &&
     isStringRecord(message.data)
+  );
+}
+
+function isEmailSendPayload(value: unknown): value is EmailSendPayload {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.notificationId === "string" &&
+    value.notificationId.length > 0 &&
+    typeof value.type === "string" &&
+    (value.link === null || typeof value.link === "string")
   );
 }
 
@@ -375,6 +409,10 @@ export function isJob(value: unknown): value is Job {
 
   if (value.type === NATIVE_PUSH_SEND_JOB_TYPE) {
     return isNativePushSendPayload(value.payload);
+  }
+
+  if (value.type === EMAIL_SEND_JOB_TYPE) {
+    return isEmailSendPayload(value.payload);
   }
 
   if (value.type === BOOKING_REMINDER_JOB_TYPE) {
@@ -638,6 +676,27 @@ export function createPlanEditedNotifyJob(
   return normalizeJobMeta({
     id: input?.id ?? randomUUID(),
     type: PLAN_EDITED_NOTIFY_JOB_TYPE,
+    payload,
+    attempts: input?.attempts ?? 0,
+    maxAttempts: input?.maxAttempts ?? DEFAULT_JOB_MAX_ATTEMPTS,
+    runAt: input?.scheduledAt ?? input?.runAt,
+    scheduledAt: input?.scheduledAt ?? input?.runAt,
+    createdAt: input?.createdAt ?? Date.now(),
+  });
+}
+
+export function createEmailSendJob(
+  payload: EmailSendPayload,
+  input?: Partial<
+    Pick<
+      EmailSendJob,
+      "id" | "attempts" | "maxAttempts" | "runAt" | "scheduledAt" | "createdAt"
+    >
+  >
+): EmailSendJob {
+  return normalizeJobMeta({
+    id: input?.id ?? randomUUID(),
+    type: EMAIL_SEND_JOB_TYPE,
     payload,
     attempts: input?.attempts ?? 0,
     maxAttempts: input?.maxAttempts ?? DEFAULT_JOB_MAX_ATTEMPTS,

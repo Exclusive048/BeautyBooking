@@ -20,6 +20,10 @@ import type { Job } from "@/lib/queue/types";
  *    аккаунта (находка A-04).
  *  - `push.native.send` — 10/30/60/120/300 с: временный сбой FCM/APNs/RuStore
  *    (429, 5xx) за 30 секунд прежнего расписания не проходит.
+ *  - `email.send` (NOTIFICATION-EMAIL-QUEUE, находка A-06) — ~1 ч: временный
+ *    отказ SMTP (лимит отправки Яндекс 360, 4xx, обрыв соединения) проходит за
+ *    минуты, а письмо о записи позже часа уже не нужно — уведомление остаётся
+ *    в центре уведомлений.
  *
  * Чего здесь нет: решения «повторять ли вообще». Его принимает обработчик
  * (`vk.send` не повторяет отказ по получателю, визуальный поиск — отсутствующий
@@ -45,6 +49,16 @@ export const RETRY_DELAYS_MS: Partial<Record<Job["type"], readonly number[]>> = 
   "vk.send": SHORT_EXPONENTIAL_DELAYS_MS,
   visual_search_index: SHORT_EXPONENTIAL_DELAYS_MS,
   "push.native.send": [10, 30, 60, 120, 300].map((n) => n * SECOND_MS),
+  // 30 с + 1 + 2 + 5 + 10 + 15 + 30 мин ≈ 1 ч 3 мин.
+  "email.send": [
+    30 * SECOND_MS,
+    1 * MINUTE_MS,
+    2 * MINUTE_MS,
+    5 * MINUTE_MS,
+    10 * MINUTE_MS,
+    15 * MINUTE_MS,
+    30 * MINUTE_MS,
+  ],
   // 1 + 2 + 5 + 10 + 30 мин + 1 + 2 + 3 + 4 × 4 ч ≈ 22 ч 48 мин.
   "yookassa.webhook": [
     1 * MINUTE_MS,

@@ -29,7 +29,7 @@ vi.mock("@/lib/logging/logger", () => ({
 
 const { toAppError } = await import("@/lib/api/errors");
 const { failOAuthCallback } = await import("@/lib/auth/oauth-callback-error");
-const { canDeliverServiceEmail } = await import("@/lib/notifications/delivery");
+const { canDeliverServiceEmail } = await import("@/lib/notifications/email-send");
 
 /** Форма сырой ошибки Prisma: важен только `code` — импорт Prisma запрещён (PERF-11). */
 const uniqueViolation = () =>

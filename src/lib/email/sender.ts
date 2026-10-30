@@ -81,12 +81,22 @@ export function isEmailConfigured(): boolean {
   return Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS);
 }
 
-export async function sendEmail(opts: MailOptions): Promise<boolean> {
+export type SendEmailResult =
+  | { status: "sent" }
+  | { status: "not-configured" }
+  | { status: "failed"; error: unknown };
+
+/**
+ * NOTIFICATION-EMAIL-QUEUE (A-06) — отправка, которая ОТДАЁТ ошибку SMTP, а не
+ * глотает её. Задаче очереди `email.send` нужна сама ошибка: временный отказ
+ * (4xx, сеть, таймаут) повторяется, постоянный (5xx) закрывает задачу, — а
+ * `sendEmail` сводит всё к `false`. Отказ здесь не логируется: решает и пишет
+ * в лог вызывающий (`sendEmail` — как раньше, задача очереди — без адреса и
+ * текста ответа сервера, в котором бывает адрес получателя).
+ */
+export async function trySendEmail(opts: MailOptions): Promise<SendEmailResult> {
   const transport = getTransporter();
-  if (!transport) {
-    logError("SMTP not configured — email not sent", { to: maskEmail(opts.to), subject: opts.subject });
-    return false;
-  }
+  if (!transport) return { status: "not-configured" };
   const from = env.SMTP_FROM ?? env.SMTP_USER;
   try {
     await transport.sendMail({
@@ -98,13 +108,23 @@ export async function sendEmail(opts: MailOptions): Promise<boolean> {
       headers: opts.headers,
     });
     logInfo("Email sent", { to: maskEmail(opts.to), subject: opts.subject });
-    return true;
+    return { status: "sent" };
   } catch (error) {
-    logError("Failed to send email", {
-      to: maskEmail(opts.to),
-      subject: opts.subject,
-      error: error instanceof Error ? error.message : String(error),
-    });
+    return { status: "failed", error };
+  }
+}
+
+export async function sendEmail(opts: MailOptions): Promise<boolean> {
+  const result = await trySendEmail(opts);
+  if (result.status === "sent") return true;
+  if (result.status === "not-configured") {
+    logError("SMTP not configured — email not sent", { to: maskEmail(opts.to), subject: opts.subject });
     return false;
   }
+  logError("Failed to send email", {
+    to: maskEmail(opts.to),
+    subject: opts.subject,
+    error: result.error instanceof Error ? result.error.message : String(result.error),
+  });
+  return false;
 }

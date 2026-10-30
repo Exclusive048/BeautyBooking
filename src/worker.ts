@@ -15,6 +15,7 @@ import { sendTelegramMessage } from "@/lib/telegram/client";
 import { getTelegramEnabled } from "@/lib/telegram/feature";
 import { processVkSendPayload } from "@/lib/vk/notify";
 import { processNativePushPayload } from "@/lib/notifications/native-push/send";
+import { runEmailSendJob } from "@/lib/notifications/email-send";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { alertCritical } from "@/lib/monitoring";
 import { sendTelegramAlert } from "@/lib/monitoring/alerts";
@@ -31,6 +32,7 @@ import type { Job } from "@/lib/queue/types";
 import {
   AVAILABLE_TODAY_RECOMPUTE_JOB_TYPE,
   BOOKING_REMINDER_JOB_TYPE,
+  EMAIL_SEND_JOB_TYPE,
   MEDIA_CLEANUP_JOB_TYPE,
   MEDIA_PURGE_JOB_TYPE,
   MRR_SNAPSHOT_DAILY_JOB_TYPE,
@@ -830,6 +832,23 @@ async function processNativePushSend(
   await retryOrDeadLetter({ ...job, payload: { ...job.payload, deviceIds: result.retryDeviceIds } });
 }
 
+/**
+ * NOTIFICATION-EMAIL-QUEUE (A-06): письмо-уведомление. Временный отказ SMTP
+ * (4xx, сеть, таймаут) — повтор по таблице типа, постоянный (5xx) и исход
+ * повторов — строка ошибки и задача закрыта (`lib/notifications/email-send.ts`).
+ */
+async function processEmailSend(
+  job: Extract<Job, { type: typeof EMAIL_SEND_JOB_TYPE }>
+): Promise<void> {
+  const scheduleAt = getJobScheduleAt(job);
+  if (typeof scheduleAt === "number" && scheduleAt > Date.now()) {
+    await enqueueRetry(job, scheduleAt - Date.now());
+    return;
+  }
+
+  await runEmailSendJob(job, { retry: enqueueRetry });
+}
+
 async function processJob(job: Job): Promise<void> {
   try {
     if (job.type === TELEGRAM_SEND_JOB_TYPE) {
@@ -838,6 +857,8 @@ async function processJob(job: Job): Promise<void> {
       await processVkSend(job);
     } else if (job.type === NATIVE_PUSH_SEND_JOB_TYPE) {
       await processNativePushSend(job);
+    } else if (job.type === EMAIL_SEND_JOB_TYPE) {
+      await processEmailSend(job);
     } else if (job.type === BOOKING_REMINDER_JOB_TYPE) {
       await processBookingReminderJob(job);
     } else if (job.type === VISUAL_SEARCH_INDEX_JOB_TYPE) {
