@@ -24,10 +24,8 @@
 /api/admin/app-settings
 /api/admin/billing
 /api/admin/billing/kpis
-/api/admin/billing/payments
 /api/admin/billing/plans/{id}
 /api/admin/billing/refund
-/api/admin/billing/subscriptions
 /api/admin/billing/subscriptions/{id}/cancel
 /api/admin/catalog
 /api/admin/catalog/categories
