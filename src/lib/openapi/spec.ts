@@ -10822,7 +10822,11 @@ export const openApiSpec = {
         summary: "Update booking rules, visibility, slot step, buffer, hot slots (and legacy week / exceptions)",
         description:
           "Тело не через Zod: значения нормализуются и молча ограничиваются. У администратора студии " +
-          "`visibility.isPublished` не применяется; `hotSlots` — по тарифу вызывающего (403 `FEATURE_GATE`).",
+          "`visibility.isPublished` не применяется; `hotSlots` — по тарифу вызывающего (403 `FEATURE_GATE`). " +
+          "Мастер в режиме `STUDIO_MASTER` (профиль в студии `?profile=`) не меняет `slotStepMin`, " +
+          "`bufferBetweenBookingsMin`, `bookingRules`, `visibility` (кроме личного `isPublished` без `?profile=`) " +
+          "и `hotSlots` — их задаёт студия: изменение — 403 `FORBIDDEN`, неизменённые значения проходят " +
+          "(STUDIO-PROFILE-RULES-TAB-STATE; раньше поля молча отбрасывались).",
         tags: ["mobile", "schedule"],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }],
         parameters: SCHEDULE_ACTOR_PARAMETERS,
@@ -10831,7 +10835,9 @@ export const openApiSpec = {
           "200": okResponse({ type: "object", description: "ScheduleEditorSnapshot + `approval` (`lastAction`)" }),
           "400": errorResponse("INVALID_BODY | VALIDATION_ERROR | DAY_INVALID | TIME_RANGE_INVALID | BREAK_OVERLAP"),
           "401": errorResponse("UNAUTHORIZED"),
-          "403": errorResponse("FORBIDDEN | FEATURE_GATE"),
+          "403": errorResponse(
+            "FORBIDDEN (в т.ч. мастер на профиле в студии меняет настройки, которые задаёт студия) | FEATURE_GATE",
+          ),
           "404": errorResponse("MASTER_NOT_FOUND | STUDIO_NOT_FOUND"),
           "429": errorResponse("RATE_LIMITED"),
           "500": errorResponse("INTERNAL_ERROR"),

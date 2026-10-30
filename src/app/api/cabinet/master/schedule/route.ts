@@ -33,6 +33,7 @@ import {
   submitStudioScheduleChange,
   type ScheduleChangeOutcome,
 } from "@/lib/schedule/change-requests";
+import { normalizeBufferMin } from "@/lib/schedule/editor-shared";
 import { weekSignature } from "@/lib/schedule/patterns";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { updateMasterProfile } from "@/lib/master/profile.service";
@@ -142,6 +143,18 @@ function settingsChanged(snapshot: ScheduleEditorSnapshot, patch: SettingsPatch)
   }
   return false;
 }
+
+/**
+ * STUDIO-PROFILE-RULES-TAB-STATE: шаг окошек, пауза между записями, правила
+ * записи, видимость окошек и горящие окошки ПРОФИЛЯ В СТУДИИ меняет только
+ * студия (режим `STUDIO_ADMIN`). Заявка мастера согласует рабочее время —
+ * неделю и дни календаря, — а этих полей не несёт. Раньше роут их молча
+ * отбрасывал: автосохранение показывало «Сохранено», а значение откатывалось.
+ * Теперь изменение отказывается явно. Неизменённые значения проходят, поэтому
+ * клиент, присылающий снапшот целиком вместе с неделей, не ломается.
+ */
+const STUDIO_PROFILE_SETTINGS_LOCKED =
+  "Паузу между записями, правила записи и видимость окошек в студии задаёт студия — изменить их может её администратор.";
 
 function applyPatchToState(
   snapshot: ScheduleEditorSnapshot,
@@ -347,6 +360,14 @@ export async function PATCH(req: Request) {
     }
 
     const settingsChangedNow = settingsChanged(currentSnapshot, settingsPatch);
+    if (
+      actor.mode === "STUDIO_MASTER" &&
+      (slotStepChanged ||
+        normalizeBufferMin(nextState.bufferBetweenBookingsMin) !== currentSnapshot.bufferBetweenBookingsMin ||
+        settingsChangedNow)
+    ) {
+      throw new AppError(STUDIO_PROFILE_SETTINGS_LOCKED, 403, "FORBIDDEN");
+    }
     const hasChanges =
       serializeScheduleState(currentState) !== serializeScheduleState(nextState) ||
       slotStepChanged ||
@@ -355,8 +376,8 @@ export async function PATCH(req: Request) {
 
     // Hot Slots are PRO+ only. Frontend hides the toggle for non-PRO plans
     // but the backend re-checks here in case the request was crafted by
-    // hand. STUDIO_MASTER never reaches this branch (their flow uses the
-    // change-request payload, which doesn't carry hotSlots).
+    // hand. STUDIO_MASTER never reaches this branch: a changed hotSlots is
+    // refused above (STUDIO-PROFILE-RULES-TAB-STATE).
     const hotSlotsTouched =
       settingsPatch.hotSlots !== undefined &&
       JSON.stringify(settingsPatch.hotSlots) !== JSON.stringify(currentSnapshot.hotSlots);
@@ -390,7 +411,8 @@ export async function PATCH(req: Request) {
       // SCHEDULE-STUDIO-PROFILE-CALENDAR: правки копятся в открытой заявке —
       // неделя «Часов» и изменённые «Особые дни» (как правки дней), а не
       // заменяют её целиком. Правила записи и видимость профиля в студии
-      // заявкой не согласуются (раньше они молча выпадали из тела заявки).
+      // заявкой не согласуются: их изменение отказано выше
+      // (STUDIO-PROFILE-RULES-TAB-STATE), сюда доходят только неделя и дни.
       const outcomes: ScheduleChangeOutcome[] = [];
       const route = "PATCH /api/cabinet/master/schedule";
       if (weekSignature(nextState.weekSchedule) !== weekSignature(currentState.weekSchedule)) {

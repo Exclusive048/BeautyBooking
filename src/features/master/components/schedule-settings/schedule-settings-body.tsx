@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Notice } from "@/components/ui/notice";
 import { Tabs, type TabItem } from "@/components/ui/tabs";
 import type { ScheduleEditorSnapshot } from "@/lib/schedule/editor-shared";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -38,6 +39,18 @@ const TABS: TabItem[] = [
   { id: "rules", label: T.tabs.rules },
   { id: "visibility", label: T.tabs.visibility },
 ];
+
+/**
+ * STUDIO-PROFILE-RULES-TAB-STATE: у расписания профиля в студии (`?profile=`)
+ * только календарь. Паузу, правила записи и видимость профиля в студии меняет
+ * студия (режим администратора), заявка мастера их не несёт, и роут на их
+ * изменение отвечает 403. Раньше вкладки были редактируемыми, автосохранение
+ * писало «Сохранено», а значения молча откатывались. Скрыты, а не показаны
+ * только для чтения: сырые значения профиля — не те правила, по которым
+ * записывают в студию (окно записи — строже из студии и мастера, отмена —
+ * по правилам студии), и показ их как «ваших правил» вводил бы в заблуждение.
+ */
+const STUDIO_PROFILE_TABS: TabItem[] = TABS.filter((item) => item.id === "calendar");
 
 type Props = {
   initialSnapshot: ScheduleEditorSnapshot;
@@ -78,7 +91,8 @@ export function ScheduleSettingsBody({ initialSnapshot, hotSlotsAllowed, studioA
   // Старые ссылки на «Особые дни» и «Часы» ведут в календарь — их заменили
   // календарь и окно графика.
   const requested = raw === "exceptions" || raw === "hours" ? "calendar" : raw;
-  const active: TabId = TABS.some((item) => item.id === requested) ? (requested as TabId) : defaultTab;
+  const tabs = studioProfile ? STUDIO_PROFILE_TABS : TABS;
+  const active: TabId = tabs.some((item) => item.id === requested) ? (requested as TabId) : defaultTab;
 
   const setTab = (next: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -118,7 +132,13 @@ export function ScheduleSettingsBody({ initialSnapshot, hotSlotsAllowed, studioA
         }}
       />
 
-      <Tabs items={TABS} value={active} onChange={setTab} />
+      {studioProfile ? (
+        <Notice tone="info" data-testid="studio-profile-settings-note">
+          {T.studioProfileSettingsNote}
+        </Notice>
+      ) : (
+        <Tabs items={tabs} value={active} onChange={setTab} />
+      )}
 
       <div key={revision}>
         {active === "calendar" ? (
