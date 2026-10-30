@@ -240,12 +240,24 @@ describe("api-alerts — одно сообщение на событие", () =>
     expect(alertCalls("critical")[0]![1]).toContain("Worker не отвечает");
   });
 
-  it("перебор OTP — одно сообщение в минуту, номер замаскирован", async () => {
-    const { alertOtpRateLimitTriggered } = await loadProcess();
-    for (let i = 0; i < 25; i += 1) alertOtpRateLimitTriggered("203.0.113.7", "+79991234567");
-    await flush();
-    expect(sendAlert).toHaveBeenCalledTimes(1);
-    expect(alertCalls("warning")[0]![2]).toMatchObject({ phone: "+799****" });
+  it("перебор OTP — одно сообщение в минуту; адрес и номер — только в structured log", async () => {
+    const consoleLog = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    try {
+      const { alertOtpRateLimitTriggered } = await loadProcess();
+      for (let i = 0; i < 25; i += 1) alertOtpRateLimitTriggered("203.0.113.7", "+79991234567");
+      await flush();
+      expect(sendAlert).toHaveBeenCalledTimes(1);
+      // ALERT-CONTEXT-ALLOWLIST: IP и начало номера в ops-чат (Telegram) не идут.
+      expect(JSON.stringify(alertCalls("warning")[0]![2] ?? {})).not.toMatch(/203\.0\.113\.7|\+799/);
+      // …а в лог — на каждое срабатывание, номер замаскирован.
+      const logged = consoleLog.mock.calls.map((call) => String(call[0])).filter((line) => line.includes("otp.rate-limit.triggered"));
+      expect(logged).toHaveLength(25);
+      expect(logged[0]).toContain("203.0.113.7");
+      expect(logged[0]).toContain("+7****67");
+      expect(logged[0]).not.toContain("79991234567");
+    } finally {
+      consoleLog.mockRestore();
+    }
   });
 
   it("5xx сверх порога — один критический алерт", async () => {

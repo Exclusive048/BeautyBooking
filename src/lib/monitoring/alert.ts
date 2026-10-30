@@ -1,5 +1,6 @@
 import { env } from "@/lib/env";
 import { logError } from "@/lib/logging/logger";
+import { scrubString } from "@/lib/observability/scrub";
 
 export type AlertLevel = "critical" | "error" | "warning";
 export type AlertContext = Record<string, unknown>;
@@ -33,17 +34,149 @@ function formatUtcTimestamp(date: Date): string {
   return date.toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC");
 }
 
+/**
+ * ALERT-CONTEXT-ALLOWLIST (D-02) — в Telegram уходит только то, что названо
+ * здесь; остальная мета остаётся в structured log.
+ *
+ * Сюда приходят ВСЕ алерты: `logError` (через паузу `alert-cooldown.ts`),
+ * `sendTelegramAlert`, `api-alerts`, прямые `alertCritical` / `alertWarning`.
+ * А `logError` отдавал свою мету целиком — `userProfileId` (OTP-вход), `ip`
+ * (партнёрская заявка), полный адрес страницы из клиентского отчёта об ошибке
+ * (в том числе ссылку «Управлять записью» с действующим токеном), почтовые
+ * адреса из диагностики SMTP. Ops-чат и сам Telegram (иностранный сервис)
+ * получали ПДн и рабочие предъявительские токены. Закрытый пункт
+ * TELEGRAM-ALERT-PII-REVIEW утверждал, что id из чата устранён, — неверно:
+ * пересылка меты была и до него.
+ *
+ * Поэтому — список РАЗРЕШЁННОГО, а не запрещённого: новое поле с id человека,
+ * адресом или телефоном не уедет в чат молча, а запрещающий список отставал бы
+ * от каждого нового вызова `logError` (их сотни). Набор выведен из фактических
+ * вызовов: корреляция с логом (`requestId` — по нему находится полная запись),
+ * что и где сломалось (коды, статусы, этапы, имена), числа (сколько, как часто,
+ * порог) и текст ошибки. Id сущностей (записи, оплаты, кабинета) сюда не
+ * входят намеренно: в чате достаточно `requestId`, а связать запись с
+ * человеком — дело structured log, не мессенджера.
+ */
+const ALERT_CONTEXT_KEYS: ReadonlySet<string> = new Set([
+  // Корреляция: найти полную запись в structured log.
+  "requestId",
+  "lastRequestId",
+  "jobId",
+  "jobType",
+  "digest",
+  "alertKey",
+  // Что и где сломалось — имена, коды, классы, а не данные человека.
+  "route",
+  "lastRoute",
+  "lastMessage",
+  "code",
+  "errorCode",
+  "status",
+  "statusCode",
+  "responseCode",
+  "alertStatus",
+  "errorKind",
+  "errorName",
+  "phase",
+  "op",
+  "outcome",
+  "kind",
+  "type",
+  "event",
+  "reason",
+  "mode",
+  "source",
+  "scope",
+  "surface",
+  "actorType",
+  "channel",
+  "provider",
+  "role",
+  "model",
+  "namespace",
+  "command",
+  "level",
+  "block",
+  "sources",
+  "missingEnv",
+  "smtpHost",
+  "smtpPort",
+  "hasPass",
+  // Числа: сколько, как часто, какой порог.
+  "suppressedRepeats",
+  "countInWindow",
+  "windowMinutes",
+  "threshold",
+  "count",
+  "deadCount",
+  "pendingCount",
+  "lastPingAgoSec",
+  "attempts",
+  "maxAttempts",
+  "rowCount",
+  "failed",
+  "cleared",
+  "length",
+  "width",
+  "periodMonths",
+  "expectedKopeks",
+  "apiKopeks",
+  "recordedKopeks",
+  // Текст ошибки — нужен для разбора, но несёт что угодно (тексты Prisma и
+  // SMTP цитируют адреса и номера): только после `scrubString`, как и всё ниже.
+  "error",
+  "errorMessage",
+  "lastError",
+  "alertError",
+  "firstError",
+  "err",
+  "message",
+  "stack",
+]);
+
+/** Предел значения: стек и тексты Prisma бывают длиннее всего сообщения Telegram (4096). */
+const MAX_ALERT_VALUE_LENGTH = 600;
+/**
+ * Строк в значении. Многострочное значение — это почти всегда стек (он едет и
+ * под `stack`, и под `error`): заголовок и первые кадры показывают место
+ * падения, хвост фреймворка — нет.
+ */
+const MAX_ALERT_VALUE_LINES = 6;
+
+function stringifyAlertValue(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  // `JSON.stringify(new Error(…))` — это «{}»: текст ошибки терялся бы целиком.
+  if (value instanceof Error) return value.stack ?? `${value.name}: ${value.message}`;
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    // Циклы и BigInt: бросок здесь — необработанное отклонение у `void sendAlert`.
+    return String(value);
+  }
+}
+
+function formatAlertValue(value: unknown): string {
+  const text = scrubString(stringifyAlertValue(value)).split("\n").slice(0, MAX_ALERT_VALUE_LINES).join("\n");
+  return text.length > MAX_ALERT_VALUE_LENGTH ? `${text.slice(0, MAX_ALERT_VALUE_LENGTH)}…` : text;
+}
+
 function formatContext(context?: AlertContext): string[] {
   if (!context) return [];
-  return Object.entries(context).map(([key, value]) => {
-    const formatted =
-      typeof value === "string"
-        ? value
-        : typeof value === "number" || typeof value === "boolean"
-          ? String(value)
-          : JSON.stringify(value);
-    return `${escapeHtml(key)}: ${escapeHtml(formatted)}`;
-  });
+  const lines: string[] = [];
+  let omitted = 0;
+  for (const [key, value] of Object.entries(context)) {
+    if (value === undefined) continue;
+    if (!ALERT_CONTEXT_KEYS.has(key)) {
+      omitted += 1;
+      continue;
+    }
+    lines.push(`${escapeHtml(key)}: ${escapeHtml(formatAlertValue(value))}`);
+  }
+  // Число, а не имена: имена полей из разобранного внешнего JSON (`...details`)
+  // выбирает не код.
+  if (omitted > 0) lines.push(`(ещё полей в логе: ${omitted})`);
+  return lines;
 }
 
 export async function sendAlert(
@@ -69,7 +202,8 @@ export async function sendAlert(
   const parts = [
     `${emoji} ${label}`,
     "",
-    `[МастерРядом] ${emoji} ${escapeHtml(message)}`,
+    // Заголовок — тоже через скраббер: тексты `logError` бывают с подстановками.
+    `[МастерРядом] ${emoji} ${escapeHtml(scrubString(message))}`,
   ];
   if (contextLines.length > 0) {
     parts.push("", ...contextLines);
