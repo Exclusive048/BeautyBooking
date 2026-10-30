@@ -14,7 +14,16 @@ import { NextResponse } from "next/server";
  * чужую схему схлопнул бы в дефолтный путь кабинета. `NextResponse.redirect`
  * принимает любой абсолютный URL (`validateURL` — это `new URL(...)`), поэтому
  * адрес собирается здесь и только здесь, из констант: параметры — ровно
- * `code` / `linked` / `error`, и значения выбирает сервер.
+ * `code` (+ `link`) / `error`, и значения выбирает сервер.
+ *
+ * Привязка (MOBILE-OAUTH-LINK-COMPLETE): флоу с link-intent кончается не
+ * `?linked=<provider>` (раньше колбэк уже записал связку), а
+ * `?code=<код>&link=<provider>` — колбэк связку НЕ пишет, приложение
+ * завершает её само (`POST /api/mobile/v1/auth/oauth/link/complete`, Bearer +
+ * PKCE-verifier). Форма выбрана так, чтобы приложение до этой версии не
+ * сделало ничего опасного: его разбор видит `code`, а в потоке привязки код
+ * для него — «callback_failed». Код привязки на `/oauth/exchange` не
+ * меняется (свой префикс в Redis), то есть входом он не станет нигде.
  *
  * Ответ `no-store` и без Referer: в `Location` может ехать одноразовый код.
  */
@@ -52,15 +61,19 @@ export type MobileAuthCallbackError =
   | "callback_failed";
 
 export type MobileAuthCallbackOutcome =
+  /** Вход: код — в `POST /api/mobile/v1/auth/oauth/exchange`. */
   | { code: string }
-  | { linked: "vk" | "yandex" }
+  /** Привязка ждёт шага приложения: код — в `POST /api/mobile/v1/auth/oauth/link/complete`. */
+  | { linkCode: string; provider: "vk" | "yandex" }
   | { error: MobileAuthCallbackError };
 
 export function buildMobileAuthCallbackUrl(outcome: MobileAuthCallbackOutcome): string {
   const url = new URL(MOBILE_AUTH_CALLBACK_URL);
   if ("code" in outcome) url.searchParams.set("code", outcome.code);
-  else if ("linked" in outcome) url.searchParams.set("linked", outcome.linked);
-  else url.searchParams.set("error", outcome.error);
+  else if ("linkCode" in outcome) {
+    url.searchParams.set("code", outcome.linkCode);
+    url.searchParams.set("link", outcome.provider);
+  } else url.searchParams.set("error", outcome.error);
   return url.toString();
 }
 

@@ -46,6 +46,24 @@ export type OAuthIdentity =
   | { provider: "vk"; profile: OAuthProviderProfile; deviceId: string }
   | { provider: "yandex"; profile: OAuthProviderProfile };
 
+/**
+ * MOBILE-OAUTH-LINK-COMPLETE — ровно то, что читает ПРИВЯЗКА: id аккаунта
+ * провайдера (связка), устройство VK (`VkLink.deviceId`) и номер
+ * (PHONE-OAUTH-PROOF-01). Имя, почта и аватар нужны только входу.
+ *
+ * Мобильная привязка держит личность в Redis между колбэком и шагом
+ * приложения (`mobile-oauth-store.ts`), и этот тип — граница минимизации:
+ * в запись уходит только он, а `linkOAuthIdentity` принимает только его.
+ * Начнёт привязка читать ещё одно поле профиля — это ошибка `typecheck`
+ * здесь, а не молча пустое значение из Redis. `OAuthIdentity` ему
+ * присваивается, поэтому веб-колбэк передаёт полную личность как раньше.
+ */
+export type OAuthLinkProfile = Pick<OAuthProviderProfile, "id" | "phone">;
+
+export type OAuthLinkIdentity =
+  | { provider: "vk"; profile: OAuthLinkProfile; deviceId: string }
+  | { provider: "yandex"; profile: OAuthLinkProfile };
+
 /** Согласия флоу (подписанная state-bound кука) и доказательная обвязка записи. */
 export type OAuthConsentContext = {
   flags: ConsentFlags | null;
@@ -82,7 +100,7 @@ async function findLinkedUserId(identity: OAuthIdentity): Promise<string | null>
  * the code exchange stay in the caller's local scope (they are what
  * `fetch*Profile` is called with) and are never written to the database.
  */
-async function upsertOAuthLink(identity: OAuthIdentity, userId: string): Promise<void> {
+async function upsertOAuthLink(identity: OAuthLinkIdentity, userId: string): Promise<void> {
   if (identity.provider === "vk") {
     const vkUserId = identity.profile.id;
     const existing = await prisma.vkLink.findUnique({
@@ -152,14 +170,22 @@ async function ensureFreeSubscriptionsAfterOAuth(
 
 /**
  * Привязка аккаунта провайдера к уже известному пользователю: у веба — к
- * сессии браузера, у приложения — к владельцу link-intent. Регистрации нет,
- * поэтому согласия не обязательны; пришедшие с формы входа — записываются.
+ * сессии браузера, у приложения — к вошедшему владельцу link-intent, который
+ * сам подтвердил привязку (`POST /api/mobile/v1/auth/oauth/link/complete`,
+ * MOBILE-OAUTH-LINK-COMPLETE). Регистрации нет, поэтому согласия не
+ * обязательны; пришедшие с формы входа — записываются.
+ *
+ * 🔴 Звать только там, где получатель связки ДОКАЗАН в этом же запросе
+ * (сессия браузера, Bearer приложения). Колбэк провайдера мобильного флоу
+ * такого доказательства не имеет: браузер, прошедший флоу, мог открыть кто
+ * угодно по чужой ссылке — и связка, номер и гостевые записи уехали бы
+ * владельцу ссылки (C-01).
  *
  * Возвращает итог подтверждения номера (PHONE-OAUTH-PROOF-01) — веб строит по
  * нему возврат на страницу «Подтвердить номер».
  */
 export async function linkOAuthIdentity(input: {
-  identity: OAuthIdentity;
+  identity: OAuthLinkIdentity;
   user: { id: string; roles: AccountType[] };
   consent: OAuthConsentContext;
 }): Promise<ProviderPhoneOutcome | null> {

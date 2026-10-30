@@ -3,7 +3,10 @@ import "server-only";
 import { createHash, randomBytes } from "crypto";
 import { z } from "zod";
 import { AppError } from "@/lib/api/errors";
+import type { OAuthLinkIdentity } from "@/lib/auth/oauth-login";
 import { OAUTH_LOGIN_PROVIDERS, type OAuthLoginProvider } from "@/lib/auth/oauth-providers";
+import type { ConsentFlags } from "@/lib/legal/consent-flags";
+import { consentFlagsSchema } from "@/lib/legal/consent-flags-schema";
 import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
 
 /**
@@ -15,14 +18,28 @@ import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connect
  *    (`POST /api/mobile/v1/auth/oauth/exchange`);
  *  · **link-intent** (`mobile:oauth:intent:<sha256>`, 5 мин) — уже вошедшее
  *    приложение просит привязать VK/Яндекс к СВОЕМУ аккаунту; intent несёт
- *    `{ userId, provider }` через системный браузер, где сессии приложения нет.
+ *    `{ userId, provider }` через системный браузер, где сессии приложения нет;
+ *  · **код привязки** (`mobile:oauth:link:<sha256>`, 60 с,
+ *    MOBILE-OAUTH-LINK-COMPLETE) — колбэк флоу с intent кладёт личность
+ *    провайдера `{ linkUserId, codeChallenge, identity, consentFlags }` и
+ *    уводит браузер в приложение с кодом; привязку пишет только
+ *    `POST /api/mobile/v1/auth/oauth/link/complete` — Bearer владельца intent +
+ *    PKCE-verifier. Колбэк сам связку не пишет: intent предъявительский, и
+ *    браузер с ним мог открыть кто угодно по чужой ссылке (C-01).
  *
- * Оба одноразовые АТОМАРНО: забираются `GETDEL` (Redis ≥ 6.2, в проде
+ * У кода привязки свой префикс, а не префикс кода входа: код одного вида не
+ * должен ни обмениваться на сессию, ни сжигать код другого вида.
+ *
+ * Все одноразовые АТОМАРНО: забираются `GETDEL` (Redis ≥ 6.2, в проде
  * `redis:7-alpine`), то есть два параллельных обмена одного кода не могут оба
  * его увидеть, а предъявленный код сгорает при любом исходе проверки.
  *
  * В ключе — sha256 значения, не само значение: ключи видны в мониторинге и
- * `SCAN`, а код/intent — предъявительские.
+ * `SCAN`, а код/intent — предъявительские. В записи кода привязки — номер
+ * телефона из профиля провайдера (ПДн): он нужен подтверждению номера
+ * (PHONE-OAUTH-PROOF-01) и лежит не дольше 60 с — до `GETDEL` шага приложения.
+ * Имени, почты, аватара и токенов провайдера (инв. #36) там нет —
+ * `OAuthLinkIdentity` и проекция в `issueMobileOAuthLinkCode`.
  *
  * Без Redis флоу невозможен (код выдаёт один контейнер, меняет другой), поэтому
  * отказ Redis — `AppError` 503, а не память процесса: fail-closed, как прочие
@@ -35,6 +52,7 @@ export const MOBILE_OAUTH_INTENT_TTL_SECONDS = 5 * 60;
 
 const CODE_KEY_PREFIX = "mobile:oauth:code:";
 const INTENT_KEY_PREFIX = "mobile:oauth:intent:";
+const LINK_CODE_KEY_PREFIX = "mobile:oauth:link:";
 
 /** 32 байта → 43 символа base64url: и код, и intent. */
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
@@ -50,8 +68,37 @@ const intentRecordSchema = z.object({
   provider: z.enum(OAUTH_LOGIN_PROVIDERS),
 });
 
+const linkProfileSchema = z.object({
+  id: z.string().min(1),
+  phone: z.string().nullable(),
+});
+
+const linkCodeRecordSchema = z.object({
+  /** Владелец link-intent: завершить привязку может только его Bearer. */
+  linkUserId: z.string().min(1),
+  /** PKCE-челлендж старта: завершение предъявляет verifier. */
+  codeChallenge: z.string().min(1),
+  identity: z.discriminatedUnion("provider", [
+    z.object({ provider: z.literal("vk"), profile: linkProfileSchema, deviceId: z.string() }),
+    z.object({ provider: z.literal("yandex"), profile: linkProfileSchema }),
+  ]),
+  /** Согласия из state-bound куки флоу (как у веб-привязки); `null` — не захвачены. */
+  consentFlags: consentFlagsSchema.nullable(),
+});
+
 export type MobileOAuthCodeRecord = z.infer<typeof codeRecordSchema>;
 export type MobileOAuthIntentRecord = z.infer<typeof intentRecordSchema>;
+export type MobileOAuthLinkCodeRecord = {
+  linkUserId: string;
+  codeChallenge: string;
+  identity: OAuthLinkIdentity;
+  consentFlags: ConsentFlags | null;
+};
+
+// Схема и тип не расходятся: запись, прочитанная из Redis, — ровно то, что
+// принимает `linkOAuthIdentity`.
+const _linkRecordShape: MobileOAuthLinkCodeRecord = undefined as unknown as z.infer<typeof linkCodeRecordSchema>;
+void _linkRecordShape;
 
 function newToken(): string {
   return randomBytes(32).toString("base64url");
@@ -119,4 +166,37 @@ export function issueMobileOAuthLinkIntent(record: { userId: string; provider: O
 /** Мобильный старт: intent сгорает при предъявлении, даже если флоу потом бросят. */
 export function takeMobileOAuthLinkIntent(intent: string): Promise<MobileOAuthIntentRecord | null> {
   return takeOnce(INTENT_KEY_PREFIX, intent, intentRecordSchema, "mobile-oauth:intent:take");
+}
+
+/**
+ * Проекция личности провайдера на то, что нужно привязке. Явная, а не
+ * `JSON.stringify(identity)`: колбэк держит ПОЛНЫЙ профиль (имя, почта,
+ * аватар), и тип-сужение `OAuthLinkIdentity` его лишних полей в рантайме не
+ * убирает — в Redis уехало бы всё.
+ */
+function toLinkIdentity(identity: OAuthLinkIdentity): OAuthLinkIdentity {
+  const profile = { id: identity.profile.id, phone: identity.profile.phone ?? null };
+  return identity.provider === "vk"
+    ? { provider: "vk", profile, deviceId: identity.deviceId }
+    : { provider: "yandex", profile };
+}
+
+/** Колбэк флоу с intent: код привязки под PKCE-челлендж приложения. Связку не пишет. */
+export function issueMobileOAuthLinkCode(record: MobileOAuthLinkCodeRecord): Promise<string> {
+  return storeOnce(
+    LINK_CODE_KEY_PREFIX,
+    {
+      linkUserId: record.linkUserId,
+      codeChallenge: record.codeChallenge,
+      identity: toLinkIdentity(record.identity),
+      consentFlags: record.consentFlags,
+    },
+    MOBILE_OAUTH_CODE_TTL_SECONDS,
+    "mobile-oauth:link:set",
+  );
+}
+
+/** Шаг приложения: код сгорает при любом исходе; `null` — неизвестен, протух или уже использован. */
+export function takeMobileOAuthLinkCode(code: string): Promise<MobileOAuthLinkCodeRecord | null> {
+  return takeOnce(LINK_CODE_KEY_PREFIX, code, linkCodeRecordSchema, "mobile-oauth:link:take");
 }

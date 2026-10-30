@@ -37,7 +37,7 @@ const API_STATIC_SEGMENTS: ReadonlySet<string> = new Set([
   "calendar", "callback", "can-leave", "cancel", "card",
   "catalog", "catalog-presence", "categories", "category", "center", "charts",
   "chat", "checkout", "cities", "classification", "clear-read",
-  "client-ip", "clients", "close", "cohorts", "config", "confirm", "consents", "context",
+  "client-ip", "clients", "close", "cohorts", "complete", "config", "confirm", "consents", "context",
   "conversations", "crop", "dashboard", "day", "decline-reschedule",
   "delete", "detail", "devices", "diagnostics", "disable", "dismiss", "duplicates", "email",
   "events", "exchange", "export", "favorite", "favorites", "feed",

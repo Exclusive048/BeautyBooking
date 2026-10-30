@@ -15,8 +15,11 @@ import { getRequestId, logError } from "@/lib/logging/logger";
  * приложение (Bearer) сначала берёт здесь одноразовый `intent` — 5 минут,
  * привязан к пользователю и провайдеру — и открывает
  * `/api/mobile/v1/auth/oauth/{provider}/start?codeChallenge=…&intent=…`.
- * Колбэк привяжет аккаунт провайдера к ЭТОМУ пользователю и вернёт
- * `masterryadom://auth/callback?linked=<provider>`.
+ * Колбэк вернёт `masterryadom://auth/callback?code=…&link=<provider>`, а
+ * связку запишет `POST /api/mobile/v1/auth/oauth/link/complete` — Bearer
+ * ЭТОГО пользователя + PKCE-verifier старта (MOBILE-OAUTH-LINK-COMPLETE).
+ * Сам intent предъявительский: браузер по нему может открыть и посторонний,
+ * поэтому до шага приложения ничего не пишется (C-01).
  *
  * Лимит — тир `mobileAuth` прокси (POST под `/api/mobile/v1/auth/`).
  */
