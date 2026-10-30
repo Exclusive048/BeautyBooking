@@ -8,6 +8,7 @@ import { requireAdminAuth } from "@/lib/auth/admin";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { formatZodError } from "@/lib/api/validation";
 import { CATEGORY_ICON_MAX_LENGTH, isCategoryIcon } from "@/lib/catalog/category-icon";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -56,6 +57,8 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     const { id } = await ctx.params;
     if (!id) return fail("Категория не найдена.", 404, "NOT_FOUND");
 
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = await req.json().catch(() => null);
     const parsed = patchSchema.safeParse(body);
     if (!parsed.success) {

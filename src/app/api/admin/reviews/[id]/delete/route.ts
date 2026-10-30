@@ -8,6 +8,7 @@ import {
   AdminDeleteReviewError,
   deleteReview,
 } from "@/features/admin-cabinet/reviews/server/delete-review.service";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 export const runtime = "nodejs";
 
@@ -34,6 +35,8 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
     const { id } = await ctx.params;
     if (!id) return fail("Не указан id отзыва", 400, "VALIDATION_ERROR");
 
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = await req.json().catch(() => null);
     const parsed = bodySchema.safeParse(body ?? {});
     if (!parsed.success) {

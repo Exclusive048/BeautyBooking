@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 import { fail, ok } from "@/lib/api/response";
 import { formatZodError } from "@/lib/api/validation";
 import { withRequestContext } from "@/lib/api/with-request-context";
@@ -85,6 +86,9 @@ export async function POST(req: Request) {
       return withNoStore(fail("Требуется вход в аккаунт.", 401, "UNAUTHORIZED"));
     }
 
+    // CSRF-CONTENT-TYPE-LAYER: приложение шлёт Bearer — проверка его пропускает.
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = await req.json().catch(() => null);
     const parsed = bodySchema.safeParse(body);
     if (!parsed.success) {

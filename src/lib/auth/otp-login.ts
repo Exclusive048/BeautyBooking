@@ -39,6 +39,7 @@ import { sendTelegramAlert } from "@/lib/monitoring/alerts";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
 import { invalidateMeIdentityCache } from "@/lib/users/me";
 import * as UI_TEXT from "@/lib/ui/text";
+import { assertJsonContentType } from "@/lib/validation";
 
 /**
  * MOBILE-AUTH-A — вход по одноразовому коду, общий для веба и приложения.
@@ -96,6 +97,8 @@ export async function verifyPhoneOtpLogin(req: Request, options: OtpLoginOptions
   }
 
   const startedAt = Date.now();
+  // CSRF-CONTENT-TYPE-LAYER: бросает 415, роуты отдают его своим конвертом.
+  assertJsonContentType(req);
   const body = await req.json().catch(() => null);
   const parsed = otpVerifySchema.safeParse(body);
   if (!parsed.success) {
@@ -238,6 +241,8 @@ export async function verifyPhoneOtpLogin(req: Request, options: OtpLoginOptions
 
 export async function verifyEmailOtpLogin(req: Request, options: OtpLoginOptions): Promise<OtpLoginResult> {
   const startedAt = Date.now();
+  // CSRF-CONTENT-TYPE-LAYER: бросает 415, роуты отдают его своим конвертом.
+  assertJsonContentType(req);
   const body = await req.json().catch(() => null);
   const parsed = otpEmailVerifySchema.safeParse(body);
   if (!parsed.success) {

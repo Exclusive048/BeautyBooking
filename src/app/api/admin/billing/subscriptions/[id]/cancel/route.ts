@@ -8,6 +8,7 @@ import {
   AdminCancelSubscriptionError,
   adminCancelSubscription,
 } from "@/features/admin-cabinet/billing/server/cancel-subscription.service";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 export const runtime = "nodejs";
 
@@ -36,6 +37,8 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
     const { id } = await ctx.params;
     if (!id) return fail("Не указан id подписки", 400, "VALIDATION_ERROR");
 
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = await req.json().catch(() => null);
     const parsed = bodySchema.safeParse(body ?? {});
     if (!parsed.success) {

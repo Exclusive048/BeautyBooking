@@ -37,6 +37,7 @@ import { normalizeBufferMin } from "@/lib/schedule/editor-shared";
 import { weekSignature } from "@/lib/schedule/patterns";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { updateMasterProfile } from "@/lib/master/profile.service";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 export const runtime = "nodejs";
 
@@ -324,6 +325,8 @@ export async function PATCH(req: Request) {
     if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     const actor = await resolveScheduleActor(req, user.id);
 
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = (await req.json().catch(() => null)) as PatchBody | null;
     if (!body || typeof body !== "object") {
       throw new AppError("Проверьте правильность заполнения полей.", 400, "INVALID_BODY");

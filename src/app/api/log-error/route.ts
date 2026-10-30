@@ -9,6 +9,7 @@ import { readBodyTextCapped } from "@/lib/http/body-limit";
 import { getClientIp } from "@/lib/http/ip";
 import { toReportedPagePath } from "@/lib/observability/report-path";
 import { scrubString } from "@/lib/observability/scrub";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 export const runtime = "nodejs";
 
@@ -42,6 +43,8 @@ export async function POST(req: Request) {
 
     // SEC-16: Zod ограничивает поля только ПОСЛЕ разбора — граница размера
     // обязана стоять до него.
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const read = await readBodyTextCapped(req);
     if (!read.ok) {
       return fail("Слишком большой запрос.", 413);

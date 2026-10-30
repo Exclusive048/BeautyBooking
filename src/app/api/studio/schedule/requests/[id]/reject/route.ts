@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { loadScheduleRequestWithRelations, notifyScheduleRequestRejected } from "@/lib/notifications/studio-notifications";
 import { scheduleRequestProcessedError } from "@/lib/schedule/change-request-conflict";
 import { SCHEDULE_REQUEST_REJECT_COMMENT_MAX } from "@/features/studio-cabinet/schedule-requests/lib/reject-comment";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 export const runtime = "nodejs";
 
@@ -47,6 +48,8 @@ export async function POST(
       return jsonFail(403, "Этот раздел доступен администратору студии.", "FORBIDDEN");
     }
 
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const parsed = bodySchema.safeParse(await req.json().catch(() => null));
     if (!parsed.success) {
       const message = parsed.error.issues[0]?.message ?? COMMENT_REQUIRED;

@@ -4,7 +4,7 @@ import { toAppError } from "@/lib/api/errors";
 import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { logError } from "@/lib/logging/logger";
-import { parseBody } from "@/lib/validation";
+import { parseOptionalBody } from "@/lib/validation";
 import { BLOCK_REASON_MAX_LENGTH, unblockUser } from "@/features/admin-cabinet/users/server/block.service";
 
 export const runtime = "nodejs";
@@ -35,8 +35,7 @@ export async function POST(req: Request, ctx: RouteContext) {
     if (!parsedId.success) return fail("Пользователь не найден.", 404, "NOT_FOUND");
     const id = parsedId.data;
     // Кнопка «Разблокировать» шлёт пустое тело — причина необязательна.
-    const text = await req.clone().text();
-    const body = text.trim() ? await parseBody(req, bodySchema) : bodySchema.parse({});
+    const body = await parseOptionalBody(req, bodySchema);
     const state = await unblockUser({
       actor: { id: auth.user.id, roles: auth.user.roles },
       targetUserId: id,

@@ -5,6 +5,7 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 import { getSessionUser } from "@/lib/auth/session";
 import { mediaAssetIdParamSchema } from "@/lib/media/schemas";
 import { updateMediaCrop } from "@/lib/media/service";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -30,6 +31,8 @@ export async function PATCH(req: Request, ctx: RouteContext) {
       return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
     }
 
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = await req.json().catch(() => null);
     const parsedBody = cropSchema.safeParse(body);
     if (!parsedBody.success) {

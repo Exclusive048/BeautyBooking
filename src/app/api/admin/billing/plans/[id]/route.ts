@@ -27,6 +27,7 @@ import {
   type PlanFeatureOverrides,
   type PlanNode,
 } from "@/lib/billing/features";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 export const runtime = "nodejs";
 
@@ -164,6 +165,8 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     const { id } = await ctx.params;
     if (!id) return fail("Не указан id плана", 400, "VALIDATION_ERROR");
 
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = await req.json().catch(() => null);
     const parsed = bodySchema.safeParse(body);
     if (!parsed.success) {

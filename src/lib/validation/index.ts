@@ -69,6 +69,10 @@ export async function parseBody<T>(
     });
   }
 
+  return parseValue(body, schema);
+}
+
+function parseValue<T>(body: unknown, schema: z.ZodType<T>): T {
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
     // FORBIDDEN-WORDS-01: запрещённые слова — свой код и понятный текст, а не
@@ -82,6 +86,38 @@ export async function parseBody<T>(
     throw validationError("Проверьте правильность заполнения полей.", formatZodIssues(parsed.error));
   }
   return parsed.data;
+}
+
+/**
+ * Тело, которое можно не присылать вовсе: кнопка без полей («Разблокировать»,
+ * «Отклонить» жалобу без пометки) шлёт POST без тела и без типа.
+ *
+ * Пустое тело данных не несёт — подделывать нечего, поэтому тип не требуется
+ * и схема разбирает `{}`. Непустое — правила `parseBody`: тип JSON
+ * (CSRF-CONTENT-TYPE-LAYER, иначе 415), граница размера (SEC-16), разбор и
+ * схема. Читается тело один раз и с границей — до решения о типе, потому что
+ * «пусто ли» без чтения не узнать (`Content-Length` может отсутствовать).
+ */
+export async function parseOptionalBody<T>(
+  req: Request,
+  schema: z.ZodType<T>,
+  maxBytes: number = MAX_JSON_BODY_BYTES,
+): Promise<T> {
+  const read = await readBodyTextCapped(req, maxBytes);
+  if (!read.ok) {
+    throw new AppError("Вы отправили слишком много за раз. Сократите и попробуйте ещё раз.", 413, "REQUEST_BODY_TOO_LARGE");
+  }
+  if (!read.text.trim()) return parseValue({}, schema);
+  assertJsonContentType(req);
+  let body: unknown;
+  try {
+    body = JSON.parse(read.text) as unknown;
+  } catch {
+    throw validationError("Не удалось прочитать отправленное. Обновите страницу и попробуйте ещё раз.", {
+      issues: [{ path: "body", message: "Не удалось прочитать отправленное. Обновите страницу и попробуйте ещё раз.", code: "invalid_json" }],
+    });
+  }
+  return parseValue(body, schema);
 }
 
 export function parseQuery<T>(url: URL, schema: z.ZodType<T>): T {

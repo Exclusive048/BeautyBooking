@@ -10,6 +10,7 @@ import { formatZodError } from "@/lib/api/validation";
 import { CATEGORY_ICON_MAX_LENGTH, isCategoryIcon } from "@/lib/catalog/category-icon";
 import { slugifyCategory } from "@/lib/slug";
 import { sortCategoriesHierarchically } from "@/lib/catalog/category-sort";
+import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 const MAX_SLUG_LENGTH = 60;
 const MAX_CATEGORY_DEPTH = 3;
@@ -195,6 +196,8 @@ export async function POST(req: Request) {
   if (!auth.ok) return auth.response;
 
   try {
+    const nonJson = nonJsonBodyRefusal(req);
+    if (nonJson) return nonJson;
     const body = await req.json().catch(() => null);
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) {
