@@ -3,6 +3,7 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/access";
 import { resolveChatAccess } from "@/lib/chat/access";
+import { CHAT_THREAD_PAGE_SIZE } from "@/lib/chat/conversation-window";
 import { prisma } from "@/lib/prisma";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { Prisma } from "@prisma/client";
@@ -25,6 +26,23 @@ const messageSelect = {
   attachmentMediaAssetId: true,
 } as const;
 
+/**
+ * CHAT-MESSAGES-TAKE: чат записи читается последними
+ * `CHAT_THREAD_PAGE_SIZE` сообщениями — тем же потолком, что первая страница
+ * переписки пары (`conversation-window.ts`). Раньше `messages` шёл без `take`,
+ * и каждый опрос (клиент перечитывает чат после каждой отправки) тянул всю
+ * историю. Берём самые новые (`desc` + `take`) и разворачиваем в
+ * хронологический порядок ответа; на одно сообщение больше потолка —
+ * признак `hasOlderMessages` (более ранняя переписка — в мессенджере).
+ */
+const chatInclude = {
+  messages: {
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: CHAT_THREAD_PAGE_SIZE + 1,
+    select: messageSelect,
+  },
+} satisfies Prisma.BookingChatInclude;
+
 export async function GET(req: NextRequest, ctx: { params: RouteParams }) {
   let userId: string | undefined;
   try {
@@ -46,35 +64,20 @@ export async function GET(req: NextRequest, ctx: { params: RouteParams }) {
 
     let chat = await prisma.bookingChat.findUnique({
       where: { bookingId },
-      include: {
-        messages: {
-          orderBy: { createdAt: "asc" },
-          select: messageSelect,
-        },
-      },
+      include: chatInclude,
     });
 
     if (!chat) {
       try {
         chat = await prisma.bookingChat.create({
           data: { bookingId },
-          include: {
-            messages: {
-              orderBy: { createdAt: "asc" },
-              select: messageSelect,
-            },
-          },
+          include: chatInclude,
         });
       } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
           chat = await prisma.bookingChat.findUnique({
             where: { bookingId },
-            include: {
-              messages: {
-                orderBy: { createdAt: "asc" },
-                select: messageSelect,
-              },
-            },
+            include: chatInclude,
           });
         } else {
           throw error;
@@ -94,11 +97,15 @@ export async function GET(req: NextRequest, ctx: { params: RouteParams }) {
       },
     });
 
+    const hasOlderMessages = chat.messages.length > CHAT_THREAD_PAGE_SIZE;
+    const messages = chat.messages.slice(0, CHAT_THREAD_PAGE_SIZE).reverse();
+
     return jsonOk({
       chatId: chat.id,
       isOpen: access.availability.canSend,
       isReadOnly: access.availability.isReadOnly,
-      messages: chat.messages,
+      messages,
+      hasOlderMessages,
       unreadCount,
     });
   } catch (error) {
