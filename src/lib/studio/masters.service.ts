@@ -6,6 +6,7 @@ import { MembershipStatus, ProviderType } from "@prisma/client";
 import { isStudioMasterActive } from "@/lib/studio/master-eligibility";
 import { normalizeInviteEmail } from "@/lib/invites/access";
 import { discardStagedMaster } from "@/lib/invites/service";
+import { lockStudioInvitesTx } from "@/lib/invites/locks";
 import {
   buildStudioMasterServicesMatrix,
   type StudioMasterServicesMatrixRow,
@@ -132,7 +133,7 @@ export async function createStudioMaster(input: {
     // STUDIO-INVITE-LIMITS: приглашения одной студии создаются по очереди —
     // иначе параллельные запросы прошли бы подсчёт неотвеченных вместе и
     // перешагнули потолок. Блокировка транзакционная: снимается коммитом.
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`studio-invites:${studio.id}`}))`;
+    await lockStudioInvitesTx(tx, studio.id);
 
     const existing = await tx.provider.findFirst({
       where: {
@@ -459,19 +460,32 @@ export async function revokeStudioMasterInvite(input: {
 
   const invite = await findStudioMasterInvite(studio.id, master);
 
+  let revokedInviteId: string | null = null;
   if (invite && invite.status === MembershipStatus.PENDING) {
-    await prisma.studioInvite.update({
-      where: { id: invite.id },
+    // INVITE-ACCEPT-ATOMIC: отзыв и принятие меняют статус только у ОЖИДАЮЩЕГО
+    // приглашения (условие в самой записи) — из двух одновременных побеждает
+    // одно. Раньше безусловная запись могла пометить отозванным приглашение,
+    // которое только что приняли.
+    const revoked = await prisma.studioInvite.updateMany({
+      where: { id: invite.id, status: MembershipStatus.PENDING },
       data: { status: MembershipStatus.LEFT },
-      select: { id: true },
     });
+    if (revoked.count === 0) {
+      const current = await prisma.studioInvite.findUnique({ where: { id: invite.id }, select: { status: true } });
+      if (current?.status === MembershipStatus.ACTIVE) {
+        throw new AppError("Мастер уже принял приглашение. Обновите страницу.", 409, "MASTER_NOT_INVITED");
+      }
+      // Успели отклонить или отозвать — уведомлять об отзыве некого.
+    } else {
+      revokedInviteId = invite.id;
+    }
   }
   // Заготовка уходит тем же путём, что при принятии и отказе, — вместе с фото,
   // которые админ мог загрузить в редакторе профиля мастера. Удаляется только
   // строка без владельца: условие стоит в самой записи.
   await discardStagedMaster(master.id);
 
-  return { inviteId: invite?.id ?? null };
+  return { inviteId: revokedInviteId };
 }
 
 /**

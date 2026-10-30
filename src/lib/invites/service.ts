@@ -1,16 +1,21 @@
 import { AccountType, MediaEntityType, MembershipStatus, Prisma, ProviderType, StudioRole } from "@prisma/client";
-import { toAppError } from "@/lib/api/errors";
+import { AppError } from "@/lib/api/errors";
 import { addRoleToUser } from "@/lib/auth/roles";
 import { enqueueMediaPurge } from "@/lib/deletion/enqueue-media-purge";
 import type { Result, StatusCode } from "@/lib/domain/result";
 import { normalizeInviteEmail, resolveInviteAccess } from "@/lib/invites/access";
+import { lockInviteAcceptorTx, lockStudioInvitesTx } from "@/lib/invites/locks";
 import { resolveMasterInviteReadiness } from "@/lib/invites/master-readiness";
 import { logError } from "@/lib/logging/logger";
 import { collectProviderMedia } from "@/lib/media/purge";
 import { markAssetsDeletedTx } from "@/lib/media/soft-delete";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prisma } from "@/lib/prisma";
-import { ensureStudioTeamLimit } from "@/lib/studio/team-limits";
+import {
+  assertStudioTeamSeatAvailable,
+  resolveStudioTeamSeat,
+  type StudioTeamSeat,
+} from "@/lib/studio/team-limits";
 import { attachMasterToStudio } from "@/lib/studios/masters";
 import { claimStagedStudioProfileTx, createStudioMasterProfileTx } from "@/lib/studios/master-profile-split";
 
@@ -112,7 +117,7 @@ export async function findPendingInvitesAddressedTo(contact: {
  * `invites/master-readiness.ts`). Текст называет, что сделать, — кнопку туда
  * карточка приглашения показывает заранее.
  */
-function masterOnboardingRequired(hasCabinet: boolean): Result<never> {
+function masterOnboardingRequired(hasCabinet: boolean): InviteRefusal {
   return {
     ok: false,
     status: 409,
@@ -123,6 +128,91 @@ function masterOnboardingRequired(hasCabinet: boolean): Result<never> {
   };
 }
 
+type InviteRefusal = Extract<Result<never>, { ok: false }>;
+
+const INVITE_NOT_FOUND: InviteRefusal = {
+  ok: false,
+  status: 404,
+  message: "Приглашение не найдено.",
+  code: "INVITE_NOT_FOUND",
+};
+
+/**
+ * INVITE-ACCEPT-ATOMIC — проигравший гонку (конфликт записи, повтор уникальной
+ * строки) получает 409 с действием, а не 500.
+ */
+const INVITE_ACCEPT_CONFLICT: InviteRefusal = {
+  ok: false,
+  status: 409,
+  message: "Не удалось принять приглашение. Обновите страницу и попробуйте ещё раз.",
+  code: "CONFLICT",
+};
+
+/** Закрытое приглашение — отказ; `null` — ещё ждёт ответа. */
+function closedInviteRefusal(status: MembershipStatus | null): InviteRefusal | null {
+  switch (status) {
+    case null:
+      return INVITE_NOT_FOUND;
+    case MembershipStatus.LEFT:
+      return { ok: false, status: 409, message: "Приглашение отозвано.", code: "INVITE_REVOKED" };
+    case MembershipStatus.ACTIVE:
+      return { ok: false, status: 409, message: "Приглашение уже принято.", code: "INVITE_ALREADY_ACCEPTED" };
+    case MembershipStatus.REJECTED:
+      return { ok: false, status: 409, message: "Приглашение уже отклонено.", code: "INVITE_ALREADY_REJECTED" };
+    default:
+      return null;
+  }
+}
+
+/**
+ * Отказ лимита команды (`assertStudioTeamSeatAvailable` / `resolveStudioTeamSeat`):
+ * 409 LIMIT_REACHED или 404 «студии нет»; прочее — не отказ, а сбой.
+ */
+function teamLimitRefusal(error: unknown): InviteRefusal | null {
+  if (!(error instanceof AppError)) return null;
+  const status: StatusCode = error.status === 404 ? 404 : error.status === 409 ? 409 : 500;
+  return { ok: false, status, message: error.message, code: error.code };
+}
+
+/** Отказ изнутри транзакции приёма: бросается, чтобы откатить всё записанное. */
+class InviteAcceptRefused extends Error {
+  constructor(readonly refusal: InviteRefusal) {
+    super(refusal.message);
+    this.name = "InviteAcceptRefused";
+  }
+}
+
+/** Копия расписания личного профиля и ожидание блокировок — дольше 5 с по умолчанию. */
+const INVITE_ACCEPT_TX_OPTIONS = { timeout: 20_000, maxWait: 10_000 } as const;
+
+/**
+ * INVITE-ACCEPT-ATOMIC (2026-10-30) — приглашение принимается ОДНОЙ транзакцией:
+ * статус приглашения, профиль в студии, привязка к студии и членство либо
+ * записываются все, либо ни одно.
+ *
+ * Раньше каждый шаг шёл своим запросом, а статус менялся безусловно в самом
+ * конце. Два нажатия «Принять» (двойной клик, две вкладки, веб и приложение)
+ * проходили проверки вместе: первое создавало профиль в студии, второе —
+ * второй, а приглашение помечалось принятым дважды. Приглашения двух студий,
+ * принятые одновременно, давали человеку профили в обеих, хотя мастер работает
+ * в одной студии. А при одном свободном месте в команде его занимали оба.
+ *
+ * Как держится:
+ * 1. Первые инструкции транзакции — блокировки человека, потом студии
+ *    (`invites/locks.ts`). Под ними проверки «профиль в другой студии», «свой
+ *    профиль в этой студии» и подсчёт мест видят то, что записала предыдущая
+ *    транзакция.
+ * 2. Статус меняется условно — только у ОЖИДАЮЩЕГО приглашения. Отказ и отзыв
+ *    идут тем же условием и блокировок не берут: из двух побеждает первое,
+ *    второе получает отказ по фактическому статусу, а записанное откатывается.
+ * 3. Заготовка студии захватывается тоже условно (только ничейная) — расписание
+ *    второй раз не копируется.
+ * 4. Повтор уникальной строки (P2002) и конфликт записи (P2034) — 409.
+ *
+ * Проверки, которые человек исправляет сам («Первые шаги», есть ли место),
+ * идут и до транзакции — чтобы на отказе не ждать блокировок. Заготовка,
+ * ставшая ненужной, удаляется после коммита.
+ */
 export async function acceptStudioInvite(
   inviteId: string,
   user: InviteActor & { roles: AccountType[] }
@@ -139,25 +229,14 @@ export async function acceptStudioInvite(
     },
   });
 
-  if (!invite) {
-    return { ok: false, status: 404, message: "Приглашение не найдено.", code: "INVITE_NOT_FOUND" };
-  }
+  if (!invite) return INVITE_NOT_FOUND;
 
   if (!(await hasInviteAccess(user, invite))) {
     return { ok: false, status: 403, message: "Недостаточно прав для этого действия.", code: "FORBIDDEN" };
   }
 
-  if (invite.status === MembershipStatus.LEFT) {
-    return { ok: false, status: 409, message: "Приглашение отозвано.", code: "INVITE_REVOKED" };
-  }
-
-  if (invite.status === MembershipStatus.ACTIVE) {
-    return { ok: false, status: 409, message: "Приглашение уже принято.", code: "INVITE_ALREADY_ACCEPTED" };
-  }
-
-  if (invite.status === MembershipStatus.REJECTED) {
-    return { ok: false, status: 409, message: "Приглашение уже отклонено.", code: "INVITE_ALREADY_REJECTED" };
-  }
+  const closed = closedInviteRefusal(invite.status);
+  if (closed) return closed;
 
   // Решение владельца 2026-10-14: в команду студии — только с настроенным
   // кабинетом мастера (все «Первые шаги»). Проверка — до места в команде:
@@ -170,182 +249,201 @@ export async function acceptStudioInvite(
   // ACTIVE-only counting, pending invites don't reserve seats, so enforcement
   // must land HERE — the point the seat actually becomes ACTIVE — not only at
   // invite-send. Blocks joining a full studio; the invite stays pending until a
-  // seat frees up or the studio upgrades its plan.
+  // seat frees up or the studio upgrades its plan. Тариф владельца читается
+  // здесь, места считаются ещё раз в транзакции — под блокировкой студии.
+  let seat: StudioTeamSeat;
   try {
-    await ensureStudioTeamLimit(invite.studioId);
+    seat = await resolveStudioTeamSeat(invite.studioId);
+    await assertStudioTeamSeatAvailable(seat);
   } catch (error) {
-    const appError = toAppError(error);
-    // `ensureStudioTeamLimit` throws 409 LIMIT_REACHED (cap) or 404 (studio
-    // gone); narrow to the Result StatusCode union, anything else → 500.
-    const status: StatusCode =
-      appError.status === 404 ? 404 : appError.status === 409 ? 409 : 500;
-    return { ok: false, status, message: appError.message, code: appError.code };
-  }
-
-  const contactWhere = stagedMasterContactWhere(invite);
-  const stagedMaster = contactWhere
-    ? await prisma.provider.findFirst({
-        where: {
-          type: ProviderType.MASTER,
-          studioId: invite.studio.providerId,
-          ...contactWhere,
-        },
-        select: {
-          id: true,
-          ownerUserId: true,
-          isPublished: true,
-          studioPaused: true,
-          publicUsername: true,
-          categories: true,
-        },
-        orderBy: { createdAt: "asc" },
-      })
-    : null;
-
-  if (stagedMaster?.ownerUserId && stagedMaster.ownerUserId !== user.id) {
-    return {
-      ok: false,
-      status: 409,
-      message: invite.email
-        ? "Эта почта уже привязана к другому аккаунту."
-        : "Этот телефон уже привязан к другому аккаунту.",
-      code: "INVITE_PHONE_ALREADY_USED",
-    };
+    const refusal = teamLimitRefusal(error);
+    if (!refusal) throw error;
+    return refusal;
   }
 
   // STUDIO-MASTER-PROFILES (этап 4, решение владельца 2026-09-27): мастер —
   // это профиль для записи. Принявший приглашение получает ОТДЕЛЬНЫЙ профиль в
   // студии; его личный профиль (кабинет мастера, своя страница и услуги) в
-  // студию не привязывается. Раньше привязывался сам личный профиль, и одно
-  // расписание, одни правила и одни услуги обслуживали обе работы.
-  //
-  // 1. Личный профиль остаётся как есть. Он есть всегда: без кабинета мастера
-  //    приглашение не принимается (проверка выше); пропал между проверкой и
-  //    этим местом (удалили кабинет) — тот же отказ.
-  const existingMasterProfile = await prisma.masterProfile.findUnique({
-    where: { userId: user.id },
-    select: { id: true, providerId: true },
-  });
-  if (!existingMasterProfile) return masterOnboardingRequired(false);
-  const personalProviderId = existingMasterProfile.providerId;
+  // студию не привязывается. Личный профиль есть всегда: без кабинета мастера
+  // приглашение не принимается (проверка выше).
+  if (!(await prisma.masterProfile.findUnique({ where: { userId: user.id }, select: { id: true } }))) {
+    return masterOnboardingRequired(false);
+  }
 
   // Роль у владельца кабинета мастера есть; страховка — ДО привязки к студии.
   if (!user.roles.includes(AccountType.MASTER)) {
     await addRoleToUser(user.id, user.roles, AccountType.MASTER);
   }
 
-  // 2. Мастер работает в одной студии: активный профиль в ДРУГОЙ студии —
-  //    отказ (как раньше «Мастер уже состоит в студии»).
-  const otherStudioProfile = await prisma.provider.findFirst({
-    where: {
-      ownerUserId: user.id,
-      type: ProviderType.MASTER,
-      masterProfile: { is: null },
-      studioId: { not: null, notIn: [invite.studio.providerId] },
-    },
-    select: { id: true },
-  });
-  if (otherStudioProfile) {
-    return { ok: false, status: 409, message: "Мастер уже состоит в студии.", code: "MASTER_ALREADY_ASSIGNED" };
-  }
+  const studioProviderId = invite.studio.providerId;
+  let accepted: { memberId: string; masterProviderId: string; stagedToDiscard: string | null };
+  try {
+    accepted = await prisma.$transaction(async (tx) => {
+      await lockInviteAcceptorTx(tx, user.id);
+      await lockStudioInvitesTx(tx, invite.studioId);
 
-  // 3. Профиль в этой студии: уже был (вернулся после ухода) → он же; иначе
-  //    заготовка студии под приглашение; иначе — копия личного.
-  const ownStudioProfile = await prisma.provider.findFirst({
-    where: {
-      ownerUserId: user.id,
-      type: ProviderType.MASTER,
-      masterProfile: { is: null },
-      studioId: invite.studio.providerId,
-    },
-    select: { id: true },
-    orderBy: { createdAt: "asc" },
-  });
-  let masterProviderId: string;
-  // Заготовка уходит только ПОСЛЕ успешного принятия.
-  let stagedToDiscard: string | null = null;
-  if (ownStudioProfile) {
-    masterProviderId = ownStudioProfile.id;
-    await prisma.provider.update({
-      where: { id: ownStudioProfile.id },
-      data: { studioPaused: false },
-      select: { id: true },
-    });
-    if (stagedMaster && stagedMaster.id !== ownStudioProfile.id && !stagedMaster.ownerUserId) {
-      stagedToDiscard = stagedMaster.id;
-    }
-  } else if (stagedMaster) {
-    masterProviderId = stagedMaster.id;
-    await prisma.$transaction((tx) =>
-      claimStagedStudioProfileTx(tx, {
-        stagedId: stagedMaster.id,
-        personalId: personalProviderId,
-        ownerUserId: user.id,
-      }),
-    );
-  } else {
-    const created = await prisma.$transaction((tx) =>
-      createStudioMasterProfileTx(tx, {
-        personalId: personalProviderId,
-        studioProviderId: invite.studio.providerId,
-      }),
-    );
-    if (!created) {
-      return { ok: false, status: 404, message: "Студия не найдена.", code: "STUDIO_NOT_FOUND" };
-    }
-    masterProviderId = created;
-  }
+      const claimed = await tx.studioInvite.updateMany({
+        where: { id: invite.id, status: MembershipStatus.PENDING },
+        data: { status: MembershipStatus.ACTIVE },
+      });
+      if (claimed.count === 0) {
+        const current = await tx.studioInvite.findUnique({ where: { id: invite.id }, select: { status: true } });
+        throw new InviteAcceptRefused(closedInviteRefusal(current?.status ?? null) ?? INVITE_ACCEPT_CONFLICT);
+      }
 
-  // Пояс и место профиля в студии — студии (`attachMasterToStudio` для уже
-  // привязанного профиля только синхронизирует их).
-  const attached = await attachMasterToStudio(invite.studio.providerId, masterProviderId);
-  if (!attached.ok) {
-    return { ok: false, status: attached.status, message: attached.message, code: attached.code };
-  }
+      try {
+        await assertStudioTeamSeatAvailable(seat, tx);
+      } catch (error) {
+        const refusal = teamLimitRefusal(error);
+        if (!refusal) throw error;
+        throw new InviteAcceptRefused(refusal);
+      }
 
-  const memberId = await prisma.$transaction(async (tx) => {
-    const membership = await tx.studioMembership.findUnique({
-      where: { userId_studioId: { userId: user.id, studioId: invite.studioId } },
-      select: { id: true, roles: true },
-    });
+      // Личный профиль мог исчезнуть после проверки выше (удалили кабинет).
+      const personal = await tx.masterProfile.findUnique({
+        where: { userId: user.id },
+        select: { providerId: true },
+      });
+      if (!personal) throw new InviteAcceptRefused(masterOnboardingRequired(false));
 
-    const nextRoles = membership
-      ? Array.from(new Set([...membership.roles, StudioRole.MASTER]))
-      : [StudioRole.MASTER];
+      const contactWhere = stagedMasterContactWhere(invite);
+      const stagedMaster = contactWhere
+        ? await tx.provider.findFirst({
+            where: { type: ProviderType.MASTER, studioId: studioProviderId, ...contactWhere },
+            select: { id: true, ownerUserId: true },
+            orderBy: { createdAt: "asc" },
+          })
+        : null;
+      if (stagedMaster?.ownerUserId && stagedMaster.ownerUserId !== user.id) {
+        throw new InviteAcceptRefused({
+          ok: false,
+          status: 409,
+          message: invite.email
+            ? "Эта почта уже привязана к другому аккаунту."
+            : "Этот телефон уже привязан к другому аккаунту.",
+          code: "INVITE_PHONE_ALREADY_USED",
+        });
+      }
 
-    const savedMembership = membership
-      ? await tx.studioMembership.update({
-          where: { id: membership.id },
-          data: { status: MembershipStatus.ACTIVE, roles: nextRoles, leftAt: null },
-          select: { id: true },
-        })
-      : await tx.studioMembership.create({
-          data: {
-            userId: user.id,
-            studioId: invite.studioId,
-            status: MembershipStatus.ACTIVE,
-            roles: nextRoles,
-            leftAt: null,
-          },
+      // Мастер работает в одной студии: активный профиль в ДРУГОЙ студии — отказ.
+      const otherStudioProfile = await tx.provider.findFirst({
+        where: {
+          ownerUserId: user.id,
+          type: ProviderType.MASTER,
+          masterProfile: { is: null },
+          studioId: { not: null, notIn: [studioProviderId] },
+        },
+        select: { id: true },
+      });
+      if (otherStudioProfile) {
+        throw new InviteAcceptRefused({
+          ok: false,
+          status: 409,
+          message: "Мастер уже состоит в студии.",
+          code: "MASTER_ALREADY_ASSIGNED",
+        });
+      }
+
+      // Профиль в этой студии: уже был (вернулся после ухода) → он же; иначе
+      // заготовка студии под приглашение; иначе — копия личного.
+      const ownStudioProfile = await tx.provider.findFirst({
+        where: {
+          ownerUserId: user.id,
+          type: ProviderType.MASTER,
+          masterProfile: { is: null },
+          studioId: studioProviderId,
+        },
+        select: { id: true },
+        orderBy: { createdAt: "asc" },
+      });
+      let masterProviderId: string;
+      // Заготовка уходит только ПОСЛЕ успешного принятия.
+      let stagedToDiscard: string | null = null;
+      if (ownStudioProfile) {
+        masterProviderId = ownStudioProfile.id;
+        await tx.provider.update({
+          where: { id: ownStudioProfile.id },
+          data: { studioPaused: false },
           select: { id: true },
         });
+        if (stagedMaster && stagedMaster.id !== ownStudioProfile.id && !stagedMaster.ownerUserId) {
+          stagedToDiscard = stagedMaster.id;
+        }
+      } else if (stagedMaster) {
+        masterProviderId = stagedMaster.id;
+        const claimedStaged = await claimStagedStudioProfileTx(tx, {
+          stagedId: stagedMaster.id,
+          personalId: personal.providerId,
+          ownerUserId: user.id,
+        });
+        if (!claimedStaged) throw new InviteAcceptRefused(INVITE_ACCEPT_CONFLICT);
+      } else {
+        const created = await createStudioMasterProfileTx(tx, {
+          personalId: personal.providerId,
+          studioProviderId,
+        });
+        if (!created) {
+          throw new InviteAcceptRefused({ ok: false, status: 404, message: "Студия не найдена.", code: "STUDIO_NOT_FOUND" });
+        }
+        masterProviderId = created;
+      }
 
-    await tx.studioInvite.update({
-      where: { id: invite.id },
-      data: { status: MembershipStatus.ACTIVE },
-      select: { id: true },
-    });
+      // Пояс и место профиля в студии — студии (`attachMasterToStudio` для уже
+      // привязанного профиля только синхронизирует их).
+      const attached = await attachMasterToStudio(studioProviderId, masterProviderId, tx);
+      if (!attached.ok) {
+        throw new InviteAcceptRefused({
+          ok: false,
+          status: attached.status,
+          message: attached.message,
+          code: attached.code,
+        });
+      }
 
-    return savedMembership.id;
-  });
+      const membership = await tx.studioMembership.findUnique({
+        where: { userId_studioId: { userId: user.id, studioId: invite.studioId } },
+        select: { id: true, roles: true },
+      });
+      const nextRoles = membership
+        ? Array.from(new Set([...membership.roles, StudioRole.MASTER]))
+        : [StudioRole.MASTER];
+      const savedMembership = membership
+        ? await tx.studioMembership.update({
+            where: { id: membership.id },
+            data: { status: MembershipStatus.ACTIVE, roles: nextRoles, leftAt: null },
+            select: { id: true },
+          })
+        : await tx.studioMembership.create({
+            data: {
+              userId: user.id,
+              studioId: invite.studioId,
+              status: MembershipStatus.ACTIVE,
+              roles: nextRoles,
+              leftAt: null,
+            },
+            select: { id: true },
+          });
 
-  if (stagedToDiscard) {
+      return { memberId: savedMembership.id, masterProviderId, stagedToDiscard };
+    }, INVITE_ACCEPT_TX_OPTIONS);
+  } catch (error) {
+    if (error instanceof InviteAcceptRefused) return error.refusal;
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      (error.code === "P2002" || error.code === "P2034")
+    ) {
+      return INVITE_ACCEPT_CONFLICT;
+    }
+    throw error;
+  }
+
+  if (accepted.stagedToDiscard) {
     try {
-      await discardStagedMaster(stagedToDiscard);
+      await discardStagedMaster(accepted.stagedToDiscard);
     } catch (error) {
       // Приглашение уже принято; брошенная заготовка — мусор, а не отказ.
       logError("Failed to discard staged master after invite accept", {
-        stagedMasterId: stagedToDiscard,
+        stagedMasterId: accepted.stagedToDiscard,
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -356,8 +454,8 @@ export async function acceptStudioInvite(
     data: {
       inviteId: invite.id,
       studioId: invite.studioId,
-      memberId,
-      masterProviderId,
+      memberId: accepted.memberId,
+      masterProviderId: accepted.masterProviderId,
     },
   };
 }
@@ -378,25 +476,18 @@ export async function rejectStudioInvite(
     },
   });
 
-  if (!invite) {
-    return { ok: false, status: 404, message: "Приглашение не найдено.", code: "INVITE_NOT_FOUND" };
-  }
+  if (!invite) return INVITE_NOT_FOUND;
 
   if (!(await hasInviteAccess(user, invite))) {
     return { ok: false, status: 403, message: "Недостаточно прав для этого действия.", code: "FORBIDDEN" };
   }
 
-  if (invite.status === MembershipStatus.ACTIVE) {
-    return { ok: false, status: 409, message: "Приглашение уже принято.", code: "INVITE_ALREADY_ACCEPTED" };
-  }
-
-  if (invite.status === MembershipStatus.LEFT) {
-    return { ok: false, status: 409, message: "Приглашение отозвано.", code: "INVITE_REVOKED" };
-  }
-
+  // Повторный отказ — успех: человек хотел ровно этого.
   if (invite.status === MembershipStatus.REJECTED) {
     return { ok: true, data: { inviteId: invite.id } };
   }
+  const closed = closedInviteRefusal(invite.status);
+  if (closed) return closed;
 
   const contactWhere = stagedMasterContactWhere(invite);
   const staged = contactWhere
@@ -411,11 +502,25 @@ export async function rejectStudioInvite(
       })
     : [];
 
-  await prisma.studioInvite.update({
-    where: { id: invite.id },
+  // INVITE-ACCEPT-ATOMIC: отказ меняет статус только у ОЖИДАЮЩЕГО приглашения —
+  // тем же условием, что принятие. Безусловная запись помечала отклонённым
+  // приглашение, которое в этот момент принимали в другой вкладке.
+  const rejected = await prisma.studioInvite.updateMany({
+    where: { id: invite.id, status: MembershipStatus.PENDING },
     data: { status: MembershipStatus.REJECTED },
-    select: { id: true },
   });
+  if (rejected.count === 0) {
+    const current = await prisma.studioInvite.findUnique({ where: { id: invite.id }, select: { status: true } });
+    if (current?.status === MembershipStatus.REJECTED) return { ok: true, data: { inviteId: invite.id } };
+    return (
+      closedInviteRefusal(current?.status ?? null) ?? {
+        ok: false,
+        status: 409,
+        message: "Не удалось отклонить приглашение. Обновите страницу и попробуйте ещё раз.",
+        code: "CONFLICT",
+      }
+    );
+  }
 
   // Заготовка (ничейный Provider под приглашение) уходит тем же путём, что при
   // принятии, — вместе с фото, которые мог загрузить админ студии. Удаляется

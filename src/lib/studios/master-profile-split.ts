@@ -454,11 +454,16 @@ export async function createStudioMasterProfileTx(
  * профилем принявшего в этой студии: владелец — он, страницы нет. Чего у
  * заготовки нет — берётся у личного профиля: расписание (копия текущего) и
  * аватар (ссылка). Имя заготовки оставляем — его вписала студия.
+ *
+ * INVITE-ACCEPT-ATOMIC: захват условный — только НИЧЕЙНОЙ заготовки (условие в
+ * самой записи). `false` — заготовку успели взять или удалить (отзыв, отказ,
+ * второе принятие): вызывающий откатывает транзакцию, а расписание второй раз
+ * не копируется.
  */
 export async function claimStagedStudioProfileTx(
   tx: Tx,
   input: { stagedId: string; personalId: string; ownerUserId: string },
-): Promise<void> {
+): Promise<boolean> {
   const [staged, personal, stagedConfig, stagedPatterns] = await Promise.all([
     tx.provider.findUnique({ where: { id: input.stagedId }, select: { avatarUrl: true } }),
     tx.provider.findUnique({ where: { id: input.personalId }, select: { avatarUrl: true } }),
@@ -466,8 +471,8 @@ export async function claimStagedStudioProfileTx(
     // SCHEDULE-PATTERNS-01: у заготовки может быть уже и график, не только неделя.
     tx.schedulePattern.count({ where: { providerId: input.stagedId } }),
   ]);
-  await tx.provider.update({
-    where: { id: input.stagedId },
+  const claimed = await tx.provider.updateMany({
+    where: { id: input.stagedId, ownerUserId: null },
     data: {
       ownerUserId: input.ownerUserId,
       studioPaused: false,
@@ -475,11 +480,12 @@ export async function claimStagedStudioProfileTx(
       publicUsername: null,
       ...(staged?.avatarUrl ? {} : { avatarUrl: personal?.avatarUrl ?? null }),
     },
-    select: { id: true },
   });
+  if (claimed.count === 0) return false;
   if (!stagedConfig && stagedPatterns === 0) {
     await copyProviderScheduleTx(tx, input.personalId, input.stagedId);
   }
+  return true;
 }
 
 /**

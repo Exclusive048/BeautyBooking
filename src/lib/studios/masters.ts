@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import type { Result } from "@/lib/domain/result";
-import { ProviderType } from "@prisma/client";
+import { ProviderType, type Prisma } from "@prisma/client";
+
+type Db = Prisma.TransactionClient | typeof prisma;
 
 type StudioMasterRecord = {
   id: string;
@@ -17,9 +19,10 @@ type StudioLocation = {
 };
 
 async function ensureStudio(
-  studioId: string
+  studioId: string,
+  db: Db = prisma,
 ): Promise<Result<{ id: string; timezone: string; location: StudioLocation }>> {
-  const studio = await prisma.provider.findUnique({
+  const studio = await db.provider.findUnique({
     where: { id: studioId },
     select: {
       id: true,
@@ -84,11 +87,16 @@ export async function listStudioMasters(studioId: string): Promise<Result<Studio
   return { ok: true, data: masters };
 }
 
+/**
+ * @param db INVITE-ACCEPT-ATOMIC: приём приглашения передаёт свою транзакцию —
+ *   привязка откатывается вместе с профилем и статусом приглашения.
+ */
 export async function attachMasterToStudio(
   studioId: string,
-  masterProviderId: string
+  masterProviderId: string,
+  db: Db = prisma,
 ): Promise<Result<StudioMasterRecord>> {
-  const studio = await ensureStudio(studioId);
+  const studio = await ensureStudio(studioId, db);
   if (!studio.ok) return studio;
 
   // SEC-27: правило «привязать можно только мастера БЕЗ студии либо уже этой же»
@@ -101,7 +109,7 @@ export async function attachMasterToStudio(
   // принимающего, — но это инвариант уровня ревью: любой новый вызывающий молча
   // возвращал бы захват solo-мастера. Теперь условие нельзя не заметить: оно в
   // `where`.
-  const master = await prisma.provider.findFirst({
+  const master = await db.provider.findFirst({
     where: {
       id: masterProviderId,
       type: ProviderType.MASTER,
@@ -114,7 +122,7 @@ export async function attachMasterToStudio(
     // Решение уже принято запросом; здесь только выбирается текст ответа —
     // «мастера нет» и «мастер занят» это разные ответы для принимающего
     // приглашение, и схлопывать их в один было бы регрессом флоу.
-    const existingMasters = await prisma.provider.count({
+    const existingMasters = await db.provider.count({
       where: { id: masterProviderId, type: ProviderType.MASTER },
     });
     return existingMasters > 0
@@ -131,7 +139,7 @@ export async function attachMasterToStudio(
       ...inheritStudioLocation(master, studio.data.location),
     };
     if (Object.keys(sync).length > 0) {
-      await prisma.provider.update({
+      await db.provider.update({
         where: { id: master.id },
         data: sync,
         select: { id: true },
@@ -143,7 +151,7 @@ export async function attachMasterToStudio(
   // Между чтением и записью мастера могла принять другая студия (два
   // приглашения, принятые одновременно). Состояние повторяется в `where`, чтобы
   // гонка кончалась отказом, а не тихой перепривязкой.
-  const attached = await prisma.provider.updateMany({
+  const attached = await db.provider.updateMany({
     where: { id: master.id, type: ProviderType.MASTER, studioId: null },
     // STUDIO-MASTER-TZ-01: мастер студии работает в её часовом поясе. Рабочие
     // часы мастера проверяются в ЕГО поясе (`studio/bookings.service.ts`), а
