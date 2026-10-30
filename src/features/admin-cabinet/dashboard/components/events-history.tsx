@@ -42,6 +42,8 @@ type Props = {
   category: AdminEventCategory;
   initial: AdminEventItem[];
   initialNextCursor: string | null;
+  /** `asOfMs` серверного рендера — точка отсчёта опроса новых. */
+  initialAsOfMs: number;
 };
 
 /**
@@ -50,7 +52,7 @@ type Props = {
  * новых раз в 30 с и выгрузка раздела в Excel. Раздел — в адресе страницы,
  * смена раздела перерисовывает список с сервера.
  */
-export function EventsHistory({ category, initial, initialNextCursor }: Props) {
+export function EventsHistory({ category, initial, initialNextCursor, initialAsOfMs }: Props) {
   const toast = useToast();
   const router = useRouter();
   const pathname = usePathname();
@@ -61,8 +63,6 @@ export function EventsHistory({ category, initial, initialNextCursor }: Props) {
   const [exportDays, setExportDays] = useState<(typeof EXPORT_DAYS)[number]>(30);
   const seenIds = useRef<Set<string>>(new Set(initial.map((item) => item.id)));
 
-  const latestMs = items.length > 0 ? items[0]!.timeMs : 0;
-
   const onFresh = useCallback((incoming: AdminEventItem[]) => {
     const fresh = incoming.filter((item) => !seenIds.current.has(item.id));
     if (fresh.length === 0) return;
@@ -70,7 +70,21 @@ export function EventsHistory({ category, initial, initialNextCursor }: Props) {
     setItems((prev) => [...fresh, ...prev]);
   }, []);
 
-  useAdminEventsPoll({ category, latestMs, onEvents: onFresh });
+  // Список устарел (вкладка долго была скрыта) — первая страница заново,
+  // догруженное «Показать ещё» отбрасывается, как при перезагрузке страницы.
+  const onReset = useCallback((page: AdminEventsResponse) => {
+    seenIds.current = new Set(page.items.map((item) => item.id));
+    setItems(page.items);
+    setNextCursor(page.nextCursor);
+  }, []);
+
+  useAdminEventsPoll({
+    category,
+    initialAsOfMs,
+    pageSize: ADMIN_EVENTS_HISTORY_PAGE,
+    onEvents: onFresh,
+    onReset,
+  });
 
   // ADMIN-EVENTS-EXPORT: отказ выгрузки возвращает сюда с ?eventsExport=.
   useEffect(() => {

@@ -111,8 +111,12 @@ export type AdminEventItem = {
 
 export type AdminEventsResponse = {
   items: AdminEventItem[];
-  /** Непрозрачный курсор `?before=` следующей страницы; `null` — старше нет. */
+  /** Непрозрачный курсор `?cursor=` следующей страницы; `null` — старше нет. */
   nextCursor: string | null;
+  /** Момент сервера до первого чтения (unix ms, UTC-tech): от него опрос
+   *  новых отсчитывает свой `since` по часам сервера, а не браузера
+   *  (ADMIN-EVENTS-SINCE-TRAIL, `events-poll-plan.ts`). */
+  asOfMs: number;
 };
 
 export type AdminHealthTone = "ok" | "warn" | "error" | "neutral";
