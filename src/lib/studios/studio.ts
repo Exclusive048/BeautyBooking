@@ -194,6 +194,19 @@ export async function updateStudioProviderProfile(
       // лёг бы рядом со СТАРЫМ городом студии (у прочих отказов город и пояс
       // намеренно не трогаются), и адрес с городом разъехались бы.
       throw new AppError(UI_TEXT.cities.addressOutsideRussia, 422, "ADDRESS_OUTSIDE_RUSSIA");
+    } else if (detection.reason === "geocoder_unavailable") {
+      // GEOCODER-UNAVAILABLE-503: то же расхождение, что у адреса вне России,
+      // только на временном сбое геокодера — НОВЫЙ адрес лёг бы рядом со старым
+      // городом и поясом. Поэтому 503 до записи. Редактор профиля студии шлёт
+      // адрес при КАЖДОМ сохранении, поэтому прежний адрес отказа не вызывает:
+      // город и пояс не трогаются, как раньше, а имя или описание сохраняются.
+      const current = await prisma.provider.findUnique({
+        where: { id: providerId },
+        select: { address: true },
+      });
+      if (input.address.trim() !== (current?.address ?? "").trim()) {
+        throw new AppError(UI_TEXT.cities.addressCheckUnavailable, 503, "SERVICE_UNAVAILABLE");
+      }
     }
   }
   const resolvedTimezone =

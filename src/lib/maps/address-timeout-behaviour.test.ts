@@ -38,7 +38,7 @@ import { createHangingFetch, type HangingFetchHandle } from "@/lib/testing/hangi
  *   2. то же в `src/app/api/address/geocode/route.ts` → 1 failed, тот же вид;
  *   3. снять `catch` вокруг `fetch` в `yandex-locality.ts` (пробросить наружу)
  *      → 1 failed: «geocodeWithLocality пробросил исключение вместо fail-soft
- *      null: TimeoutError: The operation was aborted due to timeout».
+ *      unavailable: TimeoutError: The operation was aborted due to timeout».
  */
 
 vi.mock("@/lib/env", () => ({
@@ -87,7 +87,7 @@ describe("FIX-B18 · RES-10 — зависший геокодер отпуска
       const [locality, routeResponse] = await Promise.all([
         geocodeWithLocality("Тверская, 1").catch((error: unknown) => {
           throw new Error(
-            `geocodeWithLocality пробросил исключение вместо fail-soft null: ${String(error)}`,
+            `geocodeWithLocality пробросил исключение вместо fail-soft unavailable: ${String(error)}`,
           );
         }),
         geocodeRoute(new Request("http://localhost/api/address/geocode?q=%D0%A2%D0%B2%D0%B5%D1%80%D1%81%D0%BA%D0%B0%D1%8F")),
@@ -107,7 +107,11 @@ describe("FIX-B18 · RES-10 — зависший геокодер отпуска
       ).toBeLessThan(DEADLINE_CEILING_MS);
 
       // 3. Сработала именно существующая fail-soft-ветка каждого сайта.
-      expect(locality, "yandex-locality вернул не null при недоступном геокодере").toBeNull();
+      // GEOCODER-UNAVAILABLE-503: срыв дедлайна — «недоступен», а не «не
+      // распознан» (иначе кабинет мастера обнулял бы город на сбое).
+      expect(locality, "yandex-locality вернул не unavailable при недоступном геокодере").toEqual({
+        kind: "unavailable",
+      });
       expect(routeResponse.status, "роут ответил не 502 при недоступном геокодере").toBe(502);
 
       const body = (await routeResponse.json()) as { ok: boolean; error: { message: string } };
