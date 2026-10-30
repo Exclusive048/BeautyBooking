@@ -40,34 +40,115 @@ export interface ApnsTransport {
   ): Promise<ApnsHttpResponse>;
 }
 
-export function createHttp2Transport(): ApnsTransport {
-  const sessions = new Map<string, http2.ClientHttp2Session>();
+/**
+ * APNS-SESSION-RESET (находка A-07, 2026-10-30): простой сессии дольше этого —
+ * перед повторным использованием она проверяется PING'ом.
+ */
+export const APNS_IDLE_PING_AFTER_MS = 60_000;
+/** Сколько ждать ответа на PING, прежде чем считать соединение мёртвым. */
+export const APNS_PING_TIMEOUT_MS = 3_000;
 
-  function getSession(origin: string): http2.ClientHttp2Session {
-    const existing = sessions.get(origin);
-    if (existing && !existing.closed && !existing.destroyed) return existing;
-    const session = http2.connect(origin);
-    const forget = () => {
-      if (sessions.get(origin) === session) sessions.delete(origin);
-    };
+export type Http2TransportDeps = {
+  connect?: (origin: string) => http2.ClientHttp2Session;
+  now?: () => number;
+  pingTimeoutMs?: number;
+};
+
+/**
+ * APNS-SESSION-RESET (находка A-07, 2026-10-30). Долгоживущее соединение к
+ * APNs может умереть МОЛЧА: NAT или фаервол облака выбрасывает простаивающее
+ * соединение без RST, пакеты просто теряются. Сессия при этом не `closed` и не
+ * `destroyed`, и прежний кэш отдавал её снова: каждый запрос ждал 10 с таймаута,
+ * закрывался только поток, а сессия оставалась в Map — все повторы
+ * `push.native.send` шли в то же мёртвое соединение, пока ядро через ~15 минут
+ * ретрансмиссий не объявит TCP мёртвым. Отсюда два правила:
+ *  · таймаут запроса или ошибка потока — соединение уничтожается и забывается,
+ *    следующий запрос открывает новое (другие потоки этой сессии тоже
+ *    оборвутся — для них это повтор, а не потеря);
+ *  · сессия, простоявшая дольше `APNS_IDLE_PING_AFTER_MS`, перед использованием
+ *    проверяется PING'ом; нет ответа за `APNS_PING_TIMEOUT_MS` — новое
+ *    соединение. Без этого первый push после ночи тратил бы 10 с таймаута и
+ *    попытку повтора на соединение, которого уже нет.
+ */
+export function createHttp2Transport(deps: Http2TransportDeps = {}): ApnsTransport {
+  const connect = deps.connect ?? ((origin: string) => http2.connect(origin));
+  const now = deps.now ?? Date.now;
+  const pingTimeoutMs = deps.pingTimeoutMs ?? APNS_PING_TIMEOUT_MS;
+  const sessions = new Map<string, { session: http2.ClientHttp2Session; lastUsedAt: number }>();
+
+  function forget(origin: string, session: http2.ClientHttp2Session) {
+    if (sessions.get(origin)?.session === session) sessions.delete(origin);
+  }
+
+  function drop(origin: string, session: http2.ClientHttp2Session) {
+    forget(origin, session);
+    if (!session.destroyed) session.destroy();
+  }
+
+  function open(origin: string): http2.ClientHttp2Session {
+    const session = connect(origin);
     // Ошибка сессии ляжет на поток (`req.on("error")`); здесь — только забыть её,
     // чтобы следующий запрос открыл новую.
-    session.on("error", forget);
-    session.on("goaway", forget);
-    session.on("close", forget);
+    session.on("error", () => forget(origin, session));
+    session.on("goaway", () => forget(origin, session));
+    session.on("close", () => forget(origin, session));
     // Простаивающая сессия не держит процесс при остановке воркера.
     session.unref();
-    sessions.set(origin, session);
+    sessions.set(origin, { session, lastUsedAt: now() });
     return session;
   }
 
+  function answersPing(session: http2.ClientHttp2Session): Promise<boolean> {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(false), pingTimeoutMs);
+      try {
+        const sent = session.ping((error) => {
+          clearTimeout(timer);
+          resolve(!error);
+        });
+        if (!sent) {
+          clearTimeout(timer);
+          resolve(false);
+        }
+      } catch {
+        clearTimeout(timer);
+        resolve(false);
+      }
+    });
+  }
+
+  async function getSession(origin: string): Promise<http2.ClientHttp2Session> {
+    const entry = sessions.get(origin);
+    if (entry && !entry.session.closed && !entry.session.destroyed) {
+      const idle = now() - entry.lastUsedAt >= APNS_IDLE_PING_AFTER_MS;
+      if (!idle || (await answersPing(entry.session))) {
+        entry.lastUsedAt = now();
+        return entry.session;
+      }
+      drop(origin, entry.session);
+    }
+    return open(origin);
+  }
+
   return {
-    post(origin, path, headers, body, timeoutMs) {
+    async post(origin, path, headers, body, timeoutMs) {
+      const session = await getSession(origin);
       return new Promise<ApnsHttpResponse>((resolve, reject) => {
+        let settled = false;
+        const fail = (error: Error) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          // Поток, не дождавшийся ответа, — признак мёртвого соединения:
+          // переиспользовать его значит отправить и повтор туда же.
+          drop(origin, session);
+          reject(error);
+        };
         let req: http2.ClientHttp2Stream;
         try {
-          req = getSession(origin).request({ ":method": "POST", ":path": path, ...headers });
+          req = session.request({ ":method": "POST", ":path": path, ...headers });
         } catch (error) {
+          drop(origin, session);
           reject(error instanceof Error ? error : new Error("APNS_CONNECT"));
           return;
         }
@@ -75,7 +156,7 @@ export function createHttp2Transport(): ApnsTransport {
         let data = "";
         const timer = setTimeout(() => {
           req.close(http2.constants.NGHTTP2_CANCEL);
-          reject(new Error("APNS_TIMEOUT"));
+          fail(new Error("APNS_TIMEOUT"));
         }, timeoutMs);
         req.setEncoding("utf8");
         req.on("response", (responseHeaders) => {
@@ -85,13 +166,17 @@ export function createHttp2Transport(): ApnsTransport {
           data += chunk;
         });
         req.on("end", () => {
+          if (settled) return;
+          settled = true;
           clearTimeout(timer);
+          const entry = sessions.get(origin);
+          if (entry?.session === session) entry.lastUsedAt = now();
           resolve({ status, body: data });
         });
-        req.on("error", (error) => {
-          clearTimeout(timer);
-          reject(error);
-        });
+        req.on("error", (error) => fail(error));
+        // Поток, закрытый без ответа (сессию уничтожил таймаут соседнего потока),
+        // не должен ждать своих 10 с.
+        req.on("close", () => fail(new Error("APNS_STREAM_CLOSED")));
         req.end(body);
       });
     },

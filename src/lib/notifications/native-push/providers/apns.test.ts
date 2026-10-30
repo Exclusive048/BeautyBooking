@@ -1,11 +1,15 @@
 import { generateKeyPairSync, verify } from "node:crypto";
-import { describe, expect, it, vi } from "vitest";
+import http2 from "node:http2";
+import type { AddressInfo } from "node:net";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  APNS_IDLE_PING_AFTER_MS,
   APNS_PRODUCTION_ORIGIN,
   APNS_SANDBOX_ORIGIN,
   buildApnsPayload,
   classifyApnsResponse,
   createApnsClient,
+  createHttp2Transport,
   type ApnsTransport,
 } from "@/lib/notifications/native-push/providers/apns";
 import type { NativePushOutgoing } from "@/lib/notifications/native-push/types";
@@ -156,6 +160,119 @@ describe("classifyApnsResponse", () => {
     [500, "not json", "retry"],
   ])("HTTP %s %s → %s", (status, body, outcome) => {
     expect(classifyApnsResponse(status, body).outcome).toBe(outcome);
+  });
+});
+
+/**
+ * APNS-SESSION-RESET (A-07) — настоящий HTTP/2 (h2c на 127.0.0.1), а не
+ * подменённый транспорт: проверяется, какое СОЕДИНЕНИЕ получит следующий запрос.
+ *
+ * @probe Убрал `drop(origin, session)` из `fail` — краснеет «зависший запрос…»:
+ * «expected false to be true» (сессия после таймаута жива и переиспользуется).
+ * Заменил проверку простоя на `const idle = false` — краснеют оба теста простоя:
+ * «expected [ …(1) ] to have a length of 2 but got 1» и «expected "vi.fn()" to
+ * be called 1 times, but got 0 times». Заменил на `const idle = true` — краснеет
+ * «простоявшая живая сессия…»: «expected "vi.fn()" to be called 1 times, but
+ * got 2 times».
+ */
+describe("APNS-SESSION-RESET — HTTP/2-транспорт", () => {
+  const cleanups: Array<() => Promise<void> | void> = [];
+
+  afterEach(async () => {
+    while (cleanups.length > 0) await cleanups.pop()!();
+  });
+
+  async function startServer(onStream: (stream: http2.ServerHttp2Stream, index: number) => void) {
+    const server = http2.createServer();
+    const serverSessions: http2.ServerHttp2Session[] = [];
+    let streams = 0;
+    server.on("session", (session) => {
+      session.on("error", () => {});
+      serverSessions.push(session);
+    });
+    server.on("stream", (stream) => {
+      stream.on("error", () => {});
+      onStream(stream, streams++);
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    cleanups.push(
+      () =>
+        new Promise<void>((resolve) => {
+          for (const session of serverSessions) session.destroy();
+          server.close(() => resolve());
+        }),
+    );
+    return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  }
+
+  function respondOk(stream: http2.ServerHttp2Stream) {
+    stream.respond({ ":status": 200 });
+    stream.end();
+  }
+
+  function trackedConnect(patch?: (session: http2.ClientHttp2Session, index: number) => void) {
+    const sessions: http2.ClientHttp2Session[] = [];
+    const connect = (origin: string) => {
+      const session = http2.connect(origin);
+      session.on("error", () => {});
+      patch?.(session, sessions.length);
+      sessions.push(session);
+      cleanups.push(() => session.destroy());
+      return session;
+    };
+    return { sessions, connect };
+  }
+
+  it("зависший запрос: соединение уничтожается, повтор идёт по новому", async () => {
+    const origin = await startServer((stream, index) => {
+      if (index > 0) respondOk(stream);
+      // первый запрос остаётся без ответа — «мёртвое» соединение
+    });
+    const { sessions, connect } = trackedConnect();
+    const transport = createHttp2Transport({ connect });
+
+    await expect(transport.post(origin, "/3/device/x", {}, "{}", 150)).rejects.toThrow("APNS_TIMEOUT");
+    expect(sessions[0]!.destroyed).toBe(true);
+
+    await expect(transport.post(origin, "/3/device/x", {}, "{}", 2_000)).resolves.toEqual({ status: 200, body: "" });
+    expect(sessions).toHaveLength(2);
+  });
+
+  it("простоявшая сессия без ответа на PING — новое соединение", async () => {
+    const origin = await startServer((stream) => respondOk(stream));
+    let clock = 1_000_000;
+    const { sessions, connect } = trackedConnect((session, index) => {
+      // Первое соединение «умерло молча»: PING уходит, ответа нет.
+      if (index === 0) session.ping = (() => true) as unknown as typeof session.ping;
+    });
+    const transport = createHttp2Transport({ connect, now: () => clock, pingTimeoutMs: 50 });
+
+    await transport.post(origin, "/3/device/x", {}, "{}", 2_000);
+    clock += APNS_IDLE_PING_AFTER_MS;
+    await expect(transport.post(origin, "/3/device/x", {}, "{}", 2_000)).resolves.toEqual({ status: 200, body: "" });
+
+    expect(sessions).toHaveLength(2);
+    expect(sessions[0]!.destroyed).toBe(true);
+  });
+
+  it("простоявшая живая сессия переиспользуется после PING, недавняя — без PING", async () => {
+    const origin = await startServer((stream) => respondOk(stream));
+    let clock = 1_000_000;
+    const pings: Array<ReturnType<typeof vi.fn>> = [];
+    const { sessions, connect } = trackedConnect((session) => {
+      const spy = vi.fn(session.ping.bind(session));
+      pings.push(spy);
+      session.ping = spy as unknown as typeof session.ping;
+    });
+    const transport = createHttp2Transport({ connect, now: () => clock });
+
+    await transport.post(origin, "/3/device/x", {}, "{}", 2_000);
+    clock += APNS_IDLE_PING_AFTER_MS;
+    await transport.post(origin, "/3/device/x", {}, "{}", 2_000);
+    await transport.post(origin, "/3/device/x", {}, "{}", 2_000);
+
+    expect(sessions).toHaveLength(1);
+    expect(pings[0]).toHaveBeenCalledTimes(1);
   });
 });
 
