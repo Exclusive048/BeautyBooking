@@ -7,11 +7,10 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { ensureCanReadMedia } from "@/lib/media/access";
 import { toCropArea } from "@/lib/media/crop-geometry";
-import { cropMaxSideForKind, renderCroppedImage } from "@/lib/media/crop-render";
+import { readCroppedMedia } from "@/lib/media/crop-delivery";
 import { MEDIA_PREVIEW_QUERY_PARAM, parseMediaPreviewWidth } from "@/lib/media/preview-variants";
 import { mediaAssetIdParamSchema } from "@/lib/media/schemas";
 import { isProviderMediaPubliclyVisible } from "@/lib/media/service";
-import { getStorageProvider } from "@/lib/media/storage";
 import {
   isStorageUnavailableError,
   storageUnavailableHeaders,
@@ -38,6 +37,8 @@ export const runtime = "nodejs";
  *
  * PORTFOLIO-CROP-01: тем же роутом показываются обрезанные работы портфолио
  * (мастера и студии) — потолок стороны у них свой (`cropMaxSideForKind`).
+ * MEDIA-RENDER-DEDUP: сам вырез — `readCroppedMedia` (дедупликация и общий
+ * предел sharp); в хранилище он не сохраняется, живёт в HTTP-кэше.
  */
 const PUBLIC_MEDIA_KINDS = new Set<MediaKind>([MediaKind.PORTFOLIO, MediaKind.AVATAR]);
 const PUBLIC_MEDIA_ENTITY_TYPES = new Set<MediaEntityType>([
@@ -45,14 +46,6 @@ const PUBLIC_MEDIA_ENTITY_TYPES = new Set<MediaEntityType>([
   MediaEntityType.STUDIO,
   MediaEntityType.SITE,
 ]);
-
-async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of stream) {
-    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : Buffer.from(chunk));
-  }
-  return Buffer.concat(chunks);
-}
 
 export async function GET(req: Request, ctx: RouteContext) {
   try {
@@ -88,7 +81,8 @@ export async function GET(req: Request, ctx: RouteContext) {
     const width = parseMediaPreviewWidth(new URL(req.url).searchParams.get(MEDIA_PREVIEW_QUERY_PARAM));
 
     const area = toCropArea(asset.cropX, asset.cropY, asset.cropWidth, asset.cropHeight);
-    if (!area || params.v !== cropVersionToken(asset)) {
+    const version = cropVersionToken(asset);
+    if (!area || params.v !== version) {
       // Области нет или она уже другая — ведём на то, что актуально сейчас
       // (с той же шириной: исходник её тоже понимает).
       const target = new URL(buildMediaDisplayUrl(asset), req.url);
@@ -108,16 +102,12 @@ export async function GET(req: Request, ctx: RouteContext) {
       await ensureCanReadMedia(user, asset.entityType, asset.entityId, asset.kind);
     }
 
-    const file = await getStorageProvider().getObject(asset.storageKey, asset.mimeType);
-    if (!file) {
+    // MEDIA-RENDER-DEDUP: одинаковые одновременные запросы режутся один раз,
+    // рендер — в общем на процесс пределе sharp (`lib/media/crop-delivery.ts`).
+    const cropped = await readCroppedMedia(asset, area, version, width);
+    if (!cropped) {
       return jsonFail(404, "Файл не найден.", "MEDIA_ASSET_NOT_FOUND");
     }
-    const cropped = await renderCroppedImage(
-      await streamToBuffer(file.stream),
-      area,
-      cropMaxSideForKind(asset.kind),
-      width ?? undefined,
-    );
 
     return new NextResponse(new Uint8Array(cropped), {
       status: 200,

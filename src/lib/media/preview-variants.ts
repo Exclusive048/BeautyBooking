@@ -3,6 +3,7 @@ import "server-only";
 import sharp from "sharp";
 import { Readable } from "stream";
 import { logError } from "@/lib/logging/logger";
+import { withMediaRenderSlot } from "@/lib/media/render-limit";
 import { getStorageProvider } from "@/lib/media/storage";
 import type { StorageProvider } from "@/lib/media/storage/types";
 import { prisma } from "@/lib/prisma";
@@ -34,13 +35,24 @@ import { prisma } from "@/lib/prisma";
  *
  * ## Кэш вариантов
  *
- * Обрезка (`crop/[v]`) режется на каждом запросе и живёт только в HTTP-кэше;
- * превью так нельзя — их на порядок больше (каждая плитка ленты). Поэтому
- * вариант пишется в то же хранилище рядом с оригиналом по детерминированному
- * ключу `<storageKey>.w<ширина>.webp` и генерируется один раз на пару (актив,
- * ширина). Ключ наследует случайную часть `storageKey` (uuid), то есть угадать
- * его не проще, чем ключ самого оригинала. Байты оригинала неизменны (новый
- * файл = новый актив), поэтому вариант не протухает.
+ * Вариант превью пишется в то же хранилище рядом с оригиналом по
+ * детерминированному ключу `<storageKey>.w<ширина>.webp` и генерируется один
+ * раз на пару (актив, ширина). Ключ наследует случайную часть `storageKey`
+ * (uuid), то есть угадать его не проще, чем ключ самого оригинала. Байты
+ * оригинала неизменны (новый файл = новый актив), поэтому вариант не протухает.
+ *
+ * Вырез (`crop/[v]`, `crop-delivery.ts`) с PORTFOLIO-CROP-01 тоже стоит на
+ * каждой обрезанной плитке ленты, но в хранилище пока НЕ пишется: его ключ
+ * обязан нести версию области, и при смене области прежний вариант осиротел
+ * бы (`MEDIA-CROP-VARIANT-STORE` в BACKLOG). Сейчас у него дедупликация
+ * одинаковых одновременных запросов и HTTP-кэш (`immutable` по версии).
+ *
+ * ## Предел рендеров (MEDIA-RENDER-DEDUP)
+ *
+ * Рендер превью и рендер выреза делят один предел на процесс
+ * (`withMediaRenderSlot`, `render-limit.ts`): sharp работает на пуле потоков
+ * libuv, и холодная лента не должна занимать его целиком. Чтение оригинала из
+ * хранилища — до слота.
  *
  * ## Удаление — вместе с оригиналом
  *
@@ -162,7 +174,7 @@ async function generatePreview(
 
   let preview: Buffer;
   try {
-    preview = await renderMediaPreview(source, width);
+    preview = await withMediaRenderSlot(() => renderMediaPreview(source, width));
   } catch (error) {
     // Неразбираемый исходник — отдаём его как есть: превью необязательно.
     logError("media.preview.render_failed", {
