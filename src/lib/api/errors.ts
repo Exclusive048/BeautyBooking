@@ -157,6 +157,10 @@ const ERROR_CODES = [
   "START_REQUIRED",
   "STEP_INVALID",
   "STUDIO_NOT_FOUND",
+  // STUDIO-INVITE-LIMITS (D-03): у студии предел неотвеченных приглашений.
+  // Отдельный код от `LIMIT_REACHED` (полная команда): там помогает тариф,
+  // здесь — отозвать приглашения, на которые не ответили.
+  "STUDIO_INVITES_PENDING_LIMIT",
   // STUDIO-HIDDEN-MASTER-SERVICES: скрытая студия новых записей не принимает.
   "STUDIO_NOT_ACCEPTING_BOOKINGS",
   "STUDIO_SELECTION_REQUIRED",

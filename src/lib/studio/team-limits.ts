@@ -77,6 +77,41 @@ export async function getStudioTeamCapacity(studioId: string): Promise<StudioTea
   return { max: cap, activeCount: await countActiveStudioMasters(providerId) };
 }
 
+/**
+ * STUDIO-INVITE-LIMITS (D-03, 2026-10-30) — потолок НЕОТВЕЧЕННЫХ приглашений
+ * студии. Ожидающее приглашение места в команде не занимает (BC-CAP), поэтому
+ * лимит команды их не ограничивал вовсе, а каждое тянет за собой заготовку
+ * мастера (`Provider` без владельца) и письмо.
+ *
+ * Потолок — вдвое больше мест тарифа (FREE 2 → 4, PRO 6 → 12, PREMIUM 20 → 40):
+ * студия может звать кандидатов с запасом на тех, кто не ответит. Но не меньше
+ * 10: у FREE четыре — это два места и по одному запасному, а приглашения не
+ * истекают сами, по телефону без SMS-шлюза доходят не до всех и висят, пока
+ * студия их не отзовёт. Команда без ограничения (`null`, назначает админ) — 100.
+ * Упёрлась студия — отзывает неотвеченные (`revokeStudioMasterInvite`), текст
+ * отказа говорит именно это.
+ */
+export const STUDIO_PENDING_INVITES_MIN = 10;
+export const STUDIO_PENDING_INVITES_PER_SEAT = 2;
+export const STUDIO_PENDING_INVITES_UNLIMITED_TEAM = 100;
+
+export function resolveStudioPendingInviteCap(teamCap: number | null): number {
+  if (teamCap === null) return STUDIO_PENDING_INVITES_UNLIMITED_TEAM;
+  return Math.max(STUDIO_PENDING_INVITES_MIN, teamCap * STUDIO_PENDING_INVITES_PER_SEAT);
+}
+
+/**
+ * Потолок неотвеченных приглашений студии по тарифу ВЛАДЕЛЬЦА (тот же, что у
+ * лимита команды).
+ *
+ * @param studioId `Studio.id`
+ * @throws 404 STUDIO_NOT_FOUND
+ */
+export async function getStudioPendingInviteCap(studioId: string): Promise<number> {
+  const { cap } = await resolveStudioTeamCapForStudio(studioId);
+  return resolveStudioPendingInviteCap(cap);
+}
+
 function countActiveStudioMasters(studioProviderId: string): Promise<number> {
   return prisma.provider.count({
     where: {

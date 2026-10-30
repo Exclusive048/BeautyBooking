@@ -8643,7 +8643,12 @@ export const openApiSpec = {
           "Ровно один контакт — `phone` или `email`. Уведомление (и письмо — для почты) уходит только для НОВОГО " +
           "приглашения; повторная отправка — `POST /api/cabinet/studio/masters/{id}/invite/resend`. Полная команда → " +
           "409 `LIMIT_REACHED` (`details: { limitKey: \"maxTeamMasters\", max, current }`), хотя ожидающие " +
-          "приглашения места не занимают; контакт уже принятого мастера → 409 `ALREADY_EXISTS`.",
+          "приглашения места не занимают; контакт уже принятого мастера → 409 `ALREADY_EXISTS`. Неотвеченных " +
+          "приглашений не больше двух на место тарифа (минимум 10, без ограничения команды — 100) → 409 " +
+          "`STUDIO_INVITES_PENDING_LIMIT` (`details: { max, current }`). Новых приглашений — не больше 20 в сутки на " +
+          "студию и 10 в час на аккаунт → 429 `RATE_LIMITED` (`Retry-After`, `details.retryAfterSeconds`); попытку " +
+          "тратит только созданное приглашение — отказ и повтор на тот же контакт её возвращают. Счётчик " +
+          "недоступен → 503 `RATE_LIMIT_UNAVAILABLE`.",
         tags: ["mobile", "studio", "masters"],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }],
         requestBody: {
@@ -8658,10 +8663,11 @@ export const openApiSpec = {
           "401": errorResponse("UNAUTHORIZED"),
           "403": errorResponse("FORBIDDEN"),
           "404": errorResponse("STUDIO_NOT_FOUND"),
-          "409": errorResponse("LIMIT_REACHED | ALREADY_EXISTS"),
+          "409": errorResponse("LIMIT_REACHED | ALREADY_EXISTS | STUDIO_INVITES_PENDING_LIMIT"),
           "422": errorResponse("FORBIDDEN_WORDS"),
           "429": errorResponse("RATE_LIMITED"),
           "500": errorResponse("INTERNAL_ERROR"),
+          "503": errorResponse("RATE_LIMIT_UNAVAILABLE"),
         },
       },
     },
@@ -10484,8 +10490,9 @@ export const openApiSpec = {
         summary: "Send a pending master invite again",
         description:
           "То же уведомление, что при приглашении (и письмо — для приглашения по почте). Лимит — 3 в час на " +
-          "мастера; отказы 404/409 попытку не тратят. 409 `MASTER_NOT_INVITED` — приглашение принято, отозвано " +
-          "или его нет.",
+          "мастера и, как у приглашений, 20 в сутки на студию и 10 в час на аккаунт (свой счётчик у повторов); " +
+          "отказы 404/409 попытку не тратят, сбой отправки её возвращает. 409 `MASTER_NOT_INVITED` — приглашение " +
+          "принято, отозвано или его нет.",
         tags: ["mobile", "studio", "masters"],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }],
         parameters: [

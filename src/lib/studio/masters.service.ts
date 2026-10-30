@@ -1,6 +1,6 @@
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
-import { ensureStudioTeamLimit } from "@/lib/studio/team-limits";
+import { ensureStudioTeamLimit, getStudioPendingInviteCap } from "@/lib/studio/team-limits";
 import { assertBelongsToStudio } from "@/lib/studio/tenancy";
 import { MembershipStatus, ProviderType } from "@prisma/client";
 import { isStudioMasterActive } from "@/lib/studio/master-eligibility";
@@ -126,8 +126,14 @@ export async function createStudioMaster(input: {
   const inviteKey = email
     ? { studioId_email: { studioId: studio.id, email } }
     : { studioId_phone: { studioId: studio.id, phone: phone as string } };
+  const pendingCap = await getStudioPendingInviteCap(studio.id);
 
   const created = await prisma.$transaction(async (tx) => {
+    // STUDIO-INVITE-LIMITS: приглашения одной студии создаются по очереди —
+    // иначе параллельные запросы прошли бы подсчёт неотвеченных вместе и
+    // перешагнули потолок. Блокировка транзакционная: снимается коммитом.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`studio-invites:${studio.id}`}))`;
+
     const existing = await tx.provider.findFirst({
       where: {
         type: ProviderType.MASTER,
@@ -144,6 +150,27 @@ export async function createStudioMaster(input: {
         409,
         "ALREADY_EXISTS",
       );
+    }
+
+    const existingInvite = await tx.studioInvite.findUnique({
+      where: inviteKey,
+      select: { id: true, status: true },
+    });
+    // Новое ожидающее приглашение: его не было, либо прежнее отклонили или
+    // отозвали. Повтор на уже ожидающий адрес — не новое (письма не будет).
+    const opensInvite = !existingInvite || existingInvite.status !== MembershipStatus.PENDING;
+    if (opensInvite) {
+      const pending = await tx.studioInvite.count({
+        where: { studioId: studio.id, status: MembershipStatus.PENDING },
+      });
+      if (pending >= pendingCap) {
+        throw new AppError(
+          "У студии слишком много неотвеченных приглашений. Отзовите те, на которые не ответили, — и пригласите снова.",
+          409,
+          "STUDIO_INVITES_PENDING_LIMIT",
+          { max: pendingCap, current: pending },
+        );
+      }
     }
 
     const master = existing
@@ -178,11 +205,6 @@ export async function createStudioMaster(input: {
           select: { id: true },
         });
 
-    const existingInvite = await tx.studioInvite.findUnique({
-      where: inviteKey,
-      select: { id: true, status: true },
-    });
-
     const invite = await tx.studioInvite.upsert({
       where: inviteKey,
       update: {
@@ -199,11 +221,7 @@ export async function createStudioMaster(input: {
       select: { id: true },
     });
 
-    return {
-      master,
-      inviteId: invite.id,
-      shouldNotifyInvite: !existingInvite || existingInvite.status !== MembershipStatus.PENDING,
-    };
+    return { master, inviteId: invite.id, shouldNotifyInvite: opensInvite };
   });
 
   return { id: created.master.id, inviteId: created.inviteId, shouldNotifyInvite: created.shouldNotifyInvite };

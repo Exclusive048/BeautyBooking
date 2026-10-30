@@ -4,7 +4,13 @@ import {
   isStudioMasterActive,
   STUDIO_ACTIVE_MASTER_WHERE,
 } from "@/lib/studio/master-eligibility";
-import { isStudioTeamAtCap, resolveStudioTeamCap } from "@/lib/studio/team-limits";
+import {
+  isStudioTeamAtCap,
+  resolveStudioPendingInviteCap,
+  resolveStudioTeamCap,
+  STUDIO_PENDING_INVITES_MIN,
+  STUDIO_PENDING_INVITES_UNLIMITED_TEAM,
+} from "@/lib/studio/team-limits";
 
 /**
  * BC-CAP — studio team-size cap. Pins the pure decision helpers + the
@@ -100,5 +106,24 @@ describe("BC-CAP — ACTIVE-only counting basis", () => {
       ownerUserId: { not: null },
       studioPaused: false,
     });
+  });
+});
+
+describe("STUDIO-INVITE-LIMITS — resolveStudioPendingInviteCap (pending invites per studio)", () => {
+  it("allows twice the team seats, but never fewer than the minimum", () => {
+    expect(resolveStudioPendingInviteCap(STUDIO_TEAM_CAP_BY_TIER.FREE)).toBe(STUDIO_PENDING_INVITES_MIN);
+    expect(resolveStudioPendingInviteCap(STUDIO_TEAM_CAP_BY_TIER.PRO)).toBe(12);
+    expect(resolveStudioPendingInviteCap(STUDIO_TEAM_CAP_BY_TIER.PREMIUM)).toBe(40);
+    expect(resolveStudioPendingInviteCap(0)).toBe(STUDIO_PENDING_INVITES_MIN);
+  });
+
+  it("keeps a finite ceiling for an unlimited team", () => {
+    expect(resolveStudioPendingInviteCap(null)).toBe(STUDIO_PENDING_INVITES_UNLIMITED_TEAM);
+  });
+
+  it("is never below the team cap itself (a full team can always be invited)", () => {
+    for (const cap of [1, 2, 6, 20, 50]) {
+      expect(resolveStudioPendingInviteCap(cap)).toBeGreaterThanOrEqual(cap);
+    }
   });
 });

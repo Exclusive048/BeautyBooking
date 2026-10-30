@@ -11,6 +11,7 @@ import { checkRateLimit, refundRateLimit, type RateLimitConfig } from "@/lib/rat
 import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { requireStudioCabinetAdmin } from "@/lib/studio/cabinet-access";
 import { findPendingStudioMasterInvite } from "@/lib/studio/masters.service";
+import { takeStudioInviteSendBudget } from "@/lib/studio/invite-send-limit";
 
 export const runtime = "nodejs";
 
@@ -33,7 +34,9 @@ const INVITE_RESEND_LIMIT: RateLimitConfig = { windowSeconds: 60 * 60, maxReques
  * отправке. `id` — `Provider.id` заготовки мастера в студии; студия — из сессии.
  *
  * Отказы (404 / 409 `MASTER_NOT_INVITED`) проверяются ДО лимита частоты и
- * попытку не тратят; сбой отправки (500) попытку возвращает.
+ * попытку не тратят; сбой отправки (500) попытку возвращает. Кроме трёх
+ * повторов в час на мастера повтор тратит бюджет писем студии и аккаунта
+ * (STUDIO-INVITE-LIMITS, `lib/studio/invite-send-limit.ts`).
  */
 export async function POST(req: Request, ctx: RouteContext) {
   try {
@@ -67,12 +70,25 @@ export async function POST(req: Request, ctx: RouteContext) {
       );
     }
 
+    // STUDIO-INVITE-LIMITS (D-03): повтор — такое же письмо, поэтому он тратит
+    // и общий бюджет студии и аккаунта (`invite-send-limit.ts`), а не только
+    // три повтора в час на мастера: иначе 3 × 24 письма в сутки на каждое
+    // неотвеченное приглашение.
+    const budget = await takeStudioInviteSendBudget(req, { studioId: access.studioId, userId: user.id });
+    if (!budget.ok) {
+      await refundRateLimit(rateKey);
+      const { refusal } = budget;
+      if (refusal.status === 503) return fail(refusal.message, 503, refusal.code);
+      return tooManyRequests(refusal.retryAfterSeconds, refusal.message, refusal.code);
+    }
+
     try {
       const invite = await loadInviteWithRelations(pending.inviteId);
       if (!invite) throw new Error("invite disappeared before resend");
       await notifyStudioInviteReceived(invite);
     } catch (error) {
       await refundRateLimit(rateKey);
+      await budget.refund();
       throw error;
     }
 
