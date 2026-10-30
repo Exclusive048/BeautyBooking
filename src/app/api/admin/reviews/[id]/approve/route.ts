@@ -14,10 +14,10 @@ type RouteContext = { params: Promise<{ id: string }> };
 /**
  * Dismiss a report on a review (clears `reportedAt` / `reportReason` /
  * `reportComment` so the review returns to its public state).
- * Same effect as the legacy `PATCH /api/admin/reviews/[id]` with
- * `{action: "dismiss_report"}` body, but exposed as a dedicated
- * verb-named route and with `logInfo` audit until a proper admin
- * audit table lands (BACKLOG 🟠).
+ * Replaces the legacy `PATCH /api/admin/reviews/[id]` with
+ * `{action: "dismiss_report"}` body (retired → 410, ADMIN-AUDIT-COVERAGE);
+ * `approveReview` writes the `REVIEW_APPROVED` audit row in the same
+ * transaction as the update (inv. #18).
  */
 export async function POST(req: Request, ctx: RouteContext) {
   const auth = await requireAdminAuth();
