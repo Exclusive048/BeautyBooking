@@ -19,6 +19,8 @@ import {
   checkOtpVerifyLock,
   clearOtpEmailVerifyFailures,
   clearOtpVerifyFailures,
+  isAppReviewLoginOpen,
+  registerAppReviewLoginFailure,
   registerOtpEmailVerifyFailure,
   registerOtpVerifyFailure,
 } from "@/lib/auth/otp-rate-limit";
@@ -259,9 +261,17 @@ export async function verifyEmailOtpLogin(req: Request, options: OtpLoginOptions
   // подходит только постоянный код из env (сравнение за постоянное время),
   // кодов в базе у этого адреса нет (запрос их не создаёт). Блокировка выше и
   // счётчик неверных попыток ниже — те же, что у всех.
+  //
+  // APP-REVIEW-LOGIN-CAP: у постоянного кода нет одноразовости и срока, на
+  // которых держится блокировка (почта, IP), поэтому у адреса есть ещё потолок
+  // неверных кодов с любого IP (`otp-rate-limit.ts`). Выбран — режим закрыт:
+  // код не сравнивается вовсе, а отказ идёт той же веткой, что неверный код.
   const appReview = isAppReviewLoginEmail(normalizedEmail);
-  const appReviewCodeOk = appReview && matchesAppReviewLoginCode(normalizedEmail, code);
-  if (appReview) logAppReviewLogin("verify", appReviewCodeOk ? "accepted" : "rejected");
+  const appReviewOpen = appReview && (await isAppReviewLoginOpen(normalizedEmail));
+  const appReviewCodeOk = appReviewOpen && matchesAppReviewLoginCode(normalizedEmail, code);
+  if (appReview) {
+    logAppReviewLogin("verify", appReviewCodeOk ? "accepted" : appReviewOpen ? "rejected" : "locked");
+  }
 
   const otp = appReview
     ? null
@@ -277,6 +287,7 @@ export async function verifyEmailOtpLogin(req: Request, options: OtpLoginOptions
       });
 
   if (!otp && !appReviewCodeOk) {
+    if (appReview) await registerAppReviewLoginFailure(normalizedEmail);
     const failResult = await registerOtpEmailVerifyFailure(normalizedEmail, clientIp);
     if (!failResult.ok) {
       void recordSurfaceEvent({ surface: "auth", outcome: "failure", operation: "otp-email-verify", code: failResult.error ?? "OTP_VERIFY_LOCKED" });

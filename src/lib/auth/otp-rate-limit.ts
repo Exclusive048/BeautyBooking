@@ -1,6 +1,7 @@
 import { AppError } from "@/lib/api/errors";
 import {
   hashOtpKeyPart,
+  otpAppReviewFailKey,
   otpRequestIdentityIpKey,
   otpRequestIdentityKey,
   otpRequestIpKey,
@@ -8,7 +9,8 @@ import {
   otpVerifyLockKey,
 } from "@/lib/auth/otp-rate-limit-keys";
 import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
-import { logError } from "@/lib/logging/logger";
+import { logError, logInfo } from "@/lib/logging/logger";
+import { sendTelegramAlert } from "@/lib/monitoring/alerts";
 import { alertOtpRateLimitTriggered } from "@/lib/monitoring/api-alerts";
 
 const OTP_REQUEST_IP_LIMIT = 5;
@@ -408,6 +410,97 @@ export async function clearOtpEmailVerifyFailures(email: string, ip: string | nu
     ]);
   } catch (error) {
     logError("OTP email verify lock cleanup failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+// ── App Review: потолок неверных кодов с любого IP ────────────────────────────
+
+/**
+ * APP-REVIEW-LOGIN-CAP — второй счётчик для адреса App Review, по адресу и с
+ * ЛЮБОГО IP.
+ *
+ * Обоснование ключа (почта, IP) выше (O2) держится на трёх свойствах обычного
+ * кода: он одноразовый, живёт 5 минут, а его выпуск ограничен. У постоянного
+ * кода App Review (`APP_REVIEW_LOGIN_CODE`, 6 цифр) нет ни одного: он не
+ * истекает, не сгорает при входе и не выпускается — запрос его не создаёт.
+ * Блокировка (почта, IP) оставляет распределённому перебору по 5 попыток на
+ * каждый IP за 15 минут, и из 10^6 вариантов ботнет или аренда IPv6-подсети
+ * находит код за часы–дни (C-03).
+ *
+ * Поэтому у этого адреса есть потолок: 20 неверных кодов за окно 24 ч от первой
+ * неудачи. На двадцатой режим App Review закрывается: код не принимается, даже
+ * верный, до конца окна. Перебор дорожает до ~25 000 суток на половину
+ * вариантов. Блокировка (почта, IP) продолжает работать как раньше.
+ *
+ * Снимается сам, по окну, а не вручную: ревьюер, попавший под чужой перебор,
+ * ждёт не дольше суток, а не того дня, когда кто-то вспомнит про ключ в Redis.
+ * Открыть раньше — сменить `APP_REVIEW_LOGIN_EMAIL` (счётчик ключуется адресом)
+ * либо удалить ключ `otpAppReviewFailKey`.
+ *
+ * 🔴 Осознанный размен: третье лицо, знающее служебный адрес, может двадцатью
+ * неверными кодами в сутки держать вход ревьюера закрытым — в том числе на
+ * время ревью. Это дешевле, чем отдать аккаунт ревьюера перебору. Закрытие
+ * видно сразу (Telegram-алерт со своим ключом), реакция — сменить адрес и код.
+ *
+ * Отказ неотличим от неверного кода: закрытый режим код не сравнивает вовсе,
+ * поэтому нет и разницы по времени, а ответ идёт той же веткой — счётчик
+ * (почта, IP) и 401 `CODE_NOT_FOUND` (`verifyEmailOtpLogin`). Redis недоступен
+ * — режим закрыт: не смогли посчитать — не пускаем, как весь модуль.
+ *
+ * Гонка: проверка и инкремент — разные команды, поэтому запросы, уже бывшие в
+ * полёте в момент двадцатой неудачи, сравнят код ещё раз. Добор ограничен
+ * числом одновременных запросов и блокировкой (почта, IP).
+ */
+const APP_REVIEW_FAIL_LIMIT = 20;
+const APP_REVIEW_FAIL_WINDOW_SECONDS = 24 * 60 * 60;
+const APP_REVIEW_LOCKED_ALERT_KEY = "auth:app-review-login:locked";
+const APP_REVIEW_LOCKED_ALERT_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+
+/** Принимает ли сейчас режим App Review код. Любой сбой Redis — нет. */
+export async function isAppReviewLoginOpen(email: string): Promise<boolean> {
+  const client = await getRedisConnection();
+  if (!client) return false;
+
+  try {
+    const raw = await withRedisCommandTimeout("otp:get", client.get(otpAppReviewFailKey(email)));
+    const failures = raw === null ? 0 : Number(raw);
+    // Нечитаемое значение — тоже «закрыто»: доказать, что потолок не выбран, нечем.
+    return Number.isFinite(failures) && failures < APP_REVIEW_FAIL_LIMIT;
+  } catch (error) {
+    logError("App Review login gate check failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
+}
+
+/**
+ * Неверный код для адреса App Review (в том числе при закрытом режиме).
+ * Сбой записи не роняет ответ: следом идёт счётчик (почта, IP), который при
+ * недоступном Redis сам отказывает, а проверка выше закрыта при любом сбое.
+ */
+export async function registerAppReviewLoginFailure(email: string): Promise<void> {
+  const client = await getRedisConnection();
+  if (!client) return;
+
+  try {
+    const failures = await incrWithWindow(otpAppReviewFailKey(email), APP_REVIEW_FAIL_WINDOW_SECONDS);
+    // Ровно на пороге: дальнейшие неудачи окна алерт не повторяют, а новое окно
+    // с новым перебором повторит. В тексте нет ни адреса, ни кода, ни IP.
+    if (failures === APP_REVIEW_FAIL_LIMIT) {
+      logInfo("auth.app-review-login.locked", { failures, windowHours: APP_REVIEW_FAIL_WINDOW_SECONDS / 3600 });
+      void sendTelegramAlert(
+        `Вход App Review закрыт: ${failures} неверных кодов за сутки с любых адресов. ` +
+          "Код не принимается до конца суточного окна. Если это не проверяющий магазина, " +
+          "код подбирают: смените APP_REVIEW_LOGIN_CODE и APP_REVIEW_LOGIN_EMAIL.",
+        APP_REVIEW_LOCKED_ALERT_KEY,
+        APP_REVIEW_LOCKED_ALERT_COOLDOWN_MS,
+      );
+    }
+  } catch (error) {
+    logError("App Review login failure count failed", {
       error: error instanceof Error ? error.message : String(error),
     });
   }
