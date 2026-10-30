@@ -14,7 +14,8 @@
  *     get key-based redaction — a key whose name implies user data or auth
  *     material loses its value regardless of content.
  *  3. Every surviving string then goes through value-level patterns (phones,
- *     emails, JWTs, `Bearer`, cookie pairs, `secret=…`, URL query strings) plus
+ *     emails, JWTs and the app's own two-part signed tokens, `Bearer`, cookie
+ *     pairs, `secret=…`, URL query strings) plus
  *     an optional literal-secret redactor the server wires up from `env.ts`.
  *
  * 🚩 OTP codes: this stage deliberately logs them in plaintext (CLAUDE.md rule
@@ -189,6 +190,24 @@ const INTL_PHONE_RE = /(^|[^\d\w+])(\+\d{10,15})(?!\d)/g;
 const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 /** Anchored on `ey` (base64url of `{"`) so `module.some.path` is not eaten. */
 const JWT_RE = /\bey[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g;
+/**
+ * SCRUB-SIGNED-TOKENS (D-04) — the project's own two-part signed tokens:
+ * `base64url(JSON payload)` + `.` + `base64url(HMAC-SHA256)` (43 chars). Same
+ * `ey` anchor as a JWT, one segment fewer, so `JWT_RE` never matched them. They
+ * are BEARER credentials and several ride in the URL PATH, which
+ * `stripUrlSecrets` keeps on purpose: the guest "manage booking" link
+ * `/booking/manage/<token>` and `/api/public/bookings/manage/<token>/…`
+ * (cancel, reschedule, review for 120 days) and the chat attachment
+ * `/api/chat/attachment/<token>`. Others ride in queries or bodies — `?mt=`
+ * private media, the studio master-view and master client-key tokens, the
+ * mobile OAuth flow cookie. A value pattern rather than a route list: it covers
+ * absolute URLs, relative breadcrumb paths, `transaction` and exception text
+ * alike, and a new token built the same way is masked without anyone
+ * remembering to register its route. The signature segment must be ≥20 chars,
+ * so a dotted `eyebrows.ts`-style word pair is never eaten. Runs AFTER
+ * `JWT_RE`: a three-part JWT must vanish whole, not leave a segment behind.
+ */
+const SIGNED_TOKEN_RE = /\bey[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{20,}/g;
 const AUTH_SCHEME_RE = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi;
 /** Session/OAuth cookies by name, wherever a raw Cookie header leaks into text. */
 const COOKIE_PAIR_RE =
@@ -240,6 +259,7 @@ export function scrubString(input: string, redactLiterals?: LiteralRedactor): st
   out = out.replace(COOKIE_PAIR_RE, (_m, name: string) => `${name}=${REDACTED}`);
   out = out.replace(AUTH_SCHEME_RE, (_m, scheme: string) => `${scheme} ${REDACTED}`);
   out = out.replace(JWT_RE, REDACTED);
+  out = out.replace(SIGNED_TOKEN_RE, REDACTED);
   out = out.replace(SENSITIVE_KV_RE, (match, key: string, sep: string, value: string) =>
     // Preserve `code=BOOKING_CONFLICT` — an error code is not a secret and is
     // the single most useful token when triaging.
