@@ -10579,10 +10579,14 @@ export const openApiSpec = {
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/StudioScheduleRequestDecisionData" }),
-          "400": errorResponse("VALIDATION_ERROR — «Запрос уже обработан.» | SCHEDULE_PATTERN_INVALID"),
+          "400": errorResponse("SCHEDULE_PATTERN_INVALID"),
           "401": errorResponse("UNAUTHORIZED"),
           "403": errorResponse("FORBIDDEN"),
           "404": errorResponse("NOT_FOUND"),
+          "409": errorResponse(
+            "CONFLICT — «Заявка уже обработана. Обновите страницу.» (SCHEDULE-REQUEST-ATOMIC: статус " +
+              "перепроверяется под блокировкой строки заявки; расписание применяется не больше одного раза)",
+          ),
           "422": errorResponse("INVALID_REQUEST_PAYLOAD"),
           "429": errorResponse("RATE_LIMITED"),
           "500": errorResponse("INTERNAL_ERROR"),
@@ -10619,11 +10623,15 @@ export const openApiSpec = {
           "200": okResponse({ $ref: "#/components/schemas/StudioScheduleRequestDecisionData" }),
           "400": errorResponse(
             "VALIDATION_ERROR — «Комментарий обязателен.» | «Комментарий — не длиннее 500 символов.» " +
-              "(оба с `error.fieldErrors.comment`) | «Запрос уже обработан.»",
+              "(оба с `error.fieldErrors.comment`)",
           ),
           "401": errorResponse("UNAUTHORIZED"),
           "403": errorResponse("FORBIDDEN"),
           "404": errorResponse("NOT_FOUND"),
+          "409": errorResponse(
+            "CONFLICT — «Заявка уже обработана. Обновите страницу.» (SCHEDULE-REQUEST-ATOMIC: статус " +
+              "меняется только у открытой заявки — одобренную другим администратором не перезаписывает)",
+          ),
           "429": errorResponse("RATE_LIMITED"),
           "500": errorResponse("INTERNAL_ERROR"),
         },

@@ -8,8 +8,9 @@ import {
  * STUDIO-APPROVE-400-FIX-A — pinning the approve endpoint's payload
  * detection.
  *
- * Approve fan-outs by `payloadJson` shape: `CHANGES_V1` (накопительная
- * заявка) → `applyScheduleChangesRequest`, `PATTERN_V1` → график,
+ * Approve fan-outs by `payloadJson` shape (`approveScheduleChangeRequest`,
+ * one transaction since SCHEDULE-REQUEST-ATOMIC): `CHANGES_V1` (накопительная
+ * заявка) and `PATTERN_V1` → `applyScheduleChangesRequestTx`,
  * `isScheduleEditorRequestPayload(payload) === true` → EDITOR_V1 snapshot;
  * anything else is refused (422 — «отправьте заявку заново»; the legacy
  * `{ templates, weekly, overrides }` applier was removed with

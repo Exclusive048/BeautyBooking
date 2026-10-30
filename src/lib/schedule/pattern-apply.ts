@@ -157,23 +157,16 @@ export async function applySchedulePattern(
 }
 
 /**
- * SCHEDULE-PATTERNS-01 (этап 4) — одобрение заявки мастера в формате графика.
- * Заявка могла пролежать: дата начала в прошлом сдвигается на сегодня (прошлое
- * не переписывается никогда), а график, который кончился до сегодня, применять
- * нечем — 422 с просьбой отправить заявку заново. Проверка тела — той же
- * схемой, что у окна.
+ * SCHEDULE-PATTERNS-01 (этап 4) — тело заявки мастера в формате графика →
+ * запрос графика на сегодня (чистая часть одобрения). Заявка могла пролежать:
+ * дата начала в прошлом сдвигается на сегодня (прошлое не переписывается
+ * никогда), а график, который кончился до сегодня, применять нечем — 422 с
+ * просьбой отправить заявку заново. Проверка тела — той же схемой, что у окна.
+ *
+ * График по заявке записывает одобрение (`approveScheduleChangeRequest`,
+ * `change-requests.ts`) через `applyPatternRequestTx` — в той же транзакции,
+ * что блокирует строку заявки и меняет её статус (SCHEDULE-REQUEST-ATOMIC).
  */
-export async function approvePatternChangeRequest(
-  providerId: string,
-  rawRequest: unknown,
-  now = new Date(),
-): Promise<{ conflicts: PatternConflict[] }> {
-  const timezone = await loadTimezone(providerId);
-  const request = patternRequestForApproval(rawRequest, toLocalDateKey(now, timezone));
-  return applySchedulePattern(providerId, request, now);
-}
-
-/** Тело заявки → запрос графика на сегодня (чистая часть одобрения). */
 export function patternRequestForApproval(rawRequest: unknown, todayKey: string): PatternRequest {
   const parsed = patternRequestSchema.safeParse(rawRequest);
   if (!parsed.success) {
