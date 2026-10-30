@@ -110,6 +110,8 @@ export async function PATCH(req: Request, ctx: RouteContext) {
           : null;
     const updated = await upsertClientCard({
       providerId: studio.providerId,
+      // CRM-PHANTOM-CARDS (Y22): карточка — только клиенту, записанному в студию.
+      bookingWhere: studioBookingsWhere(studio.id),
       clientKey: params.clientKey,
       notes,
       tags: body.tags,

@@ -6,7 +6,8 @@ import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { ensureClientCardAccess } from "@/lib/crm/guards";
 import { ensureClientCard } from "@/lib/crm/card-service";
 import { getRequestId, logError } from "@/lib/logging/logger";
-import { getCurrentMasterProviderId } from "@/lib/master/access";
+import { getCurrentMasterProviderId, getMasterWorkProfiles } from "@/lib/master/access";
+import { masterClientBookingsScope } from "@/lib/master/clients-view.service";
 import { prisma } from "@/lib/prisma";
 import { uploadMediaAsset } from "@/lib/media/service";
 import { readValidatedImageUpload } from "@/lib/media/validate-image-upload";
@@ -33,7 +34,14 @@ export async function POST(req: Request, ctx: RouteContext) {
     const plan = await getCurrentPlan(user.id, SubscriptionScope.MASTER);
     ensureClientCardAccess(plan.features);
 
-    const card = await ensureClientCard({ providerId, clientKey: params.clientKey });
+    // CRM-PHANTOM-CARDS (Y22): новая карточка — только клиенту мастера, иначе
+    // лимит «3 фото на карточку» обходился бы новыми ключами.
+    const workProfiles = await getMasterWorkProfiles(user.id);
+    const card = await ensureClientCard({
+      providerId,
+      bookingWhere: masterClientBookingsScope(workProfiles.allIds),
+      clientKey: params.clientKey,
+    });
     const existingCount = await prisma.clientCardPhoto.count({ where: { cardId: card.id } });
     if (existingCount >= PHOTO_LIMIT) {
       return jsonFail(409, "Больше фото в карточку не поместится. Удалите старое.", "PHOTO_LIMIT_REACHED", { limit: PHOTO_LIMIT });

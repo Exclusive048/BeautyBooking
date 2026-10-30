@@ -1659,7 +1659,9 @@ const STUDIO_CATALOG_PATHS: Record<string, PathItemObject> = {
         "400": errorResponse("VALIDATION_ERROR / CLIENT_KEY_INVALID"),
         "401": errorResponse("UNAUTHORIZED"),
         "403": errorResponse("FORBIDDEN / FEATURE_GATE"),
-        "404": errorResponse("STUDIO_NOT_FOUND"),
+        "404": errorResponse(
+          "STUDIO_NOT_FOUND / NOT_FOUND «Клиент не найден.» — карточки ещё нет, а записей этого клиента в студии нет (CRM-PHANTOM-CARDS)",
+        ),
         "429": errorResponse("RATE_LIMITED"),
         "500": errorResponse("INTERNAL_ERROR"),
       },
@@ -1702,6 +1704,9 @@ const STUDIO_CATALOG_PATHS: Record<string, PathItemObject> = {
         "400": errorResponse("MEDIA_FILE_REQUIRED / CLIENT_KEY_INVALID"),
         "401": errorResponse("UNAUTHORIZED"),
         "403": errorResponse("FORBIDDEN / FEATURE_GATE"),
+        "404": errorResponse(
+          "STUDIO_NOT_FOUND / NOT_FOUND «Клиент не найден.» — карточки ещё нет, а записей этого клиента в студии нет (CRM-PHANTOM-CARDS)",
+        ),
         "409": errorResponse("PHOTO_LIMIT_REACHED"),
         "429": errorResponse("RATE_LIMITED"),
         "500": errorResponse("INTERNAL_ERROR"),

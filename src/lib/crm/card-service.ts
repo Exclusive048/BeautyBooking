@@ -1,6 +1,7 @@
 import type { BookingStatus, Prisma } from "@prisma/client";
+import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
-import { calculateDaysSinceLastVisit } from "@/lib/crm/clients";
+import { calculateDaysSinceLastVisit, resolveBookingClientKey } from "@/lib/crm/clients";
 import {
   buildPhoneVariants,
   parseClientKeyOrThrow,
@@ -156,8 +157,60 @@ export async function getClientCardData(input: {
   };
 }
 
+/**
+ * CRM-PHANTOM-CARDS (Y22): карточку клиента можно завести только тому, кто
+ * действительно записывался в этот кабинет.
+ *
+ * Ключ клиента (`user:<id>` / `phone:<номер>`) присылает сам вызывающий, и
+ * раньше `upsertClientCard` / `ensureClientCard` создавали карточку для любого
+ * ключа — мусор в CRM (152-ФЗ: заметки и фото о человеке, которого у кабинета
+ * нет) и обход лимита «3 фото на карточку»: новая карточка — ещё три фото.
+ *
+ * Правило ключа — то же, что строит список клиентов (`resolveBookingClientKey`
+ * в `crm/clients.ts`): бронь с аккаунтом — `user:<id>`, без аккаунта —
+ * нормализованный телефон (снимок важнее текущего). Предфильтр по вариантам
+ * номера — как у истории карточки (`getClientCardData`); точное совпадение
+ * проверяет сам `resolveBookingClientKey`, поэтому номер, который принадлежит
+ * брони с аккаунтом, ключом `phone:` карточку не заводит — в списке такой
+ * клиент виден как `user:`.
+ *
+ * Окна CRM здесь нет, как и у панели клиента: давний клиент — тоже клиент.
+ * Статус брони не важен — нужен факт, что человек записывался.
+ * `bookingWhere` — скоуп кабинета: мастер — все его рабочие профили
+ * (`masterClientBookingsScope`), студия — `studioBookingsWhere`.
+ */
+const CLIENT_BOOKING_PROBE_LIMIT = 20;
+
+export async function assertClientBookedInScope(input: {
+  bookingWhere: Prisma.BookingWhereInput;
+  clientKey: string;
+}): Promise<void> {
+  const parsed = parseClientKeyOrThrow(input.clientKey);
+  const clientFilter: Prisma.BookingWhereInput =
+    parsed.type === "user"
+      ? { clientUserId: parsed.value }
+      : {
+          clientUserId: null,
+          OR: [
+            { clientPhone: { in: buildPhoneVariants(parsed.value) } },
+            { clientPhoneSnapshot: { in: buildPhoneVariants(parsed.value) } },
+          ],
+        };
+
+  const candidates = await prisma.booking.findMany({
+    where: { AND: [input.bookingWhere, clientFilter] },
+    select: { clientUserId: true, clientPhone: true, clientPhoneSnapshot: true },
+    take: CLIENT_BOOKING_PROBE_LIMIT,
+  });
+  if (!candidates.some((booking) => resolveBookingClientKey(booking) === parsed.key)) {
+    throw new AppError("Клиент не найден.", 404, "NOT_FOUND");
+  }
+}
+
 export async function upsertClientCard(input: {
   providerId: string;
+  /** Скоуп записей кабинета — без брони клиента карточка не создаётся (Y22). */
+  bookingWhere: Prisma.BookingWhereInput;
   clientKey: string;
   notes?: string | null;
   tags?: string[];
@@ -185,6 +238,7 @@ export async function upsertClientCard(input: {
     });
   }
 
+  await assertClientBookedInScope({ bookingWhere: input.bookingWhere, clientKey: input.clientKey });
   return prisma.clientCard.create({
     data: {
       providerId: input.providerId,
@@ -197,7 +251,12 @@ export async function upsertClientCard(input: {
   });
 }
 
-export async function ensureClientCard(input: { providerId: string; clientKey: string }) {
+export async function ensureClientCard(input: {
+  providerId: string;
+  /** Скоуп записей кабинета — без брони клиента карточка не создаётся (Y22). */
+  bookingWhere: Prisma.BookingWhereInput;
+  clientKey: string;
+}) {
   const { identity } = parseClientKeyIdentity(input.clientKey);
   const existing = await prisma.clientCard.findFirst({
     where: {
@@ -206,6 +265,7 @@ export async function ensureClientCard(input: { providerId: string; clientKey: s
     },
   });
   if (existing) return existing;
+  await assertClientBookedInScope({ bookingWhere: input.bookingWhere, clientKey: input.clientKey });
   return prisma.clientCard.create({
     data: {
       providerId: input.providerId,

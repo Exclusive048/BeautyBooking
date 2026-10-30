@@ -9,6 +9,7 @@ import { ensureClientCard } from "@/lib/crm/card-service";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
 import { ensureStudioRole } from "@/lib/studio/access";
+import { studioBookingsWhere } from "@/lib/studio/booking-scope";
 import { parseQuery } from "@/lib/validation";
 import { uploadMediaAsset } from "@/lib/media/service";
 import { readValidatedImageUpload } from "@/lib/media/validate-image-upload";
@@ -51,7 +52,13 @@ export async function POST(req: Request, ctx: RouteContext) {
     });
     if (!studio) return jsonFail(404, "Студия не найдена", "STUDIO_NOT_FOUND");
 
-    const card = await ensureClientCard({ providerId: studio.providerId, clientKey: params.clientKey });
+    // CRM-PHANTOM-CARDS (Y22): новая карточка — только клиенту студии, иначе
+    // лимит «3 фото на карточку» обходился бы новыми ключами.
+    const card = await ensureClientCard({
+      providerId: studio.providerId,
+      bookingWhere: studioBookingsWhere(studio.id),
+      clientKey: params.clientKey,
+    });
     const existingCount = await prisma.clientCardPhoto.count({ where: { cardId: card.id } });
     if (existingCount >= PHOTO_LIMIT) {
       return jsonFail(409, "Больше фото в карточку не поместится. Удалите старое.", "PHOTO_LIMIT_REACHED", { limit: PHOTO_LIMIT });
