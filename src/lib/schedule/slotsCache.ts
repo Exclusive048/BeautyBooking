@@ -25,8 +25,11 @@ const SLOTS_INDEX_TTL_SECONDS = SLOTS_TTL_SECONDS;
  * эпохи) тоже вход результата: выдача с ними — своя запись кэша, суффиксом. Без
  * них ключ прежний, поэтому общая выдача дня делит кэш как раньше.
  *
- * SLOTS-GAP-PACKING (2026-10-30) — выдача с отбором «без дыр» (`packing`,
- * клиентская) и без него (окно оператора) — разные записи, суффикс `:pk`.
+ * SLOTS-GAP-PACKING (2026-10-30) — набор начал (`starts`) — тоже вход: выдача
+ * с отбором «без дыр» (`packed`, клиент и ручная запись по умолчанию) —
+ * суффикс `:pk`; «все свободные времена» ручной записи (`all`: сетка, «впритык»
+ * и «подряд» без отбора, MANUAL-SLOTS-ALL) — `:all`; без суффикса — сырая
+ * выдача движка (сетка и «впритык»), её читает `listAvailabilitySlots`.
  * Набор длительностей услуг профиля, по которому идёт отбор, в ключ НЕ входит
  * намеренно: чтобы его знать, попадание в кэш стоило бы второго запроса к
  * базе (PERF-04 — один). Правка услуг меняет отбор не позже TTL (120 с), и
@@ -44,11 +47,11 @@ export function buildSlotsCacheKey(input: {
   scheduleVersion: string;
   publishedUntilLocal: string;
   extraStartMinutes?: number[];
-  packing?: boolean;
+  starts?: "packed" | "all";
 }): string {
   const extra = input.extraStartMinutes?.length ? `:x${input.extraStartMinutes.join(",")}` : "";
-  const packing = input.packing ? ":pk" : "";
-  return `slots:${input.masterId}:${input.dateKey}:${input.serviceId}:${input.serviceDuration}:${input.bufferMin}:${input.slotStepMin}:${input.timeZone}:${input.scheduleVersion}:${input.publishedUntilLocal}${packing}${extra}`;
+  const starts = input.starts === "packed" ? ":pk" : input.starts === "all" ? ":all" : "";
+  return `slots:${input.masterId}:${input.dateKey}:${input.serviceId}:${input.serviceDuration}:${input.bufferMin}:${input.slotStepMin}:${input.timeZone}:${input.scheduleVersion}:${input.publishedUntilLocal}${starts}${extra}`;
 }
 
 function buildSlotsIndexKey(masterId: string, dateKey: string): string {

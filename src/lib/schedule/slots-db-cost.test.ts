@@ -111,7 +111,7 @@ function primeSlotCacheForDays(dateKeys: string[]): void {
       scheduleVersion: SCHEDULE_VERSION,
       publishedUntilLocal,
       // SLOTS-GAP-PACKING: клиентская выдача — с отбором «без дыр».
-      packing: true,
+      starts: "packed",
     });
     store.set(key, [
       {

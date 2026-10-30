@@ -89,6 +89,13 @@ export async function listBookableSlots(input: {
    */
   operatorWindow?: boolean;
   /**
+   * MANUAL-SLOTS-ALL (2026-10-30, решение владельца): «все свободные времена»
+   * ручной записи — без отбора «без дыр». По умолчанию оператор видит те же
+   * окошки, что клиент; остальные свободные начала роут отдаёт отдельным
+   * списком для ссылки «Показать все свободные времена».
+   */
+  allStarts?: boolean;
+  /**
    * BOOKING-WINDOW-SPLIT (2026-09-24): окно записи ВЛАДЕЛЬЦА услуги, если он не
    * `provider`. Запись на услугу студии проверяет окно СТУДИИ
    * (`resolveBookingCore` → `assertBookingWindow(provider = студия)`), а окошки
@@ -114,9 +121,9 @@ export async function listBookableSlots(input: {
     limit,
     excludeBookingId: input.excludeBookingId,
     extraStartsUtc: input.extraStartsUtc,
-    // SLOTS-GAP-PACKING: оператор видит все свободные начала — время выбирает
-    // он, а ручная запись начала по движку не сверяет.
-    packing: !input.operatorWindow,
+    // MANUAL-SLOTS-ALL: отбор «без дыр» — и у клиента, и у оператора; без
+    // него — только «все свободные времена» ручной записи.
+    packing: !input.allStarts,
   });
   if (!result.ok) {
     return { ok: false, status: result.status, code: result.code, message: result.message };

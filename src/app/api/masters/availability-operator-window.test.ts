@@ -20,10 +20,15 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
  * флага — окошко раньше отсечки скрыто». Возвращено — зелёный.
  */
 
+type MockSlot = { startAtUtc: string; endAtUtc: string; label: string };
+
 const state = vi.hoisted(() => ({
   published: true,
   sessionOk: false,
   ownerOk: false,
+  // MANUAL-SLOTS-ALL: выдача с отбором «без дыр» и «все свободные времена».
+  packedSlots: [] as MockSlot[],
+  allSlots: [] as MockSlot[],
 }));
 
 const spies = vi.hoisted(() => ({
@@ -96,7 +101,12 @@ vi.mock("@/lib/schedule/resolveDuration", () => ({
 vi.mock("@/lib/schedule/bookable-window", () => ({
   listBookableSlots: (...args: unknown[]) => {
     spies.listBookableSlots(...args);
-    return Promise.resolve({ ok: true as const, slots: [], meta: {} });
+    const input = args[0] as { allStarts?: boolean };
+    return Promise.resolve({
+      ok: true as const,
+      slots: input.allStarts ? state.allSlots : state.packedSlots,
+      meta: {},
+    });
   },
 }));
 
@@ -123,6 +133,8 @@ beforeEach(() => {
   state.published = true;
   state.sessionOk = false;
   state.ownerOk = false;
+  state.packedSlots = [];
+  state.allSlots = [];
   spies.listBookableSlots.mockClear();
   bookingFindUnique.mockReset();
   bookingFindUnique.mockResolvedValue(OWN_BOOKING);
@@ -236,5 +248,68 @@ describe("BOOKING-WINDOW-SPLIT · окно записи владельца ус�
     };
     // владелец: 5 ч / 14 дн, мастер: 2 ч / 10 дн → 5 ч / 10 дн
     expect(input.windowPolicy).toEqual({ minBookingHoursAhead: 5, maxBookingDaysAhead: 10 });
+  });
+});
+
+/**
+ * MANUAL-SLOTS-ALL (2026-10-30, решение владельца) — ручная запись видит те же
+ * окошки, что клиент (`slots`), а остальные свободные времена — отдельным
+ * списком `otherSlots` для ссылки «Показать все свободные времена». Чужой
+ * запрос с `?manual=1` и аноним «всех времён» не получают: это окно оператора.
+ *
+ * @probe 2026-10-30 — в роуте `otherSlots` отдан как `allStarts.slots` целиком
+ * (без вычитания окошек клиента): красный «остальные времена — без окошек
+ * клиента». `operatorProvider !== null ?` заменено на `true ?`: красный «чужой
+ * … не получает». Возвращено — зелёный.
+ */
+describe("MANUAL-SLOTS-ALL · окошки клиента + остальные времена", () => {
+  const slot = (hm: string): MockSlot => ({
+    startAtUtc: `2026-09-23T${hm}:00.000Z`,
+    endAtUtc: `2026-09-23T${hm}:00.000Z`,
+    label: hm,
+  });
+
+  beforeEach(() => {
+    // Запись 03:10–03:30 UTC, услуги по 20 минут, шаг 15: клиенту — 03:30,
+    // 03:50, 04:10; остальные свободные — 03:45, 04:00.
+    state.packedSlots = [slot("03:30"), slot("03:50"), slot("04:10")];
+    state.allSlots = [slot("03:30"), slot("03:45"), slot("03:50"), slot("04:00"), slot("04:10")];
+  });
+
+  async function read(query: string) {
+    const res = await GET(new Request(`${BASE}${query}`), { params: Promise.resolve({ id: "prov1" }) });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: { slots: MockSlot[]; otherSlots?: MockSlot[] };
+    };
+    return body.data;
+  }
+
+  it("своя сторона с ?manual=1 — остальные времена без окошек клиента", async () => {
+    state.sessionOk = true;
+    state.ownerOk = true;
+    const data = await read("&manual=1");
+    expect(data.slots.map((s) => s.label)).toEqual(["03:30", "03:50", "04:10"]);
+    expect(data.otherSlots?.map((s) => s.label)).toEqual(["03:45", "04:00"]);
+
+    const calls = spies.listBookableSlots.mock.calls.map((call) => call[0] as { allStarts?: boolean; operatorWindow?: boolean });
+    expect(calls).toHaveLength(2);
+    expect(calls.map((input) => Boolean(input.allStarts)).sort()).toEqual([false, true]);
+    expect(calls.every((input) => input.operatorWindow === true)).toBe(true);
+  });
+
+  it("чужой с ?manual=1 не получает остальных времён", async () => {
+    state.sessionOk = true;
+    state.ownerOk = false;
+    const data = await read("&manual=1");
+    expect(data.slots.map((s) => s.label)).toEqual(["03:30", "03:50", "04:10"]);
+    expect(data.otherSlots).toBeUndefined();
+    expect(spies.listBookableSlots).toHaveBeenCalledTimes(1);
+  });
+
+  it("аноним (виджет студии) не получает остальных времён", async () => {
+    const data = await read("");
+    expect(data.otherSlots).toBeUndefined();
+    expect(spies.listBookableSlots).toHaveBeenCalledTimes(1);
   });
 });

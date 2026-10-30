@@ -19,6 +19,8 @@ export type SlotItem = {
   isHot?: boolean;
   discountType?: "PERCENT" | "FIXED";
   discountValue?: number;
+  /** Свободное, но не рекомендуемое время (MANUAL-SLOTS-ALL) — пунктирная рамка. */
+  muted?: boolean;
 };
 
 export type SlotGroup = {
@@ -169,6 +171,7 @@ const SlotGroupRow = memo(function SlotGroupRow({
                   isHot={slot.isHot}
                   discountType={slot.discountType}
                   discountValue={slot.discountValue}
+                  muted={slot.muted}
                   onChange={onChange}
                 />
               ))}
@@ -202,6 +205,7 @@ type SlotButtonProps = {
   isHot?: boolean;
   discountType?: "PERCENT" | "FIXED";
   discountValue?: number;
+  muted?: boolean;
 };
 
 const SlotButton = memo(function SlotButton({
@@ -214,6 +218,7 @@ const SlotButton = memo(function SlotButton({
   isHot,
   discountType,
   discountValue,
+  muted,
 }: SlotButtonProps) {
   const handleClick = useCallback(() => onChange(label), [label, onChange]);
   const hotLabel =
@@ -239,7 +244,9 @@ const SlotButton = memo(function SlotButton({
               // был плоским join, эти классы проигрывали варианту `secondary`
               // и «горячее» окошко выглядело обычным (29.09 доработки · 12).
               "border-warning-border bg-warning-surface text-warning-text hover:brightness-95"
-            : "border-border-subtle bg-bg-input text-text-main hover:bg-elevated",
+            : muted
+              ? "border-dashed border-border-subtle bg-bg-input text-text-sec hover:bg-elevated"
+              : "border-border-subtle bg-bg-input text-text-main hover:bg-elevated",
         disabled && "cursor-not-allowed opacity-60",
         className
       )}
@@ -298,6 +305,7 @@ const VirtualizedSlotList = memo(function VirtualizedSlotList({
                 isHot={slot.isHot}
                 discountType={slot.discountType}
                 discountValue={slot.discountValue}
+                muted={slot.muted}
                 className="flex w-full items-center justify-between text-left"
               />
             </div>

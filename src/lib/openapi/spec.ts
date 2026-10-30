@@ -378,7 +378,7 @@ const manualWindowQuery: ParameterObject = {
   required: false,
   schema: { type: "string", enum: ["1"] },
   description:
-    "Operator window for manual booking (master / studio admin): minBookingHoursAhead is not applied, only past slots are hidden. Honoured only for the provider's own side; ignored otherwise.",
+    "Operator window for manual booking (master / studio admin): minBookingHoursAhead is not applied, only past slots are hidden; `slots` are the client's gap-free starts and `otherSlots` the remaining free ones. Honoured only for the provider's own side; ignored otherwise.",
 };
 
 // MOBILE-STUDIO-C (ops) — общие схемы чтений кабинета студии для приложения
@@ -2466,6 +2466,12 @@ export const openApiSpec = {
           required: ["slots", "meta"],
           properties: {
             slots: { type: "array", items: { $ref: "#/components/schemas/AvailabilitySlot" } },
+            otherSlots: {
+              type: "array",
+              items: { $ref: "#/components/schemas/AvailabilitySlot" },
+              description:
+                "Only with ?manual=1 for the provider's own side (MANUAL-SLOTS-ALL): the remaining free starts that `slots` leaves out because they would leave a gap no service fits. Manual booking shows them on request.",
+            },
             meta: { $ref: "#/components/schemas/AvailabilitySlotsMeta" },
           },
         },
