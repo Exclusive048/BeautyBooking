@@ -4532,6 +4532,35 @@ export const openApiSpec = {
           },
         },
       },
+      // USER-BLOCKING-01 — блокировка аккаунта администратором.
+      AdminUserBlockInput: {
+        type: "object",
+        required: ["reason"],
+        properties: {
+          reason: { type: "string", minLength: 1, maxLength: 500, description: "Причина — видна в «Пользователях» и в журнале действий." },
+        },
+      },
+      AdminUserUnblockInput: {
+        type: "object",
+        properties: {
+          reason: { type: "string", maxLength: 500, description: "По желанию — уходит в журнал действий." },
+        },
+      },
+      AdminUserBlockData: {
+        type: "object",
+        required: ["user"],
+        properties: {
+          user: {
+            type: "object",
+            required: ["userId", "blockedAt", "blockedReason"],
+            properties: {
+              userId: { type: "string" },
+              blockedAt: { type: "string", format: "date-time", nullable: true },
+              blockedReason: { type: "string", nullable: true },
+            },
+          },
+        },
+      },
       ProviderUnlinkData: {
         type: "object",
         required: ["unlinked"],
@@ -10096,6 +10125,56 @@ export const openApiSpec = {
         },
       },
     },
+    "/api/admin/users/{id}/block": {
+      post: {
+        summary: "Block a user account («Заблокировать»)",
+        description:
+          "Одна транзакция: отметка блокировки, отзыв всех семей сессий, удаление push-устройств приложения, " +
+          "журнал действий USER_BLOCKED. Действующий access-токен перестаёт проходить сразу. Нельзя: себя — 403; " +
+          "постоянного администратора платформы — 403; администратора, если вы не SUPERADMIN, — 403; последнего " +
+          "действующего администратора — 409. Уже заблокирован — 409 CONFLICT. Вход заблокированному отвечает " +
+          "403 ACCOUNT_BLOCKED (после принятого кода).",
+        tags: ["admin"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", maxLength: 64 } }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/AdminUserBlockInput" } } },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/AdminUserBlockData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("FORBIDDEN"),
+          "404": errorResponse("NOT_FOUND"),
+          "409": errorResponse("CONFLICT"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/admin/users/{id}/unblock": {
+      post: {
+        summary: "Unblock a user account («Разблокировать»)",
+        description:
+          "Снимает отметку блокировки; причина по желанию, тело можно не передавать. Права — как у блокировки " +
+          "(администратора разблокирует только SUPERADMIN). Не заблокирован — 409 CONFLICT. Журнал действий: " +
+          "USER_UNBLOCKED (с прежней причиной). Отозванные сессии не возвращаются — нужно войти заново.",
+        tags: ["admin"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", maxLength: 64 } }],
+        requestBody: {
+          required: false,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/AdminUserUnblockInput" } } },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/AdminUserBlockData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("FORBIDDEN"),
+          "404": errorResponse("NOT_FOUND"),
+          "409": errorResponse("CONFLICT"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
     "/api/admin/reports/{id}/dismiss": {
       post: {
         summary: "Dismiss a content report («Отклонить»)",
@@ -10252,7 +10331,8 @@ export const openApiSpec = {
           "Любой отказ — 302 на `masterryadom://auth/callback?error=<код>`: invalid_request · " +
           "provider_unavailable · consent_required · intent_invalid · start_failed (старт); " +
           "state_invalid · access_denied · provider_timeout · vk_already_linked · yandex_already_linked · " +
-          "email_taken · callback_failed (колбэк). Сессию браузера не читает. Согласия обязательны, " +
+          "email_taken · account_blocked (аккаунт заблокирован администратором) · callback_failed (колбэк). " +
+          "Сессию браузера не читает. Согласия обязательны, " +
           "если нет `intent` (вход может создать аккаунт).",
         tags: ["mobile", "auth"],
         parameters: [

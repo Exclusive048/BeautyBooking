@@ -9,11 +9,13 @@ import * as UI_TEXT from "@/lib/ui/text";
 import type {
   AdminUserPlanFilter,
   AdminUserRoleGroup,
+  AdminUserStatusFilter,
 } from "@/features/admin-cabinet/users/types";
 
 type Props = {
   role: AdminUserRoleGroup;
   planTier: AdminUserPlanFilter;
+  status: AdminUserStatusFilter;
   search: string;
 };
 
@@ -28,7 +30,7 @@ const SEARCH_DEBOUNCE_MS = 200;
  * debounced search box. URL is the single source of truth — every
  * mutation goes through `router.replace`.
  */
-export function UsersFilters({ role, planTier, search }: Props) {
+export function UsersFilters({ role, planTier, status, search }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -96,6 +98,22 @@ export function UsersFilters({ role, planTier, search }: Props) {
         <option value="free">{PLAN.tierFree}</option>
         <option value="pro">{PLAN.tierPro}</option>
         <option value="premium">{PLAN.tierPremium}</option>
+      </Select>
+
+      <Select
+        aria-label={T.statusAll}
+        value={status}
+        onChange={(event) =>
+          pushParams((params) => {
+            const next = event.target.value;
+            if (next === "blocked") params.set("status", next);
+            else params.delete("status");
+          })
+        }
+        className="h-10 min-w-[10rem]"
+      >
+        <option value="all">{T.statusAll}</option>
+        <option value="blocked">{T.statusBlocked}</option>
       </Select>
 
       <div className="relative min-w-[16rem] flex-1">

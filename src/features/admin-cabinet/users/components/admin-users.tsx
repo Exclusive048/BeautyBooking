@@ -8,6 +8,8 @@ import type {
   AdminUserPlanFilter,
   AdminUserRoleGroup,
   AdminUserRow,
+  AdminUserStatusFilter,
+  AdminUsersViewer,
 } from "@/features/admin-cabinet/users/types";
 
 type Props = {
@@ -18,8 +20,10 @@ type Props = {
   filters: {
     role: AdminUserRoleGroup;
     planTier: AdminUserPlanFilter;
+    status: AdminUserStatusFilter;
     search: string;
   };
+  viewer: AdminUsersViewer;
 };
 
 /**
@@ -34,6 +38,7 @@ export function AdminUsers({
   plans,
   nextCursor,
   filters,
+  viewer,
 }: Props) {
   return (
     <div className="flex flex-col gap-4 lg:gap-5">
@@ -42,9 +47,15 @@ export function AdminUsers({
       <UsersFilters
         role={filters.role}
         planTier={filters.planTier}
+        status={filters.status}
         search={filters.search}
       />
-      <UsersTable rows={rows} plans={plans} nextCursor={nextCursor} />
+      <UsersTable
+        rows={rows}
+        plans={plans}
+        nextCursor={nextCursor}
+        viewer={viewer}
+      />
     </div>
   );
 }

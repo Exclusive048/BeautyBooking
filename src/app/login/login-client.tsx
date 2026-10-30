@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { OtpInput, type OtpState } from "@/components/ui/otp-input";
 import { FieldLabel } from "@/components/ui/field-label";
 import { LegalConsentGroup } from "@/features/auth/components/legal-consent-group";
+import { ACCOUNT_BLOCKED_REDIRECT_ERROR } from "@/lib/auth/account-block-shared";
 import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
 import { parseInternalPath } from "@/lib/http/safe-redirect";
 import {
@@ -156,6 +157,8 @@ export default function LoginClient({
     if (code === "provider_unavailable") return UI_TEXT.auth.loginPage.oauthProviderUnavailable;
     if (code === "consent_required") return UI_TEXT.auth.loginPage.consentRequired;
     if (code === "start_failed") return UI_TEXT.auth.loginPage.oauthStartFailed;
+    // USER-BLOCKING-01: колбэк VK / Яндекса / Telegram — аккаунт заблокирован.
+    if (code === ACCOUNT_BLOCKED_REDIRECT_ERROR) return UI_TEXT.auth.loginPage.accountBlocked;
     return null;
   }, [searchParams]);
   // Вернулись с OAuth без согласий — блок согласий сразу в состоянии «отметьте».

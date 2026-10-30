@@ -3,6 +3,7 @@ import { toAppError } from "@/lib/api/errors";
 import { fail } from "@/lib/api/response";
 import { formatZodError } from "@/lib/api/validation";
 import { withRequestContext } from "@/lib/api/with-request-context";
+import { failAccountBlocked, isAccountBlocked, isAccountBlockedError } from "@/lib/auth/account-block";
 import { matchesPkceS256Challenge } from "@/lib/auth/mobile-oauth-flow";
 import { takeMobileOAuthCode } from "@/lib/auth/mobile-oauth-store";
 import { respondWithMobileSession } from "@/lib/auth/mobile-session";
@@ -63,10 +64,16 @@ export async function POST(req: Request) {
       // удалённому не выдаётся, а ответ тот же, что у битого кода.
       const user = await prisma.userProfile.findFirst({
         where: { id: record.userId, isDeleted: false },
-        select: { id: true, phone: true, roles: true },
+        select: { id: true, phone: true, roles: true, blockedAt: true },
       });
       if (!user) {
         return codeInvalid(req, "user_gone");
+      }
+      // USER-BLOCKING-01: заблокировали между колбэком и обменом — код и
+      // verifier уже доказали личность, поэтому ответ честный, а не «битый код».
+      if (isAccountBlocked(user)) {
+        logInfo("Mobile OAuth code exchange refused: account blocked", { requestId: getRequestId(req) });
+        return failAccountBlocked();
       }
 
       void recordSurfaceEvent({
@@ -77,6 +84,7 @@ export async function POST(req: Request) {
       return await respondWithMobileSession(req, user);
     } catch (error) {
       // Redis недоступен — код не проверить (fail-closed, `mobile-oauth-store.ts`).
+      if (isAccountBlockedError(error)) return failAccountBlocked();
       const appError = toAppError(error);
       if (appError.status === 503) {
         return fail("Сервис временно недоступен. Попробуйте позже.", 503, "SERVICE_UNAVAILABLE");

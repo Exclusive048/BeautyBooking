@@ -14,6 +14,16 @@ export type AdminUserRoleGroup = "all" | "client" | "master" | "studio" | "admin
  * the service layer. */
 export type AdminUserPlanFilter = "all" | "free" | "pro" | "premium";
 
+/** USER-BLOCKING-01 — фильтр по доступу: все или только заблокированные. */
+export type AdminUserStatusFilter = "all" | "blocked";
+
+/** Кто смотрит список — чтобы не предлагать действие, которое сервер
+ * всё равно отклонит (себя; администратора — без SUPERADMIN). */
+export type AdminUsersViewer = {
+  id: string | null;
+  canManageAdmins: boolean;
+};
+
 export type AdminUserPlanSnapshot = {
   planId: string;
   planCode: string;
@@ -43,6 +53,10 @@ export type AdminUserRow = {
    * CLIENT and admin rows. */
   cityName: string | null;
   createdAt: string;
+  /** USER-BLOCKING-01 — когда заблокирован; `null` — доступ открыт. */
+  blockedAt: string | null;
+  /** Причина блокировки — видна только администраторам. */
+  blockedReason: string | null;
 };
 
 export type AdminUserCounts = {

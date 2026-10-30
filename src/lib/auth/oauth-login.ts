@@ -2,6 +2,7 @@ import type { Prisma, UserProfile } from "@prisma/client";
 import { AccountType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
+import { ACCOUNT_BLOCKED_REDIRECT_ERROR, isAccountBlocked } from "@/lib/auth/account-block";
 import type { OAuthLoginProvider } from "@/lib/auth/oauth-providers";
 import { applyProviderVerifiedPhoneSafe, type ProviderPhoneOutcome } from "@/lib/auth/phone-provider-proof";
 import { ensureClientRoleForUser } from "@/lib/auth/roles";
@@ -216,7 +217,25 @@ export async function linkOAuthIdentity(input: {
 export type OAuthLoginResolution =
   | { ok: true; user: UserProfile }
   /** RKN-FIX-01: вход создал бы аккаунт, а доказуемого согласия нет. */
-  | { ok: false; reason: "consent_required" };
+  | { ok: false; reason: "consent_required" }
+  /**
+   * USER-BLOCKING-01: связка ведёт в заблокированный аккаунт. Отказ — до
+   * любой записи (имя, фото, связка, номер, согласия): провайдер доказал
+   * личность, но аккаунт этим не меняется.
+   */
+  | { ok: false; reason: "account_blocked" };
+
+export type OAuthLoginRefusal = Extract<OAuthLoginResolution, { ok: false }>["reason"];
+
+/**
+ * Куда веб-колбэк уводит отказ входа. `consent` — исторический ключ RKN-FIX-01
+ * (его читает `login-client.tsx`), блокировка — общий с приложением ключ.
+ */
+export function webOAuthLoginRefusalPath(reason: OAuthLoginRefusal): string {
+  return reason === "account_blocked"
+    ? `/login?error=${ACCOUNT_BLOCKED_REDIRECT_ERROR}`
+    : "/login?error=consent";
+}
 
 /**
  * Вход без известного пользователя: найти по связке либо создать.
@@ -241,6 +260,11 @@ export async function resolveOAuthLogin(input: {
 
   if (!user && linkedUserId) {
     throw oauthAlreadyLinkedError(provider);
+  }
+
+  if (user && isAccountBlocked(user)) {
+    logInfo(`${PROVIDER_LOG_LABEL[provider]} auth refused: account blocked`, { userProfileId: user.id });
+    return { ok: false, reason: "account_blocked" };
   }
 
   if (!user) {

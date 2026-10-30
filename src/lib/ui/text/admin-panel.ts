@@ -550,6 +550,8 @@ export const adminPanel = {
     filters: {
       roleAll: "Все роли",
       planAll: "Все тарифы",
+      statusAll: "Все статусы",
+      statusBlocked: "Заблокированные",
       searchPlaceholder: "Имя, email, телефон",
     },
     columns: {
@@ -559,6 +561,34 @@ export const adminPanel = {
       plan: "Тариф",
       city: "Город",
       created: "Зарегистрирован",
+      access: "Доступ",
+    },
+    // USER-BLOCKING-01 — блокировка аккаунта администратором.
+    block: {
+      badge: "Заблокирован",
+      reasonEmpty: "Причина не указана",
+      action: "Заблокировать",
+      unblockAction: "Разблокировать",
+      actionAria: (name: string) => `Заблокировать: ${name}`,
+      unblockActionAria: (name: string) => `Разблокировать: ${name}`,
+      dialog: {
+        title: "Блокировка пользователя",
+        userLabel: "Пользователь",
+        consequences:
+          "Пользователь сразу выйдет из всех сессий и не сможет войти снова. Push-уведомления перестанут приходить. Записи, отзывы и переписка сохранятся.",
+        reasonLabel: "Причина",
+        reasonPlaceholder: "Например: мошенничество с записями",
+        reasonHint: "Сохраняется в журнал действий администраторов. Пользователь её не видит.",
+        reasonRequired: "Укажите причину блокировки.",
+        cancel: "Отмена",
+        submit: "Заблокировать",
+      },
+      unblockConfirm: {
+        title: "Снять блокировку?",
+        message: (name: string) =>
+          `${name} снова сможет входить в аккаунт. Прежние сессии не восстановятся — потребуется войти заново.`,
+        confirm: "Разблокировать",
+      },
     },
     roleBadge: {
       client: "Клиент",
@@ -618,6 +648,10 @@ export const adminPanel = {
     },
     toasts: {
       planChanged: "Тариф изменён",
+      blocked: "Пользователь заблокирован",
+      unblocked: "Блокировка снята",
+      blockFailed: "Не удалось заблокировать пользователя. Попробуйте ещё раз.",
+      unblockFailed: "Не удалось разблокировать пользователя. Попробуйте ещё раз.",
       errorGeneric: "Не удалось выполнить действие. Попробуйте ещё раз.",
     },
   },

@@ -154,7 +154,8 @@ export async function completeMobileOAuthCallback(
     };
     const resolution = await resolveOAuthLogin({ identity, consent });
     if (!resolution.ok) {
-      return mobileAuthCallbackRedirect({ error: "consent_required" });
+      // Ключ исхода совпадает с причиной: `consent_required` / `account_blocked`.
+      return mobileAuthCallbackRedirect({ error: resolution.reason });
     }
 
     const code = await issueMobileOAuthCode({

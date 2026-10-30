@@ -43,6 +43,11 @@ export type MobileAuthCallbackError =
   | "provider_unavailable"
   /** Обязательные согласия не отмечены, а вход создал бы аккаунт (RKN-FIX-01). */
   | "consent_required"
+  /**
+   * Связка ведёт в аккаунт, заблокированный администратором (USER-BLOCKING-01).
+   * Значение — `ACCOUNT_BLOCKED_REDIRECT_ERROR` (`auth/account-block.ts`).
+   */
+  | "account_blocked"
   /** link-intent неизвестен, протух, использован или выдан для другого провайдера. */
   | "intent_invalid"
   /** Прочий отказ старта (не собрался адрес авторизации, Redis). */

@@ -110,6 +110,7 @@ describe("getSessionUserFromRequest — Bearer", () => {
         where: {
           id: "u-bearer",
           isDeleted: false,
+          blockedAt: null,
           refreshSessions: { some: { familyId: "fam-9", revokedAt: null } },
         },
       }),

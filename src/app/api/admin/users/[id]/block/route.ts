@@ -1,0 +1,56 @@
+import { z } from "zod";
+import { fail, ok } from "@/lib/api/response";
+import { toAppError } from "@/lib/api/errors";
+import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
+import { requireAdminAuth } from "@/lib/auth/admin";
+import { logError } from "@/lib/logging/logger";
+import { parseBody } from "@/lib/validation";
+import { BLOCK_REASON_MAX_LENGTH, blockUser } from "@/features/admin-cabinet/users/server/block.service";
+
+export const runtime = "nodejs";
+
+/**
+ * USER-BLOCKING-01 — заблокировать аккаунт. Правила (кого нельзя, что
+ * отзывается, аудит в той же транзакции) — `block.service.ts`. Префикс
+ * `/api/admin/users` — fail-closed рейт-лимит (FIX-B12).
+ */
+
+const bodySchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(1, "Укажите причину блокировки.")
+    .max(BLOCK_REASON_MAX_LENGTH, `Причина — не длиннее ${BLOCK_REASON_MAX_LENGTH} символов.`),
+});
+
+const userIdSchema = z.string().trim().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/);
+
+type RouteContext = { params: Promise<{ id: string }> };
+
+export async function POST(req: Request, ctx: RouteContext) {
+  const auth = await requireAdminAuth();
+  if (!auth.ok) return auth.response;
+
+  try {
+    const parsedId = userIdSchema.safeParse((await ctx.params).id);
+    if (!parsedId.success) return fail("Пользователь не найден.", 404, "NOT_FOUND");
+    const id = parsedId.data;
+    const body = await parseBody(req, bodySchema);
+    const state = await blockUser({
+      actor: { id: auth.user.id, roles: auth.user.roles },
+      targetUserId: id,
+      reason: body.reason,
+      context: getAdminAuditContext(req),
+    });
+    return ok({ user: state });
+  } catch (error) {
+    const appError = toAppError(error);
+    if (appError.status >= 500) {
+      logError("admin.users.block failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return fail("Не удалось заблокировать пользователя. Попробуйте ещё раз.", 500, "INTERNAL_ERROR");
+    }
+    return fail(appError.message, appError.status, appError.code);
+  }
+}

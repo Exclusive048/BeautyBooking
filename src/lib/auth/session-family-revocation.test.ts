@@ -134,6 +134,7 @@ describe("SEC-13 · отзыв семьи выселяет держателя ac
         where: {
           id: "u1",
           isDeleted: false,
+          blockedAt: null,
           refreshSessions: { some: { familyId: "fam-1", revokedAt: null } },
         },
       }),
@@ -175,7 +176,7 @@ describe("SEC-13 · совместимость: деплой не разлоги
     expect(user).not.toBeNull();
     // Про семью такой токен не спрашивают вовсе.
     expect(spies.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: "u1", isDeleted: false } }),
+      expect.objectContaining({ where: { id: "u1", isDeleted: false, blockedAt: null } }),
     );
   });
 });

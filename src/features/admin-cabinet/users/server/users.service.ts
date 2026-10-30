@@ -19,6 +19,7 @@ import type {
   AdminUserPlanSnapshot,
   AdminUserRoleGroup,
   AdminUserRow,
+  AdminUserStatusFilter,
 } from "@/features/admin-cabinet/users/types";
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -27,6 +28,8 @@ const MAX_PAGE_SIZE = 100;
 type ListOpts = {
   roleGroup?: AdminUserRoleGroup;
   planTier?: AdminUserPlanFilter;
+  /** USER-BLOCKING-01 — `blocked` оставляет только заблокированных. */
+  status?: AdminUserStatusFilter;
   search?: string;
   cursor?: string | null;
   pageSize?: number;
@@ -171,6 +174,8 @@ export async function listAdminUsers(
       subscriptions: { some: { plan: { tier } } },
     });
   }
+  const status = opts.status ?? "all";
+  if (status === "blocked") conditions.push({ blockedAt: { not: null } });
   const needle = opts.search?.trim();
   if (needle) conditions.push(buildSearchWhere(needle));
 
@@ -189,6 +194,8 @@ export async function listAdminUsers(
       phone: true,
       roles: true,
       createdAt: true,
+      blockedAt: true,
+      blockedReason: true,
       providers: {
         select: {
           city: { select: { name: true } },
@@ -238,6 +245,8 @@ export async function listAdminUsers(
       plan: pickPlan(primaryRole, user.subscriptions),
       cityName: user.providers[0]?.city?.name ?? null,
       createdAt: user.createdAt.toISOString(),
+      blockedAt: user.blockedAt ? user.blockedAt.toISOString() : null,
+      blockedReason: user.blockedReason,
     };
   });
 
@@ -255,6 +264,7 @@ export async function listAdminUsers(
         search: Boolean(needle),
         roleGroup: roleGroup !== "all",
         planTier: planTier !== "all",
+        status: status !== "all",
         cursor: Boolean(opts.cursor),
       },
       { limit: pageSize },

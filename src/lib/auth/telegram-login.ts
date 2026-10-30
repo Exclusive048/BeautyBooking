@@ -1,6 +1,7 @@
 import type { UserProfile, Prisma } from "@prisma/client";
 import { AccountType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { ACCOUNT_BLOCKED_MESSAGE, isAccountBlocked } from "@/lib/auth/account-block";
 import { verifyTelegramLogin } from "@/lib/auth/telegram";
 import { ensureClientRoleForUser } from "@/lib/auth/roles";
 import { telegramLoginSchema } from "@/lib/auth/schemas";
@@ -43,6 +44,12 @@ export async function authenticateTelegramLogin(
 
   const telegramId = String(payload.id);
   let profile = await prisma.userProfile.findUnique({ where: { telegramId } });
+
+  // USER-BLOCKING-01: подпись Telegram доказала личность — заблокированному
+  // отказ до любой записи в профиль.
+  if (profile && isAccountBlocked(profile)) {
+    return { ok: false, status: 403, message: ACCOUNT_BLOCKED_MESSAGE, code: "ACCOUNT_BLOCKED" };
+  }
 
   if (!profile) {
     const displayName = buildDisplayName(payload.first_name, payload.last_name, payload.username);

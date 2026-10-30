@@ -7,7 +7,9 @@ import {
 import type {
   AdminUserPlanFilter,
   AdminUserRoleGroup,
+  AdminUserStatusFilter,
 } from "@/features/admin-cabinet/users/types";
+import { AccountType } from "@prisma/client";
 import { getSessionUser } from "@/lib/auth/session";
 import { extractClientIp } from "@/lib/http/ip";
 
@@ -17,6 +19,7 @@ type SearchParams = Promise<{
   role?: string;
   plan?: string;
   q?: string;
+  status?: string;
   cursor?: string;
 }>;
 
@@ -40,6 +43,10 @@ function parsePlan(value: string | undefined): AdminUserPlanFilter {
   return "all";
 }
 
+function parseStatus(value: string | undefined): AdminUserStatusFilter {
+  return value === "blocked" ? "blocked" : "all";
+}
+
 export default async function AdminUsersPage({
   searchParams,
 }: {
@@ -48,6 +55,7 @@ export default async function AdminUsersPage({
   const params = await searchParams;
   const role = parseRole(params.role);
   const planTier = parsePlan(params.plan);
+  const status = parseStatus(params.status);
   const search = (params.q ?? "").trim();
   const cursor = params.cursor?.trim() || null;
 
@@ -60,6 +68,7 @@ export default async function AdminUsersPage({
     listAdminUsers({
       roleGroup: role,
       planTier,
+      status,
       search,
       cursor,
       actorUserId: actor?.id ?? null,
@@ -74,7 +83,13 @@ export default async function AdminUsersPage({
       counts={list.counts}
       plans={plans}
       nextCursor={list.nextCursor}
-      filters={{ role, planTier, search }}
+      filters={{ role, planTier, status, search }}
+      viewer={{
+        id: actor?.id ?? null,
+        // USER-BLOCKING-01: администраторов блокирует только SUPERADMIN
+        // (`block.service.ts`) — остальным кнопку не показываем.
+        canManageAdmins: actor?.roles.includes(AccountType.SUPERADMIN) ?? false,
+      }}
     />
   );
 }
