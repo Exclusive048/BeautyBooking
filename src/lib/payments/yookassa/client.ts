@@ -33,6 +33,8 @@ export type YookassaPaymentDetail = {
   id: string;
   status: YookassaPaymentStatus;
   amount?: { value: string; currency: string };
+  /** Сколько по платежу уже возвращено — сумма всех успешных возвратов (PARTIAL-REFUND-ACCOUNTING). */
+  refunded_amount?: { value: string; currency: string };
   metadata?: Record<string, unknown> | null;
   confirmation?: YookassaConfirmation;
   payment_method?: YookassaPaymentMethod;
@@ -42,6 +44,8 @@ export type YookassaRefundResponse = {
   id: string;
   status: "pending" | "succeeded" | "canceled";
   payment_id: string;
+  /** Сумма ЭТОГО возврата; у частичного она меньше суммы платежа. */
+  amount?: { value: string; currency: string };
 };
 
 const PAYMENTS_URL = "https://api.yookassa.ru/v3/payments";

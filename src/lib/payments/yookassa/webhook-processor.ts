@@ -7,7 +7,9 @@ import { createBillingAuditLog } from "@/lib/billing/audit";
 import { createBillingNotification } from "@/lib/billing/notifications";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { invalidatePlanCache } from "@/lib/billing/get-current-plan";
-import { getPayment, getRefund } from "@/lib/payments/yookassa/client";
+import { getPayment } from "@/lib/payments/yookassa/client";
+import { apiAmountToKopeks } from "@/lib/payments/yookassa/amount";
+import { processYookassaRefundEvent } from "@/lib/payments/yookassa/refund-webhook";
 import type { YookassaWebhookPayload } from "@/lib/queue/types";
 
 /**
@@ -29,14 +31,6 @@ function getGraceUntil(now: Date): Date {
   return new Date(now.getTime() + PAST_DUE_GRACE_DAYS * 24 * 60 * 60 * 1000);
 }
 
-/** YooKassa `amount.value` (rubles string) → integer kopeks, or null. */
-function apiAmountToKopeks(amount: { value: string; currency: string } | undefined): number | null {
-  if (!amount) return null;
-  const rubles = Number.parseFloat(amount.value);
-  if (!Number.isFinite(rubles)) return null;
-  return Math.round(rubles * 100);
-}
-
 export async function processYookassaWebhookPayload(payload: YookassaWebhookPayload): Promise<void> {
   const { event, objectId } = payload;
   if (!objectId) {
@@ -45,53 +39,12 @@ export async function processYookassaWebhookPayload(payload: YookassaWebhookPayl
   }
 
   // ─── Refund events ─────────────────────────────────────────────────────
-  // The notification's object.id is a REFUND id — re-fetch the refund to learn
-  // the authoritative status + the payment it belongs to.
+  // The notification's object.id is a REFUND id — the refund is re-fetched and
+  // a full refund is told apart from a partial one in `refund-webhook.ts`
+  // (PARTIAL-REFUND-ACCOUNTING: a partial refund leaves the payment status
+  // as is and goes to manual review).
   if (event.startsWith("refund.")) {
-    // getRefund: null on 404 (forged/foreign → drop); throws on transient
-    // failure (→ the queue retries the job).
-    const refund = await getRefund(objectId);
-    if (!refund) {
-      logInfo("YooKassa refund not found via API (forged/foreign) — dropped", { objectId });
-      return;
-    }
-    if (refund.status !== "succeeded") {
-      logInfo("YooKassa refund not succeeded — no action", { objectId, status: refund.status });
-      return;
-    }
-
-    const billingPayment = await prisma.billingPayment.findUnique({
-      where: { yookassaPaymentId: refund.payment_id },
-      select: {
-        id: true,
-        status: true,
-        subscriptionId: true,
-        subscription: { select: { userId: true, scope: true } },
-      },
-    });
-    if (!billingPayment) {
-      logError("YooKassa refund: payment not found", { yookassaPaymentId: refund.payment_id });
-      return;
-    }
-    // Idempotent: a duplicate / 24h-redelivered refund notification (or a
-    // refund already recorded synchronously by the admin refund route) is a
-    // no-op — no second REFUNDED write, no duplicate audit.
-    if (billingPayment.status === "REFUNDED") {
-      return;
-    }
-
-    await prisma.billingPayment.update({
-      where: { id: billingPayment.id },
-      data: { status: "REFUNDED" },
-    });
-    await createBillingAuditLog({
-      userId: billingPayment.subscription.userId,
-      scope: billingPayment.subscription.scope,
-      subscriptionId: billingPayment.subscriptionId,
-      paymentId: billingPayment.id,
-      action: "PAYMENT_REFUNDED",
-      details: { yookassaPaymentId: refund.payment_id, yookassaRefundId: refund.id },
-    });
+    await processYookassaRefundEvent(objectId);
     return;
   }
 
