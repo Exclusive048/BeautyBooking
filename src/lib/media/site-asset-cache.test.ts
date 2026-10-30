@@ -107,8 +107,6 @@ describe("кэш картинок сайта", () => {
 describe("сброс кэша при смене картинки сайта (media/service.ts)", () => {
   const file = join(process.cwd(), "src", "lib", "media", "service.ts");
   const sf = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true);
-  const SITE_KEYS = new Set(["SITE_LOGO_SETTING_KEY", "SITE_LOGIN_HERO_SETTING_KEY"]);
-
   function upsertKey(call: ts.CallExpression): string | null {
     const callee = call.expression;
     if (!ts.isPropertyAccessExpression(callee) || callee.name.text !== "upsert") return null;
@@ -121,21 +119,26 @@ describe("сброс кэша при смене картинки сайта (med
     return key && ts.isPropertyAssignment(key) ? key.initializer.getText(sf) : null;
   }
 
-  function enclosingBlock(node: ts.Node): ts.Block | null {
-    for (let cur: ts.Node | undefined = node.parent; cur; cur = cur.parent) if (ts.isBlock(cur)) return cur;
+  // ADMIN-AUDIT-SITE-MEDIA: запись настройки идёт в транзакции вместе с аудитом,
+  // а сброс кэша — после коммита, поэтому «тот же блок» стал «та же функция».
+  // Поведение (порядок, транзакция, сброс) — `site-asset-audit.test.ts`.
+  function enclosingFunction(node: ts.Node): ts.FunctionDeclaration | null {
+    for (let cur: ts.Node | undefined = node.parent; cur; cur = cur.parent) {
+      if (ts.isFunctionDeclaration(cur)) return cur;
+    }
     return null;
   }
 
-  it("каждый upsert настройки картинки сайта сбрасывает кэш в том же блоке", () => {
+  it("каждый upsert настройки сайта сбрасывает кэш в той же функции", () => {
     const found: string[] = [];
     const violations: string[] = [];
     const visit = (node: ts.Node) => {
       if (ts.isCallExpression(node)) {
         const key = upsertKey(node);
-        if (key && SITE_KEYS.has(key)) {
+        if (key) {
           found.push(key);
-          const block = enclosingBlock(node);
-          const resets = block?.getText(sf).includes("invalidateSiteAssetCache(") ?? false;
+          const fn = enclosingFunction(node);
+          const resets = fn?.getText(sf).includes("invalidateSiteAssetCache(") ?? false;
           if (!resets) {
             const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
             violations.push(`upsert ${key} без invalidateSiteAssetCache (строка ${line})`);
@@ -145,8 +148,17 @@ describe("сброс кэша при смене картинки сайта (med
       ts.forEachChild(node, visit);
     };
     visit(sf);
-    expect(found.sort(), "обход нашёл запись обеих настроек").toEqual(["SITE_LOGIN_HERO_SETTING_KEY", "SITE_LOGO_SETTING_KEY"]);
+    expect(found, "обход нашёл запись настройки картинки сайта").toEqual(["siteSetting.settingKey"]);
     expect(violations).toEqual([]);
+  });
+
+  it("обе настройки картинок сайта выводит одна функция siteAssetSetting", () => {
+    const text = sf.getText();
+    const start = text.indexOf("function siteAssetSetting(");
+    expect(start).toBeGreaterThan(-1);
+    const body = text.slice(start, text.indexOf("\n}\n", start));
+    expect(body).toContain("settingKey: SITE_LOGO_SETTING_KEY");
+    expect(body).toContain("settingKey: SITE_LOGIN_HERO_SETTING_KEY");
   });
 
   it("мягкое удаление и новая область обрезки актива сайта тоже сбрасывают", () => {

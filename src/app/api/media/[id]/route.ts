@@ -4,6 +4,7 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 import { getSessionUser } from "@/lib/auth/session";
 import { mediaAssetIdParamSchema } from "@/lib/media/schemas";
 import { deleteMediaAsset } from "@/lib/media/service";
+import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -22,7 +23,7 @@ export async function DELETE(req: Request, ctx: RouteContext) {
       return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
     }
 
-    const result = await deleteMediaAsset(user, parsed.data.id);
+    const result = await deleteMediaAsset(user, parsed.data.id, { auditContext: getAdminAuditContext(req) });
     return jsonOk({ result });
   } catch (error) {
     const appError = toAppError(error);

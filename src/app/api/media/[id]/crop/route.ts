@@ -5,6 +5,7 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 import { getSessionUser } from "@/lib/auth/session";
 import { mediaAssetIdParamSchema } from "@/lib/media/schemas";
 import { updateMediaCrop } from "@/lib/media/service";
+import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 import { nonJsonBodyRefusal } from "@/lib/api/json-body-refusal";
 
 type RouteContext = {
@@ -39,7 +40,9 @@ export async function PATCH(req: Request, ctx: RouteContext) {
       return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
     }
 
-    const asset = await updateMediaCrop(user, parsedParams.data.id, parsedBody.data);
+    const asset = await updateMediaCrop(user, parsedParams.data.id, parsedBody.data, {
+      auditContext: getAdminAuditContext(req),
+    });
     return jsonOk({ asset });
   } catch (error) {
     const appError = toAppError(error);

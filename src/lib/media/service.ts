@@ -5,10 +5,14 @@ import {
   MediaKind,
   Prisma,
   SubscriptionScope,
+  type AdminAuditAction,
   type MediaAsset,
 } from "@prisma/client";
 import { Readable } from "stream";
 import { AppError } from "@/lib/api/errors";
+import { createAdminAuditLog } from "@/lib/audit/admin-audit";
+import type { AdminAuditContext } from "@/lib/audit/admin-audit-context";
+import { ADMIN_AUDIT_ACTIONS } from "@/lib/audit/types";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { createLimitReachedError } from "@/lib/billing/guards";
 import type { SessionUser } from "@/lib/auth/session";
@@ -68,8 +72,60 @@ function normalizeEntityId(entityId: string): string {
   return entityId.trim();
 }
 
-async function clearSystemConfigFocal(key: string): Promise<void> {
-  await prisma.systemConfig.deleteMany({ where: { key } });
+/** Кто меняет фото сайта: аудит админки берёт из запроса IP и браузер. */
+export type MediaMutationOptions = { auditContext?: AdminAuditContext };
+
+type SiteAssetSetting = {
+  settingKey: string;
+  focalKey: string;
+  action: AdminAuditAction;
+};
+
+/**
+ * ADMIN-AUDIT-SITE-MEDIA: логотип и фото страницы входа — настройки сайта, но
+ * меняются они через общий `/api/media`, а не через `/api/admin/*`, поэтому
+ * сторож аудита админки (`admin-audit-coverage.test.ts`) их не видит, и
+ * значения `SETTINGS_LOGO_UPDATED` / `SETTINGS_LOGIN_HERO_UPDATED` не писал
+ * никто. Какое фото сайта — какая настройка и какое действие аудита, решает
+ * только эта функция; настройка и строка аудита пишутся одной транзакцией
+ * (инв. #18).
+ */
+function siteAssetSetting(entityType: MediaEntityType, entityId: string, kind: MediaKind): SiteAssetSetting | null {
+  if (entityType !== MediaEntityType.SITE || entityId !== "site") return null;
+  if (kind === MediaKind.AVATAR) {
+    return {
+      settingKey: SITE_LOGO_SETTING_KEY,
+      focalKey: SITE_LOGO_FOCAL_SETTING_KEY,
+      action: ADMIN_AUDIT_ACTIONS.SETTINGS_LOGO_UPDATED,
+    };
+  }
+  if (kind === MediaKind.PORTFOLIO) {
+    return {
+      settingKey: SITE_LOGIN_HERO_SETTING_KEY,
+      focalKey: SITE_LOGIN_HERO_FOCAL_SETTING_KEY,
+      action: ADMIN_AUDIT_ACTIONS.SETTINGS_LOGIN_HERO_UPDATED,
+    };
+  }
+  return null;
+}
+
+function auditSiteAssetChange(input: {
+  tx: Prisma.TransactionClient;
+  user: SessionUser;
+  setting: SiteAssetSetting;
+  assetId: string;
+  details: { operation: "upload" | "delete" | "crop"; wasCurrent?: boolean };
+  options?: MediaMutationOptions;
+}) {
+  return createAdminAuditLog({
+    tx: input.tx,
+    adminUserId: input.user.id,
+    action: input.setting.action,
+    targetType: "media",
+    targetId: input.assetId,
+    details: input.details,
+    context: input.options?.auditContext,
+  });
 }
 
 function validateUploadBasics(input: UploadMediaInput): void {
@@ -515,7 +571,11 @@ async function invalidateClientAvatarCaches(entityType: MediaEntityType, entityI
   });
 }
 
-export async function uploadMediaAsset(user: SessionUser, input: UploadMediaInput): Promise<MediaAssetDto> {
+export async function uploadMediaAsset(
+  user: SessionUser,
+  input: UploadMediaInput,
+  options?: MediaMutationOptions,
+): Promise<MediaAssetDto> {
   validateUploadBasics(input);
   const entityId = normalizeEntityId(input.entityId);
 
@@ -635,31 +695,24 @@ export async function uploadMediaAsset(user: SessionUser, input: UploadMediaInpu
     });
   }
 
-  if (
-    input.entityType === MediaEntityType.SITE &&
-    entityId === "site" &&
-    input.kind === MediaKind.AVATAR
-  ) {
-    await prisma.appSetting.upsert({
-      where: { key: SITE_LOGO_SETTING_KEY },
-      update: { value: readyAsset.id },
-      create: { key: SITE_LOGO_SETTING_KEY, value: readyAsset.id },
+  const siteSetting = siteAssetSetting(input.entityType, entityId, input.kind);
+  if (siteSetting) {
+    await prisma.$transaction(async (tx) => {
+      await tx.appSetting.upsert({
+        where: { key: siteSetting.settingKey },
+        update: { value: readyAsset.id },
+        create: { key: siteSetting.settingKey, value: readyAsset.id },
+      });
+      await tx.systemConfig.deleteMany({ where: { key: siteSetting.focalKey } });
+      await auditSiteAssetChange({
+        tx,
+        user,
+        setting: siteSetting,
+        assetId: readyAsset.id,
+        details: { operation: "upload" },
+        options,
+      });
     });
-    await clearSystemConfigFocal(SITE_LOGO_FOCAL_SETTING_KEY);
-    await invalidateSiteAssetCache();
-  }
-
-  if (
-    input.entityType === MediaEntityType.SITE &&
-    entityId === "site" &&
-    input.kind === MediaKind.PORTFOLIO
-  ) {
-    await prisma.appSetting.upsert({
-      where: { key: SITE_LOGIN_HERO_SETTING_KEY },
-      update: { value: readyAsset.id },
-      create: { key: SITE_LOGIN_HERO_SETTING_KEY, value: readyAsset.id },
-    });
-    await clearSystemConfigFocal(SITE_LOGIN_HERO_FOCAL_SETTING_KEY);
     await invalidateSiteAssetCache();
   }
 
@@ -851,7 +904,11 @@ export async function uploadChatAttachmentAsset(
   return { id: created.id };
 }
 
-export async function deleteMediaAsset(user: SessionUser, assetId: string): Promise<{ id: string }> {
+export async function deleteMediaAsset(
+  user: SessionUser,
+  assetId: string,
+  options?: MediaMutationOptions,
+): Promise<{ id: string }> {
   const asset = await prisma.mediaAsset.findUnique({
     where: { id: assetId },
   });
@@ -860,39 +917,30 @@ export async function deleteMediaAsset(user: SessionUser, assetId: string): Prom
   }
 
   await ensureCanManageMedia(user, asset.entityType, asset.entityId, asset.kind);
+
+  // Настройка сайта снимается ДО удаления фото: иначе между шагами логотип
+  // указывал бы на удалённый файл, а сбой аудита оставлял бы удаление без следа.
+  const siteSetting = siteAssetSetting(asset.entityType, asset.entityId, asset.kind);
+  if (siteSetting) {
+    await prisma.$transaction(async (tx) => {
+      const removed = await tx.appSetting.deleteMany({
+        where: { key: siteSetting.settingKey, value: asset.id },
+      });
+      if (removed.count > 0) {
+        await tx.systemConfig.deleteMany({ where: { key: siteSetting.focalKey } });
+      }
+      await auditSiteAssetChange({
+        tx,
+        user,
+        setting: siteSetting,
+        assetId: asset.id,
+        details: { operation: "delete", wasCurrent: removed.count > 0 },
+        options,
+      });
+    });
+  }
+
   await deleteAssetById(asset.id);
-
-  if (
-    asset.entityType === MediaEntityType.SITE &&
-    asset.entityId === "site" &&
-    asset.kind === MediaKind.AVATAR
-  ) {
-    const removed = await prisma.appSetting.deleteMany({
-      where: {
-        key: SITE_LOGO_SETTING_KEY,
-        value: asset.id,
-      },
-    });
-    if (removed.count > 0) {
-      await clearSystemConfigFocal(SITE_LOGO_FOCAL_SETTING_KEY);
-    }
-  }
-
-  if (
-    asset.entityType === MediaEntityType.SITE &&
-    asset.entityId === "site" &&
-    asset.kind === MediaKind.PORTFOLIO
-  ) {
-    const removed = await prisma.appSetting.deleteMany({
-      where: {
-        key: SITE_LOGIN_HERO_SETTING_KEY,
-        value: asset.id,
-      },
-    });
-    if (removed.count > 0) {
-      await clearSystemConfigFocal(SITE_LOGIN_HERO_FOCAL_SETTING_KEY);
-    }
-  }
 
   if (
     asset.kind === MediaKind.AVATAR &&
@@ -932,7 +980,8 @@ export async function deleteMediaAsset(user: SessionUser, assetId: string): Prom
 export async function updateMediaCrop(
   user: SessionUser,
   assetId: string,
-  input: { cropX: number; cropY: number; cropWidth: number; cropHeight: number }
+  input: { cropX: number; cropY: number; cropWidth: number; cropHeight: number },
+  options?: MediaMutationOptions,
 ): Promise<MediaAssetDto> {
   const asset = await prisma.mediaAsset.findUnique({
     where: { id: assetId },
@@ -943,7 +992,7 @@ export async function updateMediaCrop(
 
   await ensureCanManageMedia(user, asset.entityType, asset.entityId, asset.kind);
 
-  const updated = await prisma.mediaAsset.update({
+  const cropUpdate = {
     where: { id: asset.id },
     data: {
       cropX: input.cropX,
@@ -951,7 +1000,22 @@ export async function updateMediaCrop(
       cropWidth: input.cropWidth,
       cropHeight: input.cropHeight,
     },
-  });
+  };
+  const siteSetting = siteAssetSetting(asset.entityType, asset.entityId, asset.kind);
+  const updated = siteSetting
+    ? await prisma.$transaction(async (tx) => {
+        const row = await tx.mediaAsset.update(cropUpdate);
+        await auditSiteAssetChange({
+          tx,
+          user,
+          setting: siteSetting,
+          assetId: asset.id,
+          details: { operation: "crop" },
+          options,
+        });
+        return row;
+      })
+    : await prisma.mediaAsset.update(cropUpdate);
 
   // CROP-PUBLIC-01: публичная ссылка аватара несёт версию области, поэтому
   // новая область — новая ссылка в `Provider.avatarUrl`. Только если это
