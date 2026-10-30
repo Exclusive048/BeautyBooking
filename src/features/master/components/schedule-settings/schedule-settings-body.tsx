@@ -41,17 +41,15 @@ const TABS: TabItem[] = [
 ];
 
 /**
- * STUDIO-PROFILE-RULES-TAB-STATE: у расписания профиля в студии (`?profile=`)
- * только календарь. Паузу, правила записи и видимость профиля в студии меняет
- * студия (режим администратора), заявка мастера их не несёт, и роут на их
- * изменение отвечает 403. Раньше вкладки были редактируемыми, автосохранение
- * писало «Сохранено», а значения молча откатывались. Скрыты, а не показаны
- * только для чтения: сырые значения профиля — не те правила, по которым
- * записывают в студию (окно записи — строже из студии и мастера, отмена —
- * по правилам студии), и показ их как «ваших правил» вводил бы в заблуждение.
+ * STUDIO-PROFILE-PERSONAL-RULES (решение владельца 2026-10-30): у расписания
+ * профиля в студии (`?profile=`) те же четыре вкладки, но «Перерывы»,
+ * «Правила» и «Видимость» несут только ЛИЧНЫЕ правила мастера — они
+ * применяются сразу, без заявки (`lib/schedule/studio-profile-rules.ts`).
+ * Общего для студии (отмена записи, точность времени в каталоге) и горящих
+ * окошек вкладки не показывают — роут их изменение отказывает. Пояснение над
+ * вкладкой говорит, что окно записи и приём новых клиентов действуют строже
+ * из правил мастера и студии: сырое значение профиля — не всё правило.
  */
-const STUDIO_PROFILE_TABS: TabItem[] = TABS.filter((item) => item.id === "calendar");
-
 type Props = {
   initialSnapshot: ScheduleEditorSnapshot;
   /** Forwarded to the Rules tab so it can render the locked Hot Slots state. */
@@ -91,8 +89,7 @@ export function ScheduleSettingsBody({ initialSnapshot, hotSlotsAllowed, studioA
   // Старые ссылки на «Особые дни» и «Часы» ведут в календарь — их заменили
   // календарь и окно графика.
   const requested = raw === "exceptions" || raw === "hours" ? "calendar" : raw;
-  const tabs = studioProfile ? STUDIO_PROFILE_TABS : TABS;
-  const active: TabId = tabs.some((item) => item.id === requested) ? (requested as TabId) : defaultTab;
+  const active: TabId = TABS.some((item) => item.id === requested) ? (requested as TabId) : defaultTab;
 
   const setTab = (next: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -132,13 +129,13 @@ export function ScheduleSettingsBody({ initialSnapshot, hotSlotsAllowed, studioA
         }}
       />
 
-      {studioProfile ? (
-        <Notice tone="info" data-testid="studio-profile-settings-note">
-          {T.studioProfileSettingsNote}
+      <Tabs items={TABS} value={active} onChange={setTab} />
+
+      {studioProfile && active !== "calendar" ? (
+        <Notice tone="info" data-testid="studio-profile-rules-note">
+          {T.studioProfileRulesNote}
         </Notice>
-      ) : (
-        <Tabs items={tabs} value={active} onChange={setTab} />
-      )}
+      ) : null}
 
       <div key={revision}>
         {active === "calendar" ? (

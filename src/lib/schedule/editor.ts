@@ -23,6 +23,7 @@ import {
   type VisibilityDto,
 } from "@/lib/schedule/editor-shared";
 import { invalidateSlotsForMaster } from "@/lib/schedule/slotsCache";
+import type { StudioProfilePersonalRules } from "@/lib/schedule/studio-profile-rules";
 import { loadSchedulePlan, readWeekRepresentation, saveWeekAsPatternTx } from "@/lib/schedule/patterns";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 
@@ -515,6 +516,34 @@ export async function applyProviderBookingPolicy(
     select: { id: true },
   });
 
+  await invalidateSlotsForMaster(providerId);
+}
+
+/**
+ * STUDIO-PROFILE-PERSONAL-RULES — узкий writer личных правил профиля мастера в
+ * студии (что личное, а что общее для студии — `studio-profile-rules.ts`).
+ * Отдельно от снапшота по той же причине, что `applyProviderBookingPolicy`:
+ * снапшот пишет и неделю, а неделя профиля в студии меняется только заявкой.
+ * Шаг и пауза входят в ключ кэша окошек — сброс обязателен, остальное
+ * сбрасывается заодно (см. выше).
+ */
+export async function applyStudioProfileRules(
+  providerId: string,
+  rules: StudioProfilePersonalRules
+): Promise<void> {
+  const data: Prisma.ProviderUpdateInput = {};
+  if (rules.slotStepMin !== undefined) data.slotStepMin = normalizeSlotStepMin(rules.slotStepMin);
+  if (rules.bufferBetweenBookingsMin !== undefined) {
+    data.bufferBetweenBookingsMin = normalizeBufferMin(rules.bufferBetweenBookingsMin);
+  }
+  if (rules.minHoursAhead !== undefined) data.minBookingHoursAhead = rules.minHoursAhead;
+  if (rules.maxDaysAhead !== undefined) data.maxBookingDaysAhead = rules.maxDaysAhead;
+  if (rules.autoConfirm !== undefined) data.autoConfirmBookings = rules.autoConfirm;
+  if (rules.visibleSlotDays !== undefined) data.visibleSlotDays = rules.visibleSlotDays;
+  if (rules.acceptNewClients !== undefined) data.acceptNewClients = rules.acceptNewClients;
+  if (Object.keys(data).length === 0) return;
+
+  await prisma.provider.update({ where: { id: providerId }, data, select: { id: true } });
   await invalidateSlotsForMaster(providerId);
 }
 
