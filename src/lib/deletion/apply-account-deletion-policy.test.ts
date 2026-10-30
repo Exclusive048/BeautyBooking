@@ -22,9 +22,16 @@ vi.mock("@/lib/deletion/account-deletion-actions", async (importOriginal) => {
   return { ...actions, CLIENT_BOOKING_NOT_ANONYMIZED: original.CLIENT_BOOKING_NOT_ANONYMIZED };
 });
 
+// Транзакция отложенного прохода: действия политики подменены, а пометка медиа
+// (MEDIA-PURGE-MARK-DELETED, `media/soft-delete.ts`) — настоящая, поэтому у
+// двойника транзакции есть ровно те две модели, которые она пишет.
+const deferredTx = vi.hoisted(() => ({
+  mediaAsset: { updateMany: vi.fn(async () => ({ count: 1 })) },
+  mediaAssetEmbedding: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+}));
 const prismaMock = vi.hoisted(() => ({
   userProfile: { findMany: vi.fn(async (): Promise<Array<{ id: string }>> => []) },
-  $transaction: vi.fn(async (cb: (tx: unknown) => Promise<unknown>) => cb({})),
+  $transaction: vi.fn(async (cb: (tx: unknown) => Promise<unknown>) => cb(deferredTx)),
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 const purge = vi.hoisted(() => ({ enqueueMediaPurge: vi.fn(async () => undefined) }));
@@ -128,8 +135,13 @@ describe("отложенный проход", () => {
     expect(where.isDeleted).toBe(true);
     expect(where.deletedAt).toEqual({ lt: new Date("2023-10-01T12:00:00Z") });
     expect(where.bookings).toBeDefined();
-    expect(actions.anonymizeClientBookingsTx).toHaveBeenCalledWith({}, ["u1", "u2"]);
+    expect(actions.anonymizeClientBookingsTx).toHaveBeenCalledWith(deferredTx, ["u1", "u2"]);
     expect(actions.collectPolicyMedia).toHaveBeenCalledWith(prismaMock, ["u1", "u2"], ["BOOKING_REFERENCE"]);
+    // MEDIA-PURGE-MARK-DELETED: медиа связи помечено удалённым той же транзакцией.
+    expect(deferredTx.mediaAsset.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ["m1"] }, deletedAt: null },
+      data: expect.objectContaining({ deletedAt: NOW }),
+    });
     expect(purge.enqueueMediaPurge).toHaveBeenCalledWith([{ id: "m1", storageKey: "k1" }], "account-deletion", null);
     expect(summary.bookingsAnonymized).toBe(1);
   });
@@ -157,7 +169,7 @@ describe("отложенный проход", () => {
     const where = (prismaMock.userProfile.findMany.mock.calls[0] as unknown as [{ where: Record<string, unknown> }])[0]
       .where;
     expect(where).toEqual({ isDeleted: true, deletedAt: { lt: new Date("2023-10-01T12:00:00Z") }, consents: { some: {} } });
-    expect(actions.deleteConsentsTx).toHaveBeenCalledWith({}, ["u9"]);
+    expect(actions.deleteConsentsTx).toHaveBeenCalledWith(deferredTx, ["u9"]);
     expect(summary.consentsDeleted).toBe(1);
   });
 });

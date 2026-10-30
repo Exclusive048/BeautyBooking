@@ -24,9 +24,23 @@ const providerUpdateMany = vi.hoisted(() => vi.fn(async () => ({ count: 1 })));
 const collectProviderMedia = vi.hoisted(() => vi.fn(async () => [{ id: "m1", storageKey: "k1" }]));
 const enqueueMediaPurge = vi.hoisted(() => vi.fn(async () => undefined));
 
-vi.mock("@/lib/prisma", () => ({
-  prisma: { provider: { deleteMany: providerDeleteMany, updateMany: providerUpdateMany } },
-}));
+// MEDIA-PURGE-MARK-DELETED: удаление строки и пометка её фото — одна
+// транзакция; пометка (`media/soft-delete.ts`) настоящая.
+const mediaUpdateMany = vi.hoisted(() => vi.fn(async () => ({ count: 1 })));
+const embeddingDeleteMany = vi.hoisted(() => vi.fn(async () => ({ count: 0 })));
+vi.mock("@/lib/prisma", () => {
+  const tx = {
+    provider: { deleteMany: providerDeleteMany },
+    mediaAsset: { updateMany: mediaUpdateMany },
+    mediaAssetEmbedding: { deleteMany: embeddingDeleteMany },
+  };
+  return {
+    prisma: {
+      provider: { deleteMany: providerDeleteMany, updateMany: providerUpdateMany },
+      $transaction: async (cb: (client: typeof tx) => unknown) => cb(tx),
+    },
+  };
+});
 vi.mock("@/lib/media/purge", () => ({ collectProviderMedia }));
 vi.mock("@/lib/deletion/enqueue-media-purge", () => ({ enqueueMediaPurge }));
 
@@ -40,6 +54,7 @@ beforeEach(() => {
   providerDeleteMany.mockReset();
   providerUpdateMany.mockClear();
   enqueueMediaPurge.mockClear();
+  mediaUpdateMany.mockClear();
 });
 
 describe("discardStagedMaster", () => {
@@ -59,6 +74,16 @@ describe("discardStagedMaster", () => {
     providerDeleteMany.mockResolvedValue({ count: 0 });
     await expect(discardStagedMaster("stub")).resolves.toBe("kept");
     expect(enqueueMediaPurge).not.toHaveBeenCalled();
+    expect(mediaUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("MEDIA-PURGE-MARK-DELETED: фото удалённой заготовки помечаются удалёнными сразу", async () => {
+    providerDeleteMany.mockResolvedValue({ count: 1 });
+    await discardStagedMaster("stub");
+    expect(mediaUpdateMany).toHaveBeenCalledWith({
+      where: { id: { in: ["m1"] }, deletedAt: null },
+      data: expect.objectContaining({ deletedAt: expect.any(Date), visualCategory: null }),
+    });
   });
 
   it("фото заготовки уходят в очистку хранилища вместе со строкой", async () => {
@@ -74,6 +99,7 @@ describe("discardStagedMaster", () => {
   it("держит внешний ключ — отвязывается, как раньше, и тоже только ничейная", async () => {
     providerDeleteMany.mockRejectedValue(prismaError("P2003"));
     await expect(discardStagedMaster("stub")).resolves.toBe("detached");
+    expect(mediaUpdateMany).not.toHaveBeenCalled();
     expect(providerUpdateMany).toHaveBeenCalledWith({
       where: { id: "stub", ownerUserId: null },
       data: { studioId: null, isPublished: false },

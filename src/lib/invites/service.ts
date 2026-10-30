@@ -7,6 +7,7 @@ import { normalizeInviteEmail, resolveInviteAccess } from "@/lib/invites/access"
 import { resolveMasterInviteReadiness } from "@/lib/invites/master-readiness";
 import { logError } from "@/lib/logging/logger";
 import { collectProviderMedia } from "@/lib/media/purge";
+import { markAssetsDeletedTx } from "@/lib/media/soft-delete";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prisma } from "@/lib/prisma";
 import { ensureStudioTeamLimit } from "@/lib/studio/team-limits";
@@ -454,7 +455,14 @@ export async function discardStagedMaster(
   try {
     // Удаляется только НИЧЕЙНАЯ строка: условие в самой записи, а не в
     // вызывающем, — кабинет, успевший получить владельца, не удалится никогда.
-    const removed = await prisma.provider.deleteMany({ where: { id: stagedMasterId, ownerUserId: null } });
+    // MEDIA-PURGE-MARK-DELETED: фото удалённой заготовки помечаются той же
+    // транзакцией — аватар публичен по построению и иначе отдавался бы, пока
+    // `media.purge` не доберётся до строки.
+    const removed = await prisma.$transaction(async (tx) => {
+      const result = await tx.provider.deleteMany({ where: { id: stagedMasterId, ownerUserId: null } });
+      if (result.count > 0) await markAssetsDeletedTx(tx, media.map((asset) => asset.id));
+      return result;
+    });
     if (removed.count === 0) return "kept";
     await enqueueMediaPurge(media, "staged-master-discard", null);
     return "deleted";
