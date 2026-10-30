@@ -2,10 +2,13 @@ import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.studioCabinet.scheduleV2.legend;
 
+// SCHEDULE-FLEX-DATE-NAV: «подтверждено» — тот же `accent-text`, что у
+// карточки и точки (в тёмной теме `primary` сливался с фоном), у перерыва —
+// граница `border-control`: `border-subtle` на 10px не различалась в тёмной.
 const ITEMS: Array<{ key: keyof typeof T; class: string }> = [
   {
     key: "confirmed",
-    class: "bg-primary/40 border border-primary/60",
+    class: "bg-accent-text/40 border border-accent-text/60",
   },
   {
     key: "pending",
@@ -17,7 +20,7 @@ const ITEMS: Array<{ key: keyof typeof T; class: string }> = [
   },
   {
     key: "break",
-    class: "bg-bg-input border border-dashed border-border-subtle",
+    class: "bg-bg-input border border-dashed border-border-control",
   },
 ];
 

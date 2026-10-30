@@ -8,19 +8,18 @@ import type { ScheduleDay } from "@/lib/master/schedule.service";
 import { formatLocalHm } from "@/lib/schedule/timezone";
 import { UI_FMT } from "@/lib/ui/fmt";
 import * as UI_TEXT from "@/lib/ui/text";
+import { pluralize } from "@/lib/utils/pluralize";
 
 const T = UI_TEXT.cabinetMaster.schedule;
 
 function bookingsLabel(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  const word =
-    mod10 === 1 && mod100 !== 11
-      ? T.bookingsLabelOne
-      : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
-        ? T.bookingsLabelFew
-        : T.bookingsLabelMany;
-  return `${UI_FMT.count(n)} ${word}`;
+  return `${UI_FMT.count(n)} ${pluralize(n, T.bookingsLabelOne, T.bookingsLabelFew, T.bookingsLabelMany)}`;
+}
+
+/** Точка статуса — те же цвета, что у карточки в сетке и в легенде под ней. */
+function dotClass(booking: ScheduleDay["bookings"][number]): string {
+  if (booking.runtimeStatus === "PENDING" || booking.runtimeStatus === "CHANGE_REQUESTED") return "bg-warning";
+  return booking.isNewClient ? "bg-success" : "bg-brand-gradient";
 }
 
 type Props = {
@@ -74,7 +73,8 @@ export function WeekAgenda({ days, timezone, weekStartIso, showWorkContext = fal
                     booking.runtimeStatus === "PENDING" || booking.runtimeStatus === "CHANGE_REQUESTED";
                   return (
                     <li key={booking.id} className="flex items-start gap-3 px-3 py-2">
-                      <span className="w-[6.5rem] shrink-0 text-xs font-medium tabular-nums text-text-main">
+                      <span className="flex w-[6.5rem] shrink-0 items-center gap-1.5 text-xs font-medium tabular-nums text-text-main">
+                        <span aria-hidden className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dotClass(booking))} />
                         {formatLocalHm(booking.startAtUtc, timezone)}–{formatLocalHm(booking.endAtUtc, timezone)}
                       </span>
                       <span className="min-w-0 flex-1">

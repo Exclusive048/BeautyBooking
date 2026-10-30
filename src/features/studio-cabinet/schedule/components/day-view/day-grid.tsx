@@ -256,7 +256,10 @@ export function DayGrid({
                           data-focus-id={booking.id}
                           onClick={() => setActiveBooking(booking)}
                           className={cn(
-                            "absolute z-10 overflow-hidden rounded-lg p-1.5 text-left text-2xs leading-tight transition-shadow hover:shadow-sm",
+                            // flex-col + justify-start: нативная <button> центрирует
+                            // содержимое по вертикали, и у записи на три часа время
+                            // стояло посередине карточки, а не у её начала.
+                            "absolute z-10 flex flex-col justify-start overflow-hidden rounded-lg p-1.5 text-left text-2xs leading-tight transition-shadow hover:shadow-sm",
                             BOOKING_CELL_CLASS[booking.tone],
                           )}
                           style={{

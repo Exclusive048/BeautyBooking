@@ -59,10 +59,15 @@ export function bookingToneFromRuntimeStatus(
 /**
  * Tailwind class bundle for the absolute-positioned booking cell. Kept
  * close to the tone map so visual + semantic stay in sync.
+ *
+ * SCHEDULE-FLEX-DATE-NAV: «подтверждено» — на `accent-text`, а не на
+ * `primary`. В светлой теме это тот же бордовый (114 8 8), в тёмной —
+ * золото: тёмный `primary` (#7A102C) на карточке #302026 давал карточку
+ * без видимой границы. Тот же цвет — у точки и в легенде.
  */
 export const BOOKING_CELL_CLASS: Record<BookingStatusTone, string> = {
   confirmed:
-    "border border-primary/40 bg-primary/15 text-text-main hover:bg-primary/20",
+    "border border-accent-text/40 bg-accent-text/15 text-text-main hover:bg-accent-text/20",
   pending:
     "border border-warning-border bg-warning-surface text-warning-text hover:brightness-95",
   new: "border border-success-border bg-success-surface text-success-text hover:brightness-95",

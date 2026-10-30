@@ -92,7 +92,9 @@ export function WeekGridColumn({
         </div>
       ))}
 
-      {day.isOff ? <DayOffOverlay /> : null}
+      {day.isOff ? (
+        <DayOffOverlay occupied={occupied} hourStart={hourStart} hourEnd={hourEnd} hourPx={hourPx} />
+      ) : null}
 
       {!day.isOff ? (
         <EmptyCellsOverlay
