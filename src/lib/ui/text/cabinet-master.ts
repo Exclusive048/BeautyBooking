@@ -55,7 +55,6 @@ export const cabinetMaster = {
   scheduleSettings: {
     breadcrumb: "Настройки расписания",
     title: "Настройки расписания",
-    subtitle: "График, календарь, перерывы и правила записи",
     studioApproval: {
       infoTemplate:
         "Вы в команде студии «{studio}». Рабочие дни и часы в студии меняются через одобрение студии — до подтверждения действует текущее расписание. Паузу, шаг окошек и правила записи вы меняете сами.",
@@ -460,7 +459,6 @@ export const cabinetMaster = {
   notifications: {
     breadcrumb: "Уведомления",
     title: "Уведомления",
-    subtitle: "Всё по работе с клиентами",
     emptyTitle: "Здесь пока пусто",
     emptyBody:
       "Новые записи, отзывы и сообщения от клиентов будут появляться тут. А приглашения от студий и новости по аккаунту — на странице «Личные».",
@@ -468,26 +466,6 @@ export const cabinetMaster = {
     markAllRead: "Прочитать всё",
     markRead: "Отметить прочитанным",
     settingsAria: "Настройки уведомлений",
-    kpi: {
-      unreadLabel: "Непрочитанных",
-      unreadValueTemplate: "{unread} из {total}",
-      todayLabel: "Сегодня",
-      todayValueTemplate: "{count} {word}",
-      todayWordOne: "уведомление",
-      todayWordFew: "уведомления",
-      todayWordMany: "уведомлений",
-      waitingLabel: "Ждут ответа",
-      waitingValueTemplate: "{count} {word}",
-      waitingWordOne: "запись",
-      waitingWordFew: "записи",
-      waitingWordMany: "записей",
-      waitingNone: "Нет ожидающих",
-      pushLabel: "Уведомления на телефон",
-      pushOn: "Включены",
-      pushOff: "Выключены",
-      pushOnHint: "Приходят автоматически",
-      pushOffCta: "Включить уведомления",
-    },
     tabs: {
       all: "Все",
       unread: "Непрочитанные",
@@ -531,7 +509,6 @@ export const cabinetMaster = {
   reviews: {
     breadcrumb: "Отзывы",
     title: "Отзывы",
-    subtitle: "Отвечайте на отзывы и слушайте клиентов — так растёт репутация",
     hero: {
       outOfFive: "/ 5",
       basedOnTemplate: "По {count} {word} · вы ответили на {rate}%",
@@ -546,14 +523,6 @@ export const cabinetMaster = {
       rowAria: (star: number, count: number, percent: number) =>
         `${star} звёзд: ${count} (${percent}%)`,
       rowTemplate: "{count} · {percent}%",
-    },
-    kpi: {
-      unansweredLabel: "Без ответа",
-      unansweredNone: "Все отвечены",
-      responseTimeLabel: "Среднее время ответа",
-      responseTimeNone: "—",
-      photosLabel: "С фото",
-      photosNone: "—",
     },
     filters: {
       all: "Все",
@@ -602,7 +571,6 @@ export const cabinetMaster = {
   clients: {
     breadcrumb: "Клиенты",
     title: "Клиенты",
-    subtitle: "История работы с клиентами и аналитика",
     // PERF-06: подпись окна CRM-данных. Ключ ОДИН на оба кабинета (как
     // соседний `cardNotePlaceholder` — прецедент UI-33), число приходит из
     // CRM_CLIENTS_WINDOW_MONTHS (crm/clients-window.ts) — подпись и окно
@@ -622,18 +590,6 @@ export const cabinetMaster = {
     // UI-33: ключ ОДИН на оба кабинета — дровер общий для MASTER и STUDIO
     // (как и соседний `cardNotePlaceholder`), иначе формулировки разъедутся.
     cardPhotoAltTemplate: "Фото работы для клиента {name} № {n}",
-    kpi: {
-      totalLabel: "Всего клиентов",
-      totalSubtextTemplate: "+{count} за месяц",
-      totalSubtextNone: "новых нет",
-      ltvLabel: "Общая выручка",
-      ltvLabelTooltip: "Сумма всех завершённых записей всех клиентов",
-      ltvSubtextTemplate: "средняя {avg}",
-      frequencyLabel: "Средняя частота",
-      frequencySubtext: "визитов на клиента",
-      retentionLabel: "Возвращаемость",
-      retentionSubtext: "из новых стали постоянными",
-    },
     tabs: {
       all: "Все",
       new: "Новые",
@@ -748,18 +704,6 @@ export const cabinetMaster = {
   modelOffers: {
     breadcrumb: "Модели",
     title: "Модели",
-    subtitle:
-      "Опубликуйте окошко для модели — клиенты подадут заявку, а вы выберете подходящую",
-    kpi: {
-      activeOffersLabel: "Открытые предложения",
-      activeOffersEmpty: "Опубликуйте первый",
-      pendingLabel: "Ждут решения",
-      pendingEmpty: "Все рассмотрены",
-      conversionLabel: "Дошли до записи",
-      conversionEmpty: "—",
-      archivedLabel: "В архиве",
-      archivedEmpty: "—",
-    },
     activeSection: {
       heading: "Открытые предложения",
       soonAction: "Создать предложение",
@@ -919,7 +863,6 @@ export const cabinetMaster = {
   analytics: {
     breadcrumb: "Аналитика",
     title: "Аналитика",
-    subtitle: "Как идут дела и что можно улучшить",
     period: {
       chips: {
         d7: "7 дней",
@@ -1011,7 +954,6 @@ export const cabinetMaster = {
   profile: {
     breadcrumb: "Профиль",
     title: "Профиль",
-    subtitle: "Что видят клиенты в каталоге и на странице записи",
     sidebar: {
       completionLabel: "Заполнено",
       sectionsHeading: "Разделы профиля",
@@ -1141,13 +1083,7 @@ export const cabinetMaster = {
   portfolioPage: {
     breadcrumb: "Портфолио",
     title: "Портфолио",
-    subtitle: "Покажите ваши работы клиентам",
     addCta: "Добавить работы",
-    kpi: {
-      totalLabel: "Всего работ",
-      publicLabel: "В каталоге",
-      hiddenLabel: "Скрытые",
-    },
     filters: {
       all: "Все",
       public: "В каталоге",
@@ -1249,7 +1185,6 @@ export const cabinetMaster = {
   account: {
     breadcrumb: "Настройки аккаунта",
     title: "Настройки аккаунта",
-    subtitle: "Личное — недоступно клиентам",
     tabs: {
       navAria: "Разделы аккаунта",
       notifications: "Уведомления",
@@ -1335,7 +1270,6 @@ export const cabinetMaster = {
   servicesPage: {
     breadcrumb: "Услуги и цены",
     title: "Услуги и цены",
-    subtitle: "Что предлагаете клиентам и за сколько",
     // UI-18: подпись оставлена короткой — обе кнопки стоят в шапке рядом, и
     // на 390px удлинение обеих сжимает заголовок страницы до нечитаемого
     // огрызка (замерено скриншотами до/после). Действие называет `aria-label`:
@@ -1345,11 +1279,6 @@ export const cabinetMaster = {
     addServiceAria: "Добавить услугу",
     addBundleCta: "Пакет",
     addBundleAria: "Добавить пакет",
-    kpi: {
-      servicesLabel: "Услуг",
-      bundlesLabel: "Пакетов",
-      disabledLabel: "Отключено",
-    },
     filters: {
       all: "Все",
       services: "Услуги",
@@ -1476,23 +1405,6 @@ export const cabinetMaster = {
       // расписания (CTA-инфинитив: действие со страницы, не имя раздела).
       settings: "Настроить расписание",
     },
-    kpi: {
-      weekBookings: "Записей на неделе",
-      // PWA-UX-BATCH-01: короткие подписи для плиток 4-в-ряд на телефоне.
-      weekBookingsShort: "Записей",
-      freeTodayShort: "Свободно",
-      weekRevenue: "Доход",
-      load: "Загрузка",
-      loadHoursTemplate: "из {hours} ч",
-      freeToday: "Свободно сегодня",
-      freeTodaySlotOne: "окошко",
-      freeTodaySlotFew: "окошка",
-      freeTodaySlotMany: "окошек",
-      freeTodayAfterTemplate: "ближайшее в {time}",
-      freeTodayNone: "нет окошек",
-      // SCHEDULE-FLEX-DATE-NAV: свёрнутые показатели — одна строка.
-      summaryLoadTemplate: "загрузка {pct}%",
-    },
     legend: {
       confirmed: "Подтверждено",
       pending: "Ожидает",
@@ -1597,17 +1509,21 @@ export const cabinetMaster = {
     declineError: "Не удалось отклонить запись. Попробуйте ещё раз.",
     confirmError: "Не удалось подтвердить запись. Попробуйте ещё раз.",
   },
-  userChip: {
-    trialStatusTemplate: "PREMIUM · {days} дн.",
-    planLabels: {
-      free: "FREE",
-      pro: "PRO",
-      premium: "PREMIUM",
-    },
-  },
   dashboard: {
     // QA-115 (FIX-06): studio context for a studio master (null for independent).
     studioChipTemplate: "Студия «{name}»",
+    // Решение владельца 2026-10-31: вид подписки — только здесь, плашкой у
+    // «Новой записи» (раньше — в чипе сайдбара на каждой странице).
+    planBadge: {
+      labels: {
+        free: "FREE",
+        pro: "PRO",
+        premium: "PREMIUM",
+      },
+      /** Пробный период: тариф + сколько дней осталось (с `sm`; уже — только тариф). */
+      trialDays: (days: number) => `· ${days} дн.`,
+      aria: (plan: string) => `Тариф ${plan} — открыть подписку`,
+    },
     hero: {
       nextClientLabel: "Следующий клиент",
       nextClientIn: "через",

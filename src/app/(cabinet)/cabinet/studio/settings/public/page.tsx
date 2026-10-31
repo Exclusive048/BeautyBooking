@@ -47,14 +47,13 @@ export default async function StudioSettingsPublicPage() {
   // Шапка — как у остальных страниц кабинета студии; справа та же кнопка
   // «Посмотреть глазами клиента», что у мастера.
   return (
-    <div className="space-y-5 lg:space-y-6">
+    <div className="space-y-3 lg:space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <p className="mb-1 eyebrow">{studioName}</p>
           <h1 className="font-display text-2xl font-bold tracking-tight text-text-main md:text-3xl">
             {UI_TEXT.billing.publicPage.title}
           </h1>
-          <p className="mt-1 max-w-xl text-sm text-text-sec">{UI_TEXT.billing.publicPage.subtitle}</p>
         </div>
         <ClientViewLink publicUsername={publicUsername} />
       </header>

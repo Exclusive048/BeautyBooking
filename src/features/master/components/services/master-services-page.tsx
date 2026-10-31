@@ -13,7 +13,6 @@ import { AddServiceButton } from "./add-service-button";
 import { ServicesCategorizedList } from "./services-categorized-list";
 import { ServicesEmptyState } from "./services-empty-state";
 import { ServicesFilterChips } from "./services-filter-chips";
-import { ServicesKpiStrip } from "./services-kpi-strip";
 
 const T = UI_TEXT.cabinetMaster;
 
@@ -51,7 +50,7 @@ export async function MasterServicesPage({ searchParams }: Props) {
 
   const onlinePaymentsAvailable =
     Boolean(plan.features.onlinePayments) && Boolean(plan.system.onlinePaymentsEnabled);
-  const isFullyEmpty = view.kpi.servicesCount + view.kpi.bundlesCount + view.kpi.disabledCount === 0;
+  const isFullyEmpty = view.filterCounts.all === 0;
 
   return (
     <>
@@ -62,7 +61,6 @@ export async function MasterServicesPage({ searchParams }: Props) {
           { label: T.servicesPage.breadcrumb },
         ]}
         title={T.servicesPage.title}
-        subtitle={T.servicesPage.subtitle}
         actions={
           isFullyEmpty ? null : (
             <div className="flex flex-wrap items-center gap-2">
@@ -76,7 +74,7 @@ export async function MasterServicesPage({ searchParams }: Props) {
         }
       />
 
-      <div className="space-y-6 px-4 py-6 md:px-6 lg:px-8">
+      <div className="space-y-4 px-4 pb-6 pt-3 md:px-6 md:pt-4 lg:px-8">
         {isFullyEmpty ? (
           <ServicesEmptyState
             categories={view.availableCategories}
@@ -84,7 +82,6 @@ export async function MasterServicesPage({ searchParams }: Props) {
           />
         ) : (
           <>
-            <ServicesKpiStrip kpi={view.kpi} />
             <ServicesFilterChips
               filterCounts={view.filterCounts}
               activeFilter={view.activeFilter}

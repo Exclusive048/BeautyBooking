@@ -132,17 +132,3 @@ export function groupNotificationsByDay(
 
   return groups;
 }
-
-const RU_PLURAL_RULES = new Intl.PluralRules("ru-RU");
-
-export function pluralizeRu(
-  n: number,
-  one: string,
-  few: string,
-  many: string
-): string {
-  const form = RU_PLURAL_RULES.select(n);
-  if (form === "one") return one;
-  if (form === "few") return few;
-  return many;
-}

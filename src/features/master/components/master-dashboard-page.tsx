@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Building2 } from "lucide-react";
+import { SubscriptionScope } from "@prisma/client";
+import { Building2, Crown } from "lucide-react";
 import { env } from "@/lib/env";
 import { AnnouncementsSection } from "@/features/master/components/dashboard/announcements-section";
 import { AttentionSection } from "@/features/master/components/dashboard/attention-section";
@@ -11,11 +12,17 @@ import { UpcomingBookingsSection } from "@/features/master/components/dashboard/
 import { NewBookingButton } from "@/features/master/components/manual-booking/new-booking-button";
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
 import { FocusHighlighter } from "@/components/cabinet/focus-highlighter";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AppSetupCard } from "@/features/cabinet/components/app-setup-card";
 import { SetupGuideCard } from "@/features/cabinet/setup-guide/setup-guide-card";
 import { loadMasterSetupGuide } from "@/lib/onboarding/setup-guide";
 import { getSessionUser, getSessionUserId } from "@/lib/auth/session";
+import {
+  getCurrentSubscriptionRow,
+  isActiveTrial,
+  trialDaysLeft,
+} from "@/lib/billing/get-current-subscription-row";
 import { getCurrentMasterProviderId, getMasterWorkProfiles } from "@/lib/master/access";
 import { getMasterDashboardData } from "@/lib/master/dashboard.service";
 import { isScheduleEndingSoon } from "@/lib/schedule/calendar-shared";
@@ -54,12 +61,15 @@ export async function MasterDashboardPage() {
   // The sidebar still surfaces it via the layout's own `getUnreadBadgeCount`.
   // STUDIO-MASTER-PROFILES (этап 4): рабочие списки — по всем профилям мастера.
   const workProfiles = await getMasterWorkProfiles(userId);
-  const [data, schedulePlan, setupGuide] = await Promise.all([
+  const [data, schedulePlan, setupGuide, subscription] = await Promise.all([
     getMasterDashboardData({ masterId, workProfiles }),
     // SCHEDULE-PATTERNS-01 (этап 3): плашка «расписание скоро закончится».
     loadSchedulePlan(masterId),
     // SETUP-GUIDE-01: «Первые шаги» — пока кабинет не настроен до конца.
     loadMasterSetupGuide(userId),
+    // Вид подписки — только на главной (решение владельца 2026-10-31). Строка
+    // уже прочитана шеллом кабинета: `React.cache`, второго запроса нет.
+    getCurrentSubscriptionRow(userId, SubscriptionScope.MASTER),
   ]);
   const scheduleEndsOn = isScheduleEndingSoon(schedulePlan) ? schedulePlan.configuredUntil : null;
 
@@ -99,6 +109,13 @@ export async function MasterDashboardPage() {
 
   const HEADER = UI_TEXT.cabinetMaster.pageHeader;
   const HOME_TITLE = UI_TEXT.cabinetMaster.pageTitles.home;
+  const PLAN = UI_TEXT.cabinetMaster.dashboard.planBadge;
+
+  const onTrial = isActiveTrial(subscription);
+  const planTier = onTrial ? "PREMIUM" : (subscription?.planTier ?? "FREE");
+  const planLabel =
+    planTier === "PREMIUM" ? PLAN.labels.premium : planTier === "PRO" ? PLAN.labels.pro : PLAN.labels.free;
+  const trialDays = onTrial ? Math.max(trialDaysLeft(subscription.trialEndsAt), 0) : null;
 
   return (
     <>
@@ -113,12 +130,37 @@ export async function MasterDashboardPage() {
         // отдельная строка под ним отнимала ~60px первого экрана кабинета.
         actionsInline
         actions={
-          <NewBookingButton label={HEADER.newBookingCta} className="rounded-xl" />
+          <>
+            <Link
+              href="/cabinet/master/billing"
+              aria-label={PLAN.aria(planLabel)}
+              className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            >
+              <Badge
+                size="xs"
+                variant={planTier === "FREE" ? "muted" : "default"}
+                className="gap-1 transition-colors hover:border-primary"
+              >
+                {/* На 375px шапка — «Главная» + плашка + «Новая запись» в одну
+                    строку: корона и дни пробного периода появляются с `sm`,
+                    иначе обрезается заголовок. Об окончании пробного периода
+                    за 3 дня скажет баннер шелла. */}
+                {planTier === "FREE" ? null : (
+                  <Crown className="hidden h-3 w-3 shrink-0 text-accent-text sm:block" aria-hidden />
+                )}
+                {planLabel}
+                {trialDays !== null ? (
+                  <span className="hidden sm:inline">{PLAN.trialDays(trialDays)}</span>
+                ) : null}
+              </Badge>
+            </Link>
+            <NewBookingButton label={HEADER.newBookingCta} className="rounded-xl" />
+          </>
         }
       />
       <FocusHighlighter />
 
-      <div className="space-y-6 px-4 py-6 md:px-6 lg:px-8">
+      <div className="space-y-4 px-4 pb-6 pt-3 md:space-y-6 md:px-6 md:pt-4 lg:px-8">
         {/* QA-115 (FIX-06): studio context for a studio master (nothing for independent). */}
         {data.master.studio ? (
           <div className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-bg-card px-3 py-1 text-xs text-text-sec">
@@ -175,7 +217,7 @@ export async function MasterDashboardPage() {
           }
         />
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.4fr_1fr]">
+        <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-[1.4fr_1fr]">
           <UpcomingBookingsSection
             upcoming={data.upcomingBookings}
             totalTodayCount={data.todayBookings.length}
@@ -191,7 +233,7 @@ export async function MasterDashboardPage() {
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-2">
           <QuickActionsSection publicProfileUrl={publicProfileUrl} />
           <AnnouncementsSection />
         </div>

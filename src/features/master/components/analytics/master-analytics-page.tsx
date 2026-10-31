@@ -89,10 +89,9 @@ export async function MasterAnalyticsPage({ searchParams }: Props) {
           { label: T.analytics.breadcrumb },
         ]}
         title={T.analytics.title}
-        subtitle={T.analytics.subtitle}
       />
 
-      <div className="space-y-6 px-4 py-6 md:px-6 lg:px-8">
+      <div className="space-y-4 px-4 pb-6 pt-3 md:space-y-6 md:px-6 md:pt-4 lg:px-8">
         <PeriodSelectorBar
           activePeriod={periodId}
           comparison={comparison}

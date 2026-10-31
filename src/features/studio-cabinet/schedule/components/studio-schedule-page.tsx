@@ -1,9 +1,7 @@
-import { KpiPanel } from "@/features/schedule-nav/components/kpi-panel";
 import type { StudioScheduleView } from "../lib/view-state";
 import type { StudioScheduleData } from "../server/types";
 import { DayGrid } from "./day-view/day-grid";
 import { ScheduleHeader } from "./schedule-header";
-import { ScheduleKpiRow, ScheduleKpiSummary } from "./schedule-kpi-row";
 import { ScheduleLegend } from "./schedule-legend";
 import { StudioWeekAgenda } from "./week-view/week-agenda";
 import { WeekGrid } from "./week-view/week-grid";
@@ -24,20 +22,18 @@ type Props = {
 
 /**
  * Server orchestrator for `/cabinet/studio/calendar`. Receives the
- * pre-fetched schedule payload and lays out: header → KPI → day or week
- * grid (driven by `?view`) → legend.
+ * pre-fetched schedule payload and lays out: header → day or week grid
+ * (driven by `?view`) → legend.
  *
- * SCHEDULE-FLEX-DATE-NAV: показатели сворачиваются в одну строку (на телефоне
- * — по умолчанию), неделя на ПК — таблица с записями, на телефоне — список по
- * дням. Легенда цветов — под сеткой: справка, а не первое, что видно.
+ * Плиток с показателями периода здесь нет: суммы и загрузка — в аналитике и
+ * на главной кабинета, календарь сразу показывает сетку. Неделя на ПК —
+ * таблица с записями, на телефоне — список по дням. Легенда цветов — под
+ * сеткой: справка, а не первое, что видно.
  */
 export function StudioSchedulePage({ studioId, view, data, focusMasterId }: Props) {
   const week = view === "week" ? data.week : null;
-  const includesToday = week
-    ? week.days.some((day) => day.dateKey === data.todayKey)
-    : data.dateKey === data.todayKey;
   return (
-    <div className="space-y-4 lg:space-y-5">
+    <div className="space-y-3 lg:space-y-5">
       <ScheduleHeader
         studioId={studioId}
         view={view}
@@ -50,9 +46,6 @@ export function StudioSchedulePage({ studioId, view, data, focusMasterId }: Prop
         services={data.services}
         freeWindows={data.freeWindows}
       />
-      <KpiPanel storageKey="mr-schedule-kpi-studio" summary={<ScheduleKpiSummary kpis={data.kpis} />}>
-        <ScheduleKpiRow kpis={data.kpis} view={view} includesToday={includesToday} />
-      </KpiPanel>
       {week ? (
         <>
           <div className="hidden md:block">

@@ -37,10 +37,9 @@ export default async function MasterSettingsPublicPage() {
           { label: UI_TEXT.cabinetMaster.nav.items.myPage },
         ]}
         title={UI_TEXT.billing.publicPage.title}
-        subtitle={UI_TEXT.billing.publicPage.subtitle}
         actions={<ClientViewLink publicUsername={provider.publicUsername} />}
       />
-      <div className="px-4 py-6 md:px-6 lg:px-8">
+      <div className="px-4 pb-6 pt-3 md:px-6 md:pt-4 lg:px-8">
         <PublicSettingsClient
           endpoint="/api/cabinet/master/public-username"
           name={provider.name}

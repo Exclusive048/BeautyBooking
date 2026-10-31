@@ -1,11 +1,9 @@
-import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import {
   getNotificationCenterData,
   type NotificationCenterNotificationItem,
 } from "@/lib/notifications/center";
 import { groupNotificationsByDay } from "@/features/master/components/notifications/lib/group-by-day";
-import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { classifyStudioChip } from "../lib/chip-classifier";
 
 const DEFAULT_DISPLAY_TIMEZONE = "Europe/Moscow";
@@ -59,17 +57,6 @@ export function parseStudioSort(value: string | null | undefined): NotificationS
   return value === "oldest" ? "oldest" : "newest";
 }
 
-const getPushEnabled = cache(async (userId: string): Promise<boolean> => {
-  const count = await prisma.pushSubscription.count({ where: { userId } });
-  return count > 0;
-});
-
-// FIX-04 (QA-113): "today" computed in the studio's own timezone (self-view),
-// not the Node process TZ.
-function isToday(iso: string, now: Date, timeZone: string): boolean {
-  return toLocalDateKey(new Date(iso), timeZone) === toLocalDateKey(now, timeZone);
-}
-
 function applyChipFilter(
   items: NotificationCenterNotificationItem[],
   chip: StudioNotificationChip,
@@ -94,28 +81,17 @@ export async function loadStudioNotificationsData(
 ): Promise<StudioNotificationsData> {
   const now = input.now ?? new Date();
 
-  const [center, pushEnabled, providerTz] = await Promise.all([
+  const [center, providerTz] = await Promise.all([
     getNotificationCenterData({ userId: input.userId, phone: input.phone }),
-    getPushEnabled(input.userId),
     prisma.provider.findUnique({ where: { id: input.studioProviderId }, select: { timezone: true } }),
   ]);
 
   const timeZone = providerTz?.timezone ?? DEFAULT_DISPLAY_TIMEZONE;
   const studioItems = center.notifications.filter((item) => item.channel === "STUDIO");
 
-  const totalCount = studioItems.length;
-  const unreadCount = studioItems.filter((item) => !item.isRead).length;
-  const todayCount = studioItems.filter((item) => isToday(item.createdAt, now, timeZone)).length;
-  // "Needs decision" = pending schedule requests (the only actionable
-  // surface that targets the studio owner directly today). Other
-  // STUDIO_* types are informational.
-  const needsDecisionCount = studioItems.filter(
-    (item) => item.type === "SCHEDULE_REQUEST",
-  ).length;
-
   const chipCounts: StudioNotificationsChipCounts = {
-    all: totalCount,
-    unread: unreadCount,
+    all: studioItems.length,
+    unread: studioItems.filter((item) => !item.isRead).length,
     bookings: 0,
     cancellations: 0,
     reschedules: 0,
@@ -134,7 +110,6 @@ export async function loadStudioNotificationsData(
   const groups = groupNotificationsByDay(filtered, input.sort, now, timeZone);
 
   return {
-    kpi: { unreadCount, totalCount, todayCount, needsDecisionCount, pushEnabled },
     chipCounts,
     groups,
     timeZone,

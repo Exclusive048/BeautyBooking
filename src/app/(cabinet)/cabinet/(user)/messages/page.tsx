@@ -12,8 +12,8 @@ export default async function ClientMessagesPage() {
   if (!user) redirect("/login");
 
   return (
-    <div className="space-y-6">
-      <HeaderBlock title={C.page.clientTitle} subtitle={C.page.clientSubtitle} />
+    <div className="space-y-3 md:space-y-4">
+      <HeaderBlock title={C.page.clientTitle} />
       <ChatShell perspective="client" />
     </div>
   );

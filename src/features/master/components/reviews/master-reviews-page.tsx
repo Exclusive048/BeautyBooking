@@ -14,7 +14,6 @@ import { ReviewsFilterChips } from "./reviews-filter-chips";
 import { ReviewsDistribution } from "./reviews-distribution";
 import { ReviewsFeed } from "./reviews-feed";
 import { ReviewsHeroCard } from "./reviews-hero-card";
-import { ReviewsKpiTiles } from "./reviews-kpi-tiles";
 import { personalMasterProviderWhere, getMasterWorkProfiles } from "@/lib/master/access";
 
 const T = UI_TEXT.cabinetMaster;
@@ -36,7 +35,6 @@ function readString(value: string | string[] | undefined): string | null {
  * Layout:
  *   ┌────────────────────────────────┐
  *   │ Hero (rating)  │ Distribution  │
- *   │                │ KPI tiles     │
  *   ├────────────────────────────────┤
  *   │ Filter chips                   │
  *   │ Feed                           │
@@ -105,23 +103,18 @@ export async function MasterReviewsPage({ searchParams }: Props) {
           { label: T.reviews.breadcrumb },
         ]}
         title={T.reviews.title}
-        subtitle={T.reviews.subtitle}
       />
       <FocusHighlighter />
 
-      <div className="space-y-6 px-4 py-6 md:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          <div className="lg:col-span-4">
+      <div className="space-y-4 px-4 pb-6 pt-3 md:px-6 md:pt-4 lg:px-8">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-12 md:gap-4">
+          <div className="md:col-span-5 lg:col-span-4">
             <ReviewsHeroCard stats={data.stats} />
           </div>
-          <div className="space-y-4 lg:col-span-8">
+          <div className="md:col-span-7 lg:col-span-8">
             <ReviewsDistribution
               distribution={data.stats.distribution}
               totalCount={data.stats.totalCount}
-            />
-            <ReviewsKpiTiles
-              stats={data.stats}
-              responseTimeLabel={data.avgResponseLabel}
             />
           </div>
         </div>

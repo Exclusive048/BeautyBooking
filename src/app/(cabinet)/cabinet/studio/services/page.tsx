@@ -7,7 +7,6 @@ import {
 import {
   listAvailableCategoriesForStudio,
   loadStudioServiceDetail,
-  loadStudioServicesKpis,
   loadStudioServicesListData,
 } from "@/features/studio-cabinet/services/server/services-data.service";
 import { getSessionUser } from "@/lib/auth/session";
@@ -43,7 +42,6 @@ export default async function StudioServicesRoute({ searchParams }: Props) {
 
   const [
     listData,
-    kpis,
     pickerOptions,
     packages,
     packagePickerServices,
@@ -54,7 +52,6 @@ export default async function StudioServicesRoute({ searchParams }: Props) {
       categoryId,
       search,
     }),
-    loadStudioServicesKpis(studioId),
     listAvailableCategoriesForStudio(user.id),
     loadStudioPackages(studioId),
     loadStudioPackagePickerServices(studioId),
@@ -73,7 +70,6 @@ export default async function StudioServicesRoute({ searchParams }: Props) {
       items={listData.items}
       search={search}
       detail={detail}
-      kpis={kpis}
       packages={packages}
       packagePickerServices={packagePickerServices}
     />

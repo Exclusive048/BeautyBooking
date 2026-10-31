@@ -1,23 +1,8 @@
-import { Crown } from "lucide-react";
 import { ResilientImage } from "@/components/ui/resilient-image";
-import * as UI_TEXT from "@/lib/ui/text";
-
-type PlanTier = "FREE" | "PRO" | "PREMIUM";
 
 type Props = {
   name: string;
   avatarUrl: string | null;
-  /** When true, status renders as "Премиум · Nд" with a crown. */
-  isTrial: boolean;
-  trialDaysLeft: number;
-  /** Falls back to FREE label when not on trial. */
-  planTier: PlanTier;
-};
-
-const PLAN_LABEL: Record<PlanTier, string> = {
-  FREE: UI_TEXT.cabinetMaster.userChip.planLabels.free,
-  PRO: UI_TEXT.cabinetMaster.userChip.planLabels.pro,
-  PREMIUM: UI_TEXT.cabinetMaster.userChip.planLabels.premium,
 };
 
 function initialsOf(name: string): string {
@@ -28,25 +13,14 @@ function initialsOf(name: string): string {
 }
 
 /**
- * Bottom-of-sidebar block: avatar + display name + subscription / trial
- * tagline. Styled as a quiet card — no hover affordance because clicking
- * is owned by the explicit "Профиль" nav item above.
+ * Bottom-of-sidebar block: avatar + display name. Styled as a quiet card — no
+ * hover affordance because clicking is owned by the explicit "Профиль" nav
+ * item above.
+ *
+ * Тариф здесь не показывается (решение владельца 2026-10-31): вид подписки —
+ * один раз, плашкой на главной кабинета (`master-dashboard-page.tsx`).
  */
-export function MasterUserChip({
-  name,
-  avatarUrl,
-  isTrial,
-  trialDaysLeft,
-  planTier,
-}: Props) {
-  const showCrown = isTrial || planTier === "PREMIUM";
-  const statusText = isTrial
-    ? UI_TEXT.cabinetMaster.userChip.trialStatusTemplate.replace(
-        "{days}",
-        String(Math.max(trialDaysLeft, 0)),
-      )
-    : PLAN_LABEL[planTier];
-
+export function MasterUserChip({ name, avatarUrl }: Props) {
   const initialsAvatar = (
     <span
       aria-hidden
@@ -75,12 +49,6 @@ export function MasterUserChip({
       )}
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-text-main">{name}</p>
-        <p className="mt-0.5 flex items-center gap-1 text-xs text-text-sec">
-          {showCrown ? (
-            <Crown className="h-3 w-3 shrink-0 text-accent-text" aria-hidden />
-          ) : null}
-          <span className="truncate">{statusText}</span>
-        </p>
       </div>
     </div>
   );

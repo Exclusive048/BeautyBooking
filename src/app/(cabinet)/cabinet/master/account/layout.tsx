@@ -31,10 +31,9 @@ export default async function MasterAccountLayout({
           { label: T.account.breadcrumb },
         ]}
         title={T.account.title}
-        subtitle={T.account.subtitle}
       />
 
-      <div className="space-y-6 px-4 py-6 md:px-6 lg:px-8">
+      <div className="space-y-4 px-4 pb-6 pt-3 md:space-y-6 md:px-6 md:pt-4 lg:px-8">
         <AccountNav />
 
         <div className="max-w-3xl">{children}</div>

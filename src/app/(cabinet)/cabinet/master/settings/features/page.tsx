@@ -17,12 +17,11 @@ export default async function MasterSettingsFeaturesPage() {
   }
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-4 px-4 pb-6 pt-3 md:px-6 md:pt-4 lg:px-8">
       <header>
         <h2 className="text-xl font-semibold text-text-main">
           {UI_TEXT.billing.featuresPage.title}
         </h2>
-        <p className="text-sm text-text-sec">{UI_TEXT.billing.featuresPage.subtitle}</p>
       </header>
       <FeaturesPageClient scope="MASTER" billingHref="/cabinet/master/billing" />
     </section>

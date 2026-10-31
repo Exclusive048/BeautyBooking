@@ -15,6 +15,8 @@ type Props = {
   studioName: string;
   /** SETUP-GUIDE-01: «Первые шаги»; `null` — не показывать. */
   setupGuide?: SetupGuideDto | null;
+  /** Конец действующего пробного периода (ISO); `null` — пробного нет. */
+  trialEndsAt?: string | null;
 };
 
 /**
@@ -24,19 +26,19 @@ type Props = {
  * + attention (2-up) → occupancy + popular services (2-up) →
  * revenue chart full width.
  */
-export function StudioDashboardPage({ data, studioName, setupGuide = null }: Props) {
+export function StudioDashboardPage({ data, studioName, setupGuide = null, trialEndsAt = null }: Props) {
   return (
-    <div className="space-y-5 lg:space-y-6">
+    <div className="space-y-4 lg:space-y-6">
       {setupGuide && !setupGuide.hidden ? <SetupGuideCard guide={setupGuide} /> : null}
 
-      <StudioTodayBanner data={data.todayBanner} studioName={studioName} />
+      <StudioTodayBanner data={data.todayBanner} studioName={studioName} trialEndsAt={trialEndsAt} />
 
       {/* PWA-ONBOARDING-01: установка приложения + уведомления (скрывается сама). */}
       <AppSetupCard />
 
       <StudioKpiRow kpis={data.kpis} />
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.4fr_1fr]">
+      <div className="grid grid-cols-1 gap-4 lg:gap-5 xl:grid-cols-[1.4fr_1fr]">
         <StudioTopMasters masters={data.topMasters} />
         <StudioAttentionPanel
           items={data.attentionItems}
@@ -45,7 +47,7 @@ export function StudioDashboardPage({ data, studioName, setupGuide = null }: Pro
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:gap-5 xl:grid-cols-2">
         <StudioTopOccupancy rows={data.topOccupancyToday} />
         <StudioPopularServices services={data.popularServices} />
       </div>

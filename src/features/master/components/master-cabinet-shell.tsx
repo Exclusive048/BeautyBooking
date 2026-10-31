@@ -100,11 +100,6 @@ export async function MasterCabinetShell({
                 name: userName,
                 avatarUrl: master.avatarUrl,
               }}
-              trial={{
-                isTrial: trialActive,
-                daysLeft,
-              }}
-              planTier={subscription?.planTier ?? "FREE"}
               publicUsername={master.publicUsername}
             />
           </div>

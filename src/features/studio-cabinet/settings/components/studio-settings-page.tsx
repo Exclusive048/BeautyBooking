@@ -37,15 +37,11 @@ export function StudioSettingsPage({ data, section }: Props) {
       : section;
 
   return (
-    <div className="space-y-5 lg:space-y-6">
+    <div className="space-y-3 lg:space-y-6">
       <header className="min-w-0">
-        <p className="mb-1 eyebrow">
-          {T.header.caption}
-        </p>
         <h1 className="font-display text-2xl font-bold tracking-tight text-text-main md:text-3xl">
           {T.header.title}
         </h1>
-        <p className="mt-1 max-w-xl text-sm text-text-sec">{T.header.subtitle}</p>
       </header>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[220px_1fr]">

@@ -25,20 +25,9 @@ export type StudioNotificationChip =
   | "finance"
   | "system";
 
-export type StudioNotificationsKpi = {
-  unreadCount: number;
-  totalCount: number;
-  todayCount: number;
-  /** Pending actions awaiting the owner/admin — currently
-   *  ScheduleChangeRequest pseudo-notifications (PENDING). */
-  needsDecisionCount: number;
-  pushEnabled: boolean;
-};
-
 export type StudioNotificationsChipCounts = Record<StudioNotificationChip, number>;
 
 export type StudioNotificationsData = {
-  kpi: StudioNotificationsKpi;
   chipCounts: StudioNotificationsChipCounts;
   groups: NotificationDayGroup[];
   /** Пояс студии: время прихода уведомления — по нему (salon-tz, rule 17). */

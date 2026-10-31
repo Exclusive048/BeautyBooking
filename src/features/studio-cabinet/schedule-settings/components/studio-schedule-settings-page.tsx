@@ -38,7 +38,7 @@ export function StudioScheduleSettingsPage({
   studioPublicUsername,
 }: Props) {
   return (
-    <div className="space-y-5 lg:space-y-6">
+    <div className="space-y-3 lg:space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <PageTitleRow backHref="/cabinet/studio/schedule/team">
@@ -49,7 +49,6 @@ export function StudioScheduleSettingsPage({
               {T.title}
             </h1>
           </PageTitleRow>
-          <p className="mt-2 text-sm text-text-sec">{T.studioSubtitle}</p>
         </div>
         <ClientViewLink publicUsername={studioPublicUsername} />
       </header>

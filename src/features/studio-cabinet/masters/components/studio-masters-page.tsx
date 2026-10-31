@@ -34,11 +34,11 @@ export function StudioMastersPage({
   detail,
 }: Props) {
   return (
-    <div className="space-y-5">
-      <MastersHeader studioId={studioId} counts={list.counts} />
+    <div className="space-y-3 lg:space-y-5">
+      <MastersHeader studioId={studioId} />
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_1.5fr]">
-        <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 lg:gap-5 xl:grid-cols-[1fr_1.5fr]">
+        <div className="space-y-3 lg:space-y-4">
           <MastersFilters
             filter={filter}
             search={search}

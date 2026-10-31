@@ -65,7 +65,7 @@ vi.mock("@/lib/schedule/day-plans", async (importOriginal) => ({
   loadDayPlans,
 }));
 
-import { loadStudioScheduleData } from "./schedule-data.service";
+import { loadStudioScheduleData, loadStudioScheduleDay } from "./schedule-data.service";
 
 // 01.10.2026 Марина работает 10:00–19:00 (салон, UTC+5); «сейчас» — накануне.
 const NOW = new Date("2026-09-30T12:00:00Z");
@@ -142,13 +142,15 @@ describe("календарь студии — личная запись маст
   });
 
   it("личная запись не считается записью студии, но занимает время", async () => {
-    const data = await loadStudioScheduleData({ studioId: STUDIO_ID, dateKey: "2026-10-01", view: "day", now: NOW });
-    expect(data.kpis.bookingsCount).toBe(1);
-    expect(data.kpis.revenueKopeks).toBe(150000);
+    // Показатели дня — у приложения (`loadStudioScheduleDay`); веб их не показывает.
+    const day = await loadStudioScheduleDay({ studioId: STUDIO_ID, dateKey: "2026-10-01", now: NOW });
+    expect(day!.kpis.bookingsCount).toBe(1);
+    expect(day!.kpis.revenueKopeks).toBe(150000);
     // Загрузка и окошки считают обе: время мастера занято и личной записью.
     // 120 из 540 минут; свободно 11–12 и 13–19 (без личной было бы 11–19).
-    expect(data.kpis.occupancyPercent).toBe(22);
-    expect(data.kpis.freeWindowsCount).toBe(2);
+    expect(day!.kpis.occupancyPercent).toBe(22);
+    expect(day!.kpis.freeWindowsCount).toBe(2);
+    const data = await loadStudioScheduleData({ studioId: STUDIO_ID, dateKey: "2026-10-01", view: "day", now: NOW });
     expect(data.freeWindows[0]!.days[0]!.windows).toEqual([
       { startMin: 11 * 60, endMin: 12 * 60 },
       { startMin: 13 * 60, endMin: 19 * 60 },

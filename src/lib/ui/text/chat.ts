@@ -24,9 +24,7 @@ export const chat = {
   placeholder: "Напишите сообщение",
   page: {
     masterTitle: "Сообщения",
-    masterSubtitle: "Переписка с клиентами",
     clientTitle: "Сообщения",
-    clientSubtitle: "Переписка с мастерами",
   },
   shell: {
     loading: "Загружаем переписки…",

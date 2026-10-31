@@ -1,6 +1,5 @@
 import { Calendar, LineChart, Users, Wallet } from "lucide-react";
-import { StatTileGrid } from "@/components/ui/stat-tile";
-import { KpiCard } from "@/features/master/components/dashboard/kpi-card";
+import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
 import { WorkContextRevenueSplit } from "@/features/master/components/work-context-revenue";
 import type { RevenueSplit } from "@/lib/bookings/work-context";
 import { UI_FMT } from "@/lib/ui/fmt";
@@ -52,7 +51,7 @@ export function KpiCardsGrid({
 
   return (
     <StatTileGrid columns={4}>
-      <KpiCard
+      <StatTile
         icon={Wallet}
         label={T.todayRevenue}
         value={formatRub(todayRevenue)}
@@ -67,13 +66,13 @@ export function KpiCardsGrid({
           )
         }
       />
-      <KpiCard
+      <StatTile
         icon={Calendar}
         label={T.todayBookings}
         value={todayBookingsValue}
         sublabel={T.todayBookingsSub}
       />
-      <KpiCard
+      <StatTile
         icon={LineChart}
         label={T.weekRevenue}
         value={formatRub(weekRevenue)}
@@ -88,7 +87,7 @@ export function KpiCardsGrid({
           )
         }
       />
-      <KpiCard
+      <StatTile
         icon={Users}
         label={T.newClients}
         value={newClientsValue}

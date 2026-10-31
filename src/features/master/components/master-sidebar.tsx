@@ -39,11 +39,6 @@ type Props = {
     name: string;
     avatarUrl: string | null;
   };
-  trial: {
-    isTrial: boolean;
-    daysLeft: number;
-  };
-  planTier: "FREE" | "PRO" | "PREMIUM";
   publicUsername: string | null;
 };
 
@@ -103,14 +98,12 @@ type NavItem = {
  * Desktop sidebar shell for /cabinet/master/*. Brand block at the top, four
  * groups of nav items in the middle, user-chip pinned to the bottom. Counts
  * (pending bookings, unread notifs, unanswered reviews) are server-resolved
- * in the layout and passed through; the chip's status mirrors the trial /
- * plan state from the same fetch.
+ * in the layout and passed through. The plan is not shown here — only on the
+ * dashboard (owner decision 2026-10-31).
  */
 export function MasterSidebar({
   counts,
   user,
-  trial,
-  planTier,
   publicUsername,
 }: Props) {
   const pathname = usePathname();
@@ -275,9 +268,6 @@ export function MasterSidebar({
         <MasterUserChip
           name={user.name}
           avatarUrl={user.avatarUrl}
-          isTrial={trial.isTrial}
-          trialDaysLeft={trial.daysLeft}
-          planTier={planTier}
         />
       </div>
     </aside>

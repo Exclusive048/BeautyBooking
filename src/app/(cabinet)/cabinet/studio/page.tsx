@@ -1,9 +1,10 @@
-import { StudioRole } from "@prisma/client";
+import { StudioRole, SubscriptionScope } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { StudioDashboardPage } from "@/features/studio-cabinet/dashboard/components/studio-dashboard-page";
 import { loadStudioDashboardData } from "@/features/studio-cabinet/dashboard/server/dashboard-data.service";
 import { getStudioShellInfo } from "@/features/studio-cabinet/server/studio-info.service";
 import { getSessionUser } from "@/lib/auth/session";
+import { getCurrentSubscriptionRow, isActiveTrial } from "@/lib/billing/get-current-subscription-row";
 import { loadStudioSetupGuide } from "@/lib/onboarding/setup-guide";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -23,14 +24,20 @@ export default async function StudioCabinetIndexPage() {
   const { studioId } = access;
   const administers = access.roles.includes(StudioRole.OWNER) || access.roles.includes(StudioRole.ADMIN);
 
-  const [data, studioInfo, setupGuide] = await Promise.all([
+  const [data, studioInfo, setupGuide, subscription] = await Promise.all([
     loadStudioDashboardData({ studioId }),
     getStudioShellInfo(studioId),
     // SETUP-GUIDE-01: «Первые шаги» — владельцу и администратору.
     administers ? loadStudioSetupGuide({ studioProviderId: access.providerId, studioId }) : Promise.resolve(null),
+    // Пробный период — только на главной (раньше плашка стояла над каждой
+    // страницей кабинета); строку уже прочитал layout — `cache` отдаёт её же.
+    getCurrentSubscriptionRow(user.id, SubscriptionScope.STUDIO),
   ]);
 
   const studioName = studioInfo?.name ?? UI_TEXT.studioCabinet.layout.studioFallbackName;
+  const trialEndsAt = isActiveTrial(subscription) ? subscription.trialEndsAt.toISOString() : null;
 
-  return <StudioDashboardPage data={data} studioName={studioName} setupGuide={setupGuide} />;
+  return (
+    <StudioDashboardPage data={data} studioName={studioName} setupGuide={setupGuide} trialEndsAt={trialEndsAt} />
+  );
 }

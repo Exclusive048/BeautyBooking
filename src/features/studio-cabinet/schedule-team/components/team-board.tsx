@@ -193,9 +193,11 @@ export function TeamBoard({ studioId, initialBoard }: Props) {
           <Repeat className="mr-1.5 h-4 w-4" aria-hidden />
           {T.rhythmCta}
         </Button>
-        <p className="w-full text-xs text-text-sec">
-          {brush ? CAL.brushHint(brush.kind === "off" ? CAL.offBrush : CAL.resetBrush) : T.subtitle}
-        </p>
+        {brush ? (
+          <p className="w-full text-xs text-text-sec">
+            {CAL.brushHint(brush.kind === "off" ? CAL.offBrush : CAL.resetBrush)}
+          </p>
+        ) : null}
       </div>
 
       {error ? (

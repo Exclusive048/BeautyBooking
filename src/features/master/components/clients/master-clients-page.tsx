@@ -12,7 +12,6 @@ import { CRM_CLIENTS_WINDOW_MONTHS } from "@/lib/crm/clients-window";
 import { extractClientIp } from "@/lib/http/ip";
 import { prisma } from "@/lib/prisma";
 import * as UI_TEXT from "@/lib/ui/text";
-import { ClientsKpiCards } from "./clients-kpi-cards";
 import { ClientsPaneClient } from "./clients-pane-client";
 import { ClientsSearchInput } from "./search-input";
 import { ClientsSortSelect } from "./sort-select";
@@ -34,7 +33,7 @@ function readString(value: string | string[] | undefined): string | null {
 
 /**
  * Server orchestrator for `/cabinet/master/clients`. Reads URL state
- * (`?tab/sort/q`), runs the view aggregator, and renders header, KPIs,
+ * (`?tab/sort/q`), runs the view aggregator, and renders header,
  * tabs, toolbar — all server-rendered. The list+detail panes are
  * delegated to `<ClientsPaneClient>`, which holds the active selection
  * in component state (no `?id=` in the URL — see 27a-FIX-URL).
@@ -79,13 +78,10 @@ export async function MasterClientsPage({ searchParams }: Props) {
           { label: T.clients.breadcrumb },
         ]}
         title={T.clients.title}
-        subtitle={`${T.clients.subtitle} · ${T.clients.windowNote(CRM_CLIENTS_WINDOW_MONTHS)}`}
       />
 
-      <div className="space-y-6 px-4 py-6 md:px-6 lg:px-8">
-        <ClientsKpiCards stats={data.kpi} />
-
-        <div className="space-y-4">
+      <div className="space-y-4 px-4 pb-6 pt-3 md:px-6 md:pt-4 lg:px-8">
+        <div className="space-y-3">
           <ClientsTabs
             activeTab={data.activeTab}
             tabCounts={data.tabCounts}
@@ -98,6 +94,8 @@ export async function MasterClientsPage({ searchParams }: Props) {
             </div>
             <ClientsSortSelect value={data.sort} />
           </div>
+          {/* PERF-06 / решение 31.1: список считается за окно — подпись видна всегда. */}
+          <p className="text-xs text-text-sec">{T.clients.windowNote(CRM_CLIENTS_WINDOW_MONTHS)}</p>
         </div>
 
         <ClientsPaneClient initialClients={data.clients} isFiltering={isFiltering} />

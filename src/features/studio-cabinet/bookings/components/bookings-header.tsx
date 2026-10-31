@@ -42,7 +42,6 @@ export function BookingsHeader({
           <h1 className="font-display text-2xl font-bold tracking-tight text-text-main md:text-3xl">
             {T.title}
           </h1>
-          <p className="mt-1 text-sm text-text-sec">{T.subtitle}</p>
         </div>
         <Button variant="primary" onClick={() => setCreateOpen(true)}>
           <Plus className="h-4 w-4" aria-hidden />

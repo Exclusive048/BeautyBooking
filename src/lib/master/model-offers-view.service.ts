@@ -104,13 +104,6 @@ export type ApplicationItem = {
   };
 };
 
-export type OffersKpi = {
-  activeOffersCount: number;
-  pendingApplicationsCount: number;
-  conversionRate: number | null;
-  archivedCount: number;
-};
-
 export type OfferFilterOption = {
   id: string;
   label: string;
@@ -128,7 +121,6 @@ export type AvailableServiceForOffer = {
 };
 
 export type MasterModelOffersViewData = {
-  kpi: OffersKpi;
   /** Offers with status ACTIVE — split first because they get the prominent
    * top card. Sorted by date ascending so the next event is closest to
    * the eye. Past-dated active offers (the master forgot to close) sink
@@ -463,18 +455,6 @@ export async function getMasterModelOffersView(input: {
       };
     });
 
-  // KPI conversion across all offers, not just active — gives the master
-  // a stable "how often do my offers convert" metric, not one that flips
-  // every time they archive/close offers.
-  const totals = offerItems.reduce(
-    (acc, offer) => {
-      acc.total += offer.counts.total;
-      acc.confirmed += offer.counts.confirmed;
-      return acc;
-    },
-    { total: 0, confirmed: 0 }
-  );
-
   const filterOptions: OfferFilterOption[] = activeOffers
     .filter((offer) => offer.counts.pending > 0)
     .map((offer) => ({
@@ -483,15 +463,6 @@ export async function getMasterModelOffersView(input: {
     }));
 
   return {
-    kpi: {
-      activeOffersCount: activeOffers.length,
-      pendingApplicationsCount: pendingAllRaw.length,
-      conversionRate: computeConversionRate({
-        total: totals.total,
-        confirmed: totals.confirmed,
-      }),
-      archivedCount: archivedOffers.length,
-    },
     activeOffers,
     pendingApplications,
     archivedOffers,
@@ -576,12 +547,6 @@ async function loadAvailableServices(
 
 function emptyView(availableServices: AvailableServiceForOffer[]): MasterModelOffersViewData {
   return {
-    kpi: {
-      activeOffersCount: 0,
-      pendingApplicationsCount: 0,
-      conversionRate: null,
-      archivedCount: 0,
-    },
     activeOffers: [],
     pendingApplications: [],
     archivedOffers: [],

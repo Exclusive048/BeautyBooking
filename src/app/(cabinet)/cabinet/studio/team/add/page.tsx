@@ -8,7 +8,6 @@ export default function AddStudioMasterPage() {
     <section className="space-y-4">
       <header>
         <h2 className="text-xl font-semibold text-text-main">{UI_TEXT.studioCabinet.teamAdd.title}</h2>
-        <p className="text-sm text-text-sec">{UI_TEXT.studioCabinet.teamAdd.subtitle}</p>
       </header>
       <Card>
         <CardContent className="pt-5 text-sm text-text-sec">{UI_TEXT.studioCabinet.teamAdd.info}</CardContent>

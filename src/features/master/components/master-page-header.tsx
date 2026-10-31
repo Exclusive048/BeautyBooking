@@ -14,8 +14,11 @@ export type Crumb = {
 type Props = {
   /** Ordered ancestors → current page. The Home icon is rendered before the list. */
   breadcrumb: Crumb[];
+  /**
+   * Строки под заголовком нет (решение владельца 2026-10-31: описание под
+   * заголовком — лишний текст между шапкой и содержимым).
+   */
   title: string;
-  subtitle?: string;
   /** Optional right-side action slot — buttons, badges, anything. */
   actions?: ReactNode;
   /**
@@ -52,22 +55,27 @@ type Props = {
  * сохранено. Ниже `lg` заголовок уезжает со прокруткой; ориентир «где я» на
  * мобильном несёт нижняя навигация, которая никуда не уезжает.
  *
+ * Ниже `lg` крошки из двух звеньев («Главная › Раздел») не показываются: первое
+ * звено — кнопка «Главная» нижней навигации, второе повторяет заголовок под
+ * ними. Глубже двух звеньев (портфолио и услуги — внутри «Профиля») крошки
+ * остаются: среднее звено — единственный путь к родителю без кнопки «Назад».
+ *
  * Server component — no client hooks. Pages pass plain props; the header
  * doesn't reach into URL state.
  */
 export function MasterPageHeader({
   breadcrumb,
   title,
-  subtitle,
   actions,
   actionsInline = false,
   backHref,
 }: Props) {
+  const crumbsRedundantOnPhone = Boolean(backHref) || breadcrumb.length <= 2;
   return (
-    <header className="z-sticky border-b border-border-subtle bg-bg-page/85 px-4 py-3 backdrop-blur-md md:px-6 lg:sticky lg:top-[var(--topbar-h)] lg:px-8 lg:py-4">
+    <header className="z-sticky border-b border-border-subtle bg-bg-page/85 px-4 py-2.5 backdrop-blur-md md:px-6 lg:sticky lg:top-[var(--topbar-h)] lg:px-8 lg:py-4">
       <div
         className={cn(
-          "flex flex-wrap justify-between gap-4",
+          "flex flex-wrap justify-between gap-x-4 gap-y-2",
           actionsInline ? "items-center" : "items-end",
         )}
       >
@@ -75,8 +83,8 @@ export function MasterPageHeader({
           <nav
             aria-label={UI_TEXT.a11y.breadcrumbs}
             className={cn(
-              "mb-1.5 flex items-center gap-1 text-xs text-text-sec",
-              backHref && "hidden lg:flex",
+              "mb-1 flex items-center gap-1 text-xs text-text-sec lg:mb-1.5",
+              crumbsRedundantOnPhone && "hidden lg:flex",
             )}
           >
             <Home className="h-3 w-3 shrink-0" aria-hidden />
@@ -102,13 +110,10 @@ export function MasterPageHeader({
             ))}
           </nav>
           <PageTitleRow backHref={backHref}>
-            <h1 className="truncate font-display text-2xl text-text-main lg:text-3xl">
+            <h1 className="truncate font-display text-xl text-text-main sm:text-2xl lg:text-3xl">
               {title}
             </h1>
           </PageTitleRow>
-          {subtitle ? (
-            <p className="mt-1 text-sm text-text-sec">{subtitle}</p>
-          ) : null}
         </div>
 
         {actions ? (

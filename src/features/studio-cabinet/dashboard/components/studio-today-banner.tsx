@@ -1,5 +1,6 @@
 import { Users } from "lucide-react";
 import { ResilientImage } from "@/components/ui/resilient-image";
+import { TrialStatusBadge } from "@/features/cabinet/components/trial-status-badge";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioTodayBannerData } from "../server/types";
 import { UI_FMT } from "@/lib/ui/fmt";
@@ -7,6 +8,11 @@ import { UI_FMT } from "@/lib/ui/fmt";
 type Props = {
   data: StudioTodayBannerData;
   studioName: string;
+  /**
+   * Конец пробного периода (ISO) — плашка «PREMIUM · N дней» стоит только
+   * здесь, на главной, а не над каждой страницей кабинета.
+   */
+  trialEndsAt?: string | null;
 };
 
 const T = UI_TEXT.studioCabinet.dashboardV2.banner;
@@ -28,7 +34,7 @@ function formatToday(now: Date, timeZone: string): string {
   return UI_FMT.date(now, "weekdayDayMonthLong", { timeZone });
 }
 
-export function StudioTodayBanner({ data, studioName }: Props) {
+export function StudioTodayBanner({ data, studioName, trialEndsAt = null }: Props) {
   const today = formatToday(new Date(), data.timeZone);
   const visibleMasters = data.mastersOnShift.slice(0, 5);
   const extraCount = Math.max(0, data.mastersOnShift.length - visibleMasters.length);
@@ -39,24 +45,25 @@ export function StudioTodayBanner({ data, studioName }: Props) {
   // burgundy gradient. Title template now interpolates `{studioName}`
   // so the headline names the studio directly.
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-brand-gradient p-6 text-white md:p-7">
+    <div className="relative overflow-hidden rounded-2xl bg-brand-gradient p-4 text-white md:p-6">
       <div
         aria-hidden
         className="absolute inset-0 bg-[radial-gradient(circle_at_85%_30%,rgba(255,255,255,0.18),transparent_50%)]"
       />
-      <div className="relative z-10 flex flex-wrap items-center justify-between gap-6">
+      <div className="relative z-10 flex flex-wrap items-center justify-between gap-4 md:gap-6">
         <div className="min-w-0">
-          <div className="mb-2 eyebrow text-white opacity-75">
-            {today}
+          <div className="mb-1.5 flex flex-wrap items-center gap-2">
+            <span className="eyebrow text-white opacity-75">{today}</span>
+            {/* Подложка карточки: тонированная плашка не читается на бренд-градиенте. */}
+            {trialEndsAt ? (
+              <span className="rounded-full bg-bg-card">
+                <TrialStatusBadge trialEndsAt={trialEndsAt} />
+              </span>
+            ) : null}
           </div>
-          <h2 className="font-display text-2xl font-bold leading-tight md:text-3xl">
+          <h2 className="font-display text-xl font-bold leading-tight md:text-3xl">
             {T.title(studioName, data.bookingsToday)}
           </h2>
-          <p className="mt-2 max-w-xl text-sm opacity-90 md:text-[15px]">
-            {T.subtitleTemplate
-              .replace("{onShift}", String(data.mastersOnShift.length))
-              .replace("{load}", String(data.averageLoadPercent))}
-          </p>
         </div>
 
         <div className="flex flex-col items-end gap-2">

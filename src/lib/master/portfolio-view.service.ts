@@ -11,8 +11,8 @@ import { loadPortfolioMediaView } from "@/lib/media/portfolio-display";
  *
  * Returns everything the page needs in one round-trip:
  *  - filtered + ordered items (driven by `?filter=` and `?cat=`)
- *  - KPI counts (always full-population, never affected by current filter)
- *  - filter chip counts per visibility bucket
+ *  - filter chip counts per visibility bucket (full population, never
+ *    affected by the current filter)
  *  - dropdown options: master's enabled services, available global
  *    categories, and the master's previously-used tags (for the edit
  *    modal's autocomplete).
@@ -66,12 +66,6 @@ export type PortfolioItemView = {
   isCatalogCover: boolean;
 };
 
-export type PortfolioKpi = {
-  totalCount: number;
-  publicCount: number;
-  hiddenCount: number;
-};
-
 export type PortfolioCategoryOption = {
   id: string;
   name: string;
@@ -92,7 +86,6 @@ export type PortfolioTagOption = {
 export type MasterPortfolioViewData = {
   providerId: string;
   items: PortfolioItemView[];
-  kpi: PortfolioKpi;
   filterCounts: Record<PortfolioFilterId, number>;
   /** Categories that have at least one portfolio item in this master's
    * full population — used for the secondary chip row. */
@@ -162,15 +155,11 @@ export async function getMasterPortfolioView(input: {
     }),
   ]);
 
-  const kpi: PortfolioKpi = {
-    totalCount: allItems.length,
-    publicCount: allItems.filter((item) => item.isPublic).length,
-    hiddenCount: allItems.filter((item) => !item.isPublic).length,
-  };
+  const publicCount = allItems.filter((item) => item.isPublic).length;
   const filterCounts: Record<PortfolioFilterId, number> = {
-    all: kpi.totalCount,
-    public: kpi.publicCount,
-    hidden: kpi.hiddenCount,
+    all: allItems.length,
+    public: publicCount,
+    hidden: allItems.length - publicCount,
   };
 
   const categoriesUsedMap = new Map<string, PortfolioCategoryOption>();
@@ -223,7 +212,6 @@ export async function getMasterPortfolioView(input: {
   return {
     providerId: provider.id,
     items,
-    kpi,
     filterCounts,
     categoriesUsed,
     categoriesAll,

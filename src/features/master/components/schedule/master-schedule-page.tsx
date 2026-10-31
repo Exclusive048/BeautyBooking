@@ -2,9 +2,7 @@ import { redirect } from "next/navigation";
 import { FooterHint } from "@/features/master/components/schedule/footer-hint";
 import { RefreshButton } from "@/features/master/components/schedule/refresh-button";
 import { ScheduleControls } from "@/features/master/components/schedule/schedule-controls";
-import { ScheduleKpiCards, ScheduleKpiSummary } from "@/features/master/components/schedule/schedule-kpi-cards";
 import { WeekAgenda } from "@/features/master/components/schedule/week-agenda";
-import { KpiPanel } from "@/features/schedule-nav/components/kpi-panel";
 import { ScheduleLegend } from "@/features/master/components/schedule/schedule-legend";
 import { DayView, type DayStripItem } from "@/features/master/components/schedule/day-view";
 import { parseScheduleView } from "@/features/master/components/schedule/schedule-view-state";
@@ -69,7 +67,7 @@ export async function MasterSchedulePage({ searchParams }: Props) {
         }
       />
 
-      <div className="space-y-4 px-4 py-6 md:px-6 lg:px-8">
+      <div className="space-y-3 px-4 pb-6 pt-3 md:space-y-4 md:px-6 md:pt-4 lg:px-8">
         <ScheduleControls
           weekStartIso={weekStartIso}
           todayIso={todayIso}
@@ -83,9 +81,6 @@ export async function MasterSchedulePage({ searchParams }: Props) {
             freeStarts: d.freeWindows.freeStarts,
           }))}
         />
-        <KpiPanel storageKey="mr-schedule-kpi-master" summary={<ScheduleKpiSummary stats={data.kpi} />}>
-          <ScheduleKpiCards stats={data.kpi} showWorkContext={data.showWorkContext} />
-        </KpiPanel>
         {view === "day" ? (
           <DayView
             weekStartIso={weekStartIso}
@@ -139,8 +134,8 @@ export async function MasterSchedulePage({ searchParams }: Props) {
             </div>
           </>
         )}
-        {/* SCHEDULE-FLEX-DATE-NAV: легенда — справка под сеткой; период, записи
-            и выручка недели — в строке показателей (подзаголовок их дублировал). */}
+        {/* SCHEDULE-FLEX-DATE-NAV: легенда — справка под сеткой. Показатели недели
+            (записи, выручка, загрузка) — на главной и в аналитике, не здесь. */}
         <ScheduleLegend showWorkContext={data.showWorkContext} />
         <FooterHint fetchedAt={data.fetchedAt} timezone={data.timezone} />
       </div>

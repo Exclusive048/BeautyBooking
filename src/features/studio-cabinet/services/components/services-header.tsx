@@ -11,32 +11,18 @@ const T = UI_TEXT.studioCabinet.servicesV2.header;
 
 type Props = {
   studioId: string;
-  servicesCount: number;
-  categoriesCount: number;
   pickerOptions: StudioCategoryPickerOption[];
 };
 
-export function ServicesHeader({
-  studioId,
-  servicesCount,
-  categoriesCount,
-  pickerOptions,
-}: Props) {
+/** Заголовок и «Добавить услугу»; описания и строки со счётчиками нет. */
+export function ServicesHeader({ studioId, pickerOptions }: Props) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <p className="mb-1 eyebrow">
-            {T.caption
-              .replace("{services}", String(servicesCount))
-              .replace("{categories}", String(categoriesCount))}
-          </p>
-          <h1 className="font-display text-2xl font-bold tracking-tight text-text-main md:text-3xl">
-            {T.title}
-          </h1>
-          <p className="mt-1 max-w-xl text-sm text-text-sec">{T.subtitle}</p>
-        </div>
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="min-w-0 font-display text-2xl font-bold tracking-tight text-text-main md:text-3xl">
+          {T.title}
+        </h1>
         <Button variant="primary" onClick={() => setOpen(true)} data-guide="services">
           <Plus className="h-4 w-4" aria-hidden />
           {T.addService}

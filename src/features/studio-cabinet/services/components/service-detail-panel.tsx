@@ -294,26 +294,6 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
           )}
         </div>
 
-        <div className="rounded-xl border border-border-subtle bg-bg-input/30 p-3">
-          <p className="mb-2 text-xs font-mono uppercase tracking-wide text-text-sec">
-            {T.statsTitle}
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="text-2xs text-text-sec">{T.statsBookings}</p>
-              <p className="mt-0.5 font-display text-base font-semibold tabular-nums text-text-main">
-                {UI_FMT.count(detail.stats30d.bookingsCount)}
-              </p>
-            </div>
-            <div>
-              <p className="text-2xs text-text-sec">{T.statsRevenue}</p>
-              <p className="mt-0.5 font-display text-base font-semibold tabular-nums text-text-main">
-                {UI_FMT.priceLabel(detail.stats30d.revenueKopeks)}
-              </p>
-            </div>
-          </div>
-        </div>
-
         {error ? (
           <div className="rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text">
             {error}

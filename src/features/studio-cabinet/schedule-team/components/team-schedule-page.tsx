@@ -11,7 +11,7 @@ const T = UI_TEXT.studioCabinet.scheduleTeam;
  */
 export function TeamSchedulePage({ studioId, board }: { studioId: string; board: TeamBoardDto }) {
   return (
-    <div className="min-w-0 space-y-5 lg:space-y-6">
+    <div className="min-w-0 space-y-3 lg:space-y-6">
       {/* «Назад» — в календарь студии: отдельной страницы `/cabinet/studio/schedule`
           нет, прежняя ссылка туда давала 404 (BACK-BUTTON-01). */}
       <header>

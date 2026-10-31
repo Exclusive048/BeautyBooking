@@ -140,11 +140,8 @@ export default async function RolesPage() {
     : null;
 
   return (
-    <div className="space-y-6">
-      <HeaderBlock
-        title={UI_TEXT.cabinetRolesPage.title}
-        subtitle={UI_TEXT.cabinetRolesPage.subtitle}
-      />
+    <div className="space-y-3 md:space-y-4">
+      <HeaderBlock title={UI_TEXT.cabinetRolesPage.title} />
 
       {/* BETA-PROMO-DEC: пока есть кабинет, который можно создать, — сказать, что он будет на PREMIUM без оплаты. */}
       {!me.hasMasterProfile || !me.hasStudioProfile ? <BetaPromoBanner /> : null}

@@ -74,15 +74,12 @@ export const billing = {
   },
   featuresPage: {
     title: "Функции",
-    subtitle: "Управляйте функциями вашего тарифа.",
     planBadge: (plan: string) => `Ваш тариф: ${plan}`,
     allUnlocked: "Все функции разблокированы",
-    lockedSection: (plan: string) => `Доступно в тарифе ${plan}`,
     upgradeCta: "Улучшить тариф",
   },
   publicPage: {
     title: "Публичная страница",
-    subtitle: "Настройте публичную ссылку и поделитесь профилем.",
     usernameLabel: "Публичный адрес",
     usernameHint: "Только латинские буквы, цифры и дефис. Мин. 3 символа.",
     copyLink: "Скопировать ссылку",

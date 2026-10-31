@@ -10,7 +10,6 @@ import { StudioBottomNav } from "@/features/studio-cabinet/components/studio-bot
 import { getStudioSidebarCounts } from "@/features/studio-cabinet/server/sidebar-counts.service";
 import { getStudioShellInfo } from "@/features/studio-cabinet/server/studio-info.service";
 import { TrialEndingBanner } from "@/features/cabinet/components/trial-ending-banner";
-import { TrialStatusBadge } from "@/features/cabinet/components/trial-status-badge";
 import {
   getCurrentSubscriptionRow,
   isActiveTrial,
@@ -87,12 +86,7 @@ export default async function StudioCabinetLayout({
         </div>
 
         {/* Main content column — full width, padding only */}
-        <main data-testid="page-main" className="guide-space min-w-0 flex-1 px-4 py-6 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:px-6 lg:px-8 lg:pb-8">
-          {trialActive && daysLeft > 0 ? (
-            <div className="mb-4 flex justify-end">
-              <TrialStatusBadge trialEndsAt={subscription.trialEndsAt.toISOString()} />
-            </div>
-          ) : null}
+        <main data-testid="page-main" className="guide-space min-w-0 flex-1 px-4 pt-3 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:px-6 lg:px-8 lg:pt-5 lg:pb-8">
           {children}
         </main>
 
