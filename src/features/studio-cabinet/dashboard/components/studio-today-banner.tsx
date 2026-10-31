@@ -15,7 +15,7 @@ type Props = {
   trialEndsAt?: string | null;
 };
 
-const T = UI_TEXT.studioCabinet.dashboardV2.banner;
+const T = UI_TEXT.studioCabinet.dashboardV2.today;
 
 function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -25,91 +25,64 @@ function initialsOf(name: string): string {
 }
 
 /**
- * Дата «сегодня» — по поясу СТУДИИ (salon-tz, rule 17): баннер рендерится на
- * сервере, и без пояса дата шла по часам контейнера (у студии в Екатеринбурге
- * с 00:00 до 05:00 — вчерашний день). Метка зоны не нужна: это дата студии в
- * её собственном кабинете.
+ * Шапка главной студии (DASHBOARD-REORDER, 2026-10-31): название, дата,
+ * сколько записей сегодня и кто на смене — одной компактной карточкой вместо
+ * высокого баннера, чтобы «Требуют внимания» и ближайшие записи были видны
+ * сразу (особенно в установленном приложении).
+ *
+ * Дата «сегодня» — по поясу СТУДИИ (salon-tz, rule 17): карточка рендерится
+ * на сервере, и без пояса дата шла бы по часам контейнера. Метка зоны не
+ * нужна: это дата студии в её собственном кабинете.
  */
-function formatToday(now: Date, timeZone: string): string {
-  return UI_FMT.date(now, "weekdayDayMonthLong", { timeZone });
-}
-
 export function StudioTodayBanner({ data, studioName, trialEndsAt = null }: Props) {
-  const today = formatToday(new Date(), data.timeZone);
-  const visibleMasters = data.mastersOnShift.slice(0, 5);
+  const today = UI_FMT.date(new Date(), "weekdayDayMonthLong", { timeZone: data.timeZone });
+  const visibleMasters = data.mastersOnShift.slice(0, 4);
   const extraCount = Math.max(0, data.mastersOnShift.length - visibleMasters.length);
 
-  // STUDIO-POLISH-A #2: explicit `text-white` (mirrors master's
-  // GreetingHero). The previous `text-[rgb(var(--accent-fg))]` resolved to
-  // a near-black in light theme, making the title unreadable on the
-  // burgundy gradient. Title template now interpolates `{studioName}`
-  // so the headline names the studio directly.
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-brand-gradient p-4 text-white md:p-6">
-      <div
-        aria-hidden
-        className="absolute inset-0 bg-[radial-gradient(circle_at_85%_30%,rgba(255,255,255,0.18),transparent_50%)]"
-      />
-      <div className="relative z-10 flex flex-wrap items-center justify-between gap-4 md:gap-6">
-        <div className="min-w-0">
-          <div className="mb-1.5 flex flex-wrap items-center gap-2">
-            <span className="eyebrow text-white opacity-75">{today}</span>
-            {/* Подложка карточки: тонированная плашка не читается на бренд-градиенте. */}
-            {trialEndsAt ? (
-              <span className="rounded-full bg-bg-card">
-                <TrialStatusBadge trialEndsAt={trialEndsAt} />
-              </span>
-            ) : null}
-          </div>
-          <h2 className="font-display text-xl font-bold leading-tight md:text-3xl">
-            {T.title(studioName, data.bookingsToday)}
-          </h2>
+    <section
+      className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border-subtle bg-bg-card px-4 py-3 md:px-5"
+      data-testid="studio-today"
+    >
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="eyebrow">{today}</span>
+          {trialEndsAt ? <TrialStatusBadge trialEndsAt={trialEndsAt} /> : null}
         </div>
-
-        <div className="flex flex-col items-end gap-2">
-          <div className="eyebrow text-white opacity-70">
-            {T.onShiftLabel}
-          </div>
-          <div className="flex items-center gap-3 rounded-xl bg-white/15 px-3.5 py-2.5 backdrop-blur">
-            <div className="flex">
-              {visibleMasters.length === 0 ? (
-                <Users className="h-7 w-7 opacity-80" aria-hidden />
-              ) : (
-                visibleMasters.map((master, index) => (
-                  <span
-                    key={master.id}
-                    className="inline-grid h-8 w-8 place-items-center rounded-full border-2 border-white/25 bg-white/20 text-2xs font-bold"
-                    style={{ marginLeft: index === 0 ? 0 : -10 }}
-                    aria-label={master.name}
-                  >
-                    {master.avatarUrl ? (
-                      <ResilientImage
-                        src={master.avatarUrl}
-                        alt=""
-                        width={32}
-                        height={32}
-                        className="h-8 w-8 rounded-full object-cover"
-                      />
-                    ) : (
-                      initialsOf(master.name)
-                    )}
-                  </span>
-                ))
-              )}
-            </div>
-            {extraCount > 0 ? (
-              <span className="text-sm font-semibold">+{extraCount}</span>
-            ) : null}
-            <span aria-hidden className="h-7 w-px bg-white/25" />
-            <div className="font-display text-xl tabular-nums">
-              {data.mastersOnShift.length}
-              <span className="ml-1 text-xs font-normal opacity-70">
-                {T.outOfTemplate.replace("{total}", String(data.totalMasters))}
-              </span>
-            </div>
-          </div>
-        </div>
+        <h1 className="mt-0.5 truncate font-display text-lg text-text-main md:text-xl">{studioName}</h1>
+        <p className="text-sm text-text-sec">{T.bookings(data.bookingsToday)}</p>
       </div>
-    </div>
+
+      <div className="flex items-center gap-2">
+        <div className="flex items-center">
+          {visibleMasters.length === 0 ? (
+            <Users className="h-5 w-5 text-text-sec" aria-hidden />
+          ) : (
+            visibleMasters.map((master, index) => (
+              <span
+                key={master.id}
+                className="inline-grid h-7 w-7 place-items-center overflow-hidden rounded-full border-2 border-bg-card bg-bg-input text-3xs font-semibold text-text-sec"
+                style={{ marginLeft: index === 0 ? 0 : -8 }}
+                aria-hidden
+              >
+                {master.avatarUrl ? (
+                  <ResilientImage
+                    src={master.avatarUrl}
+                    alt=""
+                    width={28}
+                    height={28}
+                    className="h-7 w-7 rounded-full object-cover"
+                  />
+                ) : (
+                  initialsOf(master.name)
+                )}
+              </span>
+            ))
+          )}
+          {extraCount > 0 ? <span className="ml-1 text-xs font-semibold text-text-sec">+{extraCount}</span> : null}
+        </div>
+        <span className="text-xs text-text-sec">{T.onShift(data.mastersOnShift.length, data.totalMasters)}</span>
+      </div>
+    </section>
   );
 }

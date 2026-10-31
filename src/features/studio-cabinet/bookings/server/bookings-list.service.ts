@@ -2,6 +2,7 @@ import {
   BookingStatus,
   Prisma,
   ProviderType,
+  type BookingActionRequiredBy,
   type BookingSource,
 } from "@prisma/client";
 import { CLIENT_STATUS_THRESHOLDS } from "@/lib/master/clients-classifier";
@@ -38,6 +39,13 @@ export type StudioBookingsFilters = {
   search?: string;
   /** MOBILE-STUDIO-C (ops): только записи, начинающиеся строго позже этого момента. */
   startsAfter?: Date;
+  /** DASHBOARD-REORDER: только записи, которые ещё не закончились к этому моменту. */
+  endsAfter?: Date;
+  /**
+   * DASHBOARD-REORDER: только записи, где ход за этой стороной (`actionRequiredBy`):
+   * «ждут ответа студии» — без переносов, которые студия сама предложила клиенту.
+   */
+  actionRequiredBy?: BookingActionRequiredBy;
   /**
    * BOOKINGS-JOURNAL: окно журнала (полночь салона → полночь салона; без
    * конца — «все предстоящие»). Задано — `range` не действует.
@@ -139,6 +147,12 @@ export async function listStudioBookings(input: {
   const whereStartsAfter: Prisma.BookingWhereInput = filters.startsAfter
     ? { startAtUtc: { gt: filters.startsAfter } }
     : {};
+  const whereEndsAfter: Prisma.BookingWhereInput = filters.endsAfter
+    ? { endAtUtc: { gt: filters.endsAfter } }
+    : {};
+  const whereActionBy: Prisma.BookingWhereInput = filters.actionRequiredBy
+    ? { actionRequiredBy: filters.actionRequiredBy }
+    : {};
   const whereMaster: Prisma.BookingWhereInput =
     filters.masterId && filters.masterId !== "all"
       ? { masterProviderId: filters.masterId }
@@ -152,11 +166,14 @@ export async function listStudioBookings(input: {
       whereStatus,
       whereMaster,
       whereStartsAfter,
+      whereEndsAfter,
+      whereActionBy,
       ...(whereSearch ? [whereSearch] : []),
     ],
   };
   const pageSize = input.page?.limit ?? PAGE_SIZE;
   const withRangeCounts = input.withRangeCounts ?? true;
+  // conflict-scope-ok: журнал студии — скоуп студии (поверхность записи), окно «ещё не закончилась» — фильтр списка, а не проверка пересечения перед записью.
   const countIf = (where: Prisma.BookingWhereInput) =>
     withRangeCounts ? prisma.booking.count({ where }) : Promise.resolve(0);
 
@@ -167,6 +184,7 @@ export async function listStudioBookings(input: {
   const tomorrowBounds = bookingsTimeRangeBounds("tomorrow", timezone);
   const weekBounds = bookingsTimeRangeBounds("week", timezone);
 
+  // conflict-scope-ok: журнал студии — скоуп студии (поверхность записи), окно «ещё не закончилась» — фильтр списка, а не проверка пересечения перед записью.
   const [bookings, todayCount, tomorrowCount, weekCount, allCount] =
     await Promise.all([
       prisma.booking.findMany({

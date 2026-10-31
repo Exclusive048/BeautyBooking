@@ -63,8 +63,9 @@ export async function getStudioSidebarCounts(input: {
 /**
  * STUDIO-CHAT: переписку студии читают только владелец и администраторы
  * (`chat/studio-side.ts`), поэтому мастеру студии счётчик не считается.
+ * Его же читает «Требуют внимания» главной студии (DASHBOARD-REORDER).
  */
-async function countStudioUnreadMessages(
+export async function countStudioUnreadMessages(
   userId: string,
   studioProviderId: string | null,
 ): Promise<number> {

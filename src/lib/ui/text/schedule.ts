@@ -71,6 +71,11 @@ export const schedule = {
     copyFailed: "Не удалось скопировать. Выделите текст ниже и скопируйте вручную.",
     textTitle: (period: string) => `Свободные окошки · ${period}`,
     textZone: (zone: string) => `Время ${zone}`,
+    // DASHBOARD-REORDER: список на главной кабинета — неделя с сегодняшнего дня.
+    toSchedule: "В расписание",
+    toCalendar: "В календарь",
+    weekEmpty: "На неделю вперёд свободного времени нет.",
+    moreDays: (count: number) => `ещё ${count} дн.`,
   },
   // BOOKINGS-JOURNAL: журнал записей кабинетов мастера и студии — записи по
   // дням, выбор даты, одна строка поиска (без привязки к дате, по всем

@@ -336,7 +336,6 @@ const ACTIONABLE_REFUSAL_SURFACES = [
   "src/features/master/components/clients/client-detail-panel.tsx",
   "src/features/master/components/clients/client-notes-editor.tsx",
   "src/features/master/components/dashboard/booking-action-buttons.tsx",
-  "src/features/master/components/dashboard/confirm-booking-action.tsx",
   "src/features/master/components/dashboard/manual-booking-modal.tsx",
   "src/features/master/components/hot-slots-settings-section.tsx",
   "src/features/master/components/notifications/mark-all-read-button.tsx",

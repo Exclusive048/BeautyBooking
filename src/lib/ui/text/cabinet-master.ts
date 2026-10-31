@@ -139,7 +139,6 @@ export const cabinetMaster = {
       endingSoonHint: (date: string) =>
         `Расписание закончится ${date} — после этого клиенты не увидят окошек.`,
       manualHint: "Рабочие дни отмечаются в календаре ниже.",
-      endingCta: "Продлить график",
     },
     // SCHEDULE-PATTERNS-01 (этап 3): календарь на 3 месяца и палитра рабочих
     // дней. Кисть — рабочий день палитры; «как по графику» снимает правку.
@@ -1524,34 +1523,15 @@ export const cabinetMaster = {
       trialDays: (days: number) => `· ${days} дн.`,
       aria: (plan: string) => `Тариф ${plan} — открыть подписку`,
     },
-    hero: {
-      nextClientLabel: "Следующий клиент",
-      nextClientIn: "через",
-      minutesShort: "мин",
-    },
-    kpi: {
-      todayRevenue: "Выручка сегодня",
-      // QA-112: was a hardcoded "vs прошлая суббота" — a comparison that is
-      // never computed (KPI tiles carry no trend deltas yet). Honest
-      // descriptive sublabel instead of a false/misleading comparison.
-      todayRevenueSub: "По записям на сегодня",
-      todayBookings: "Записей сегодня",
-      todayBookingsSub: "загрузка дня",
-      todayBookingsValueTemplate: "{count} из {capacity}ч",
-      weekRevenue: "Выручка за неделю",
-      weekRevenueSub: "к прошлой неделе",
-      newClients: "Новые клиенты",
-      newClientsValueTemplate: "{count} за 7д",
-      returningClientsTemplate: "повторных: {count}",
-    },
     bookings: {
       title: "Ближайшие записи",
-      subtitle: (count: number, totalToday: number) =>
+      // DASHBOARD-REORDER: выручка дня — здесь, а не плиткой KPI.
+      subtitle: (count: number, totalToday: number, revenue: string | null) =>
         `Сегодня · ещё ${count} ${pluralize(count, "запись", "записи", "записей")}` +
-        (totalToday > 0 ? ` из ${totalToday}` : ""),
-      seeAll: "Все записи",
-      emptyTitle: "На сегодня записей нет",
-      emptyDescription: "Можно поправить расписание или добавить запись вручную.",
+        (totalToday > 0 ? ` из ${totalToday}` : "") +
+        (revenue ? ` · ${revenue}` : ""),
+      toSchedule: "Всё расписание",
+      emptyTitle: "На сегодня записей больше нет",
       pendingBadge: "Ожидает",
       confirmAction: "Подтвердить",
       declineAction: "Отклонить",
@@ -1568,31 +1548,17 @@ export const cabinetMaster = {
       confirmWindowExpiredTooltip:
         "Время записи уже наступило — подтверждать уже поздно.",
     },
+    // DASHBOARD-REORDER (запрос владельца 2026-10-31): что ждёт действия —
+    // сгруппировано, без деталей отдельных записей; строка ведёт туда, где
+    // это разбирают.
     attention: {
       title: "Требуют внимания",
-      subtitle: (count: number) => `${count} ${pluralize(count, "задача", "задачи", "задач")}`,
-      sortLabel: "Сортировка: важность",
-      emptyTitle: "Всё под контролем",
-      emptyDescription:
-        "Нет срочных задач. Можно сосредоточиться на работе с клиентами.",
-      confirmBookingTitle: "Подтвердить запись",
-      // RESCHEDULE-CURRENT-TIME: запрос переноса — отдельная задача, время
-      // в описании «прежнее → запрошенное».
-      rescheduleRequestTitle: "Подтвердить перенос",
-      confirmBookingCta: "Подтвердить",
-      confirmBookingBusy: "Подтверждаем…",
-      unansweredReviewTitle: "Ответить на отзыв",
-      unansweredReviewCta: "Ответить",
-      freeSlotTitle: "Свободное окошко {from}–{to}",
-      // FIX-FREE-HOURS: раньше здесь стояли минуты («435 мин сегодня
-      // пустуют») — величина, которую мастер всё равно переводит в часы в
-      // уме, причём тем дольше, чем крупнее окошко. Часы округляются ВНИЗ:
-      // окошко всегда >= 60 мин (см. `findFirstFreeSlotToday`), поэтому
-      // значение никогда не ноль, и округление вниз не обещает больше, чем
-      // есть. Точные границы окошка остаются в заголовке карточки.
-      freeSlotDescription: (hours: number) =>
-        `Сегодня пустует ${hours} ${pluralize(hours, "час", "часа", "часов")}. Настройте автоматические скидки.`,
-      freeSlotCta: "Настроить горящие окошки",
+      empty: "Всё под контролем — ничего не ждёт.",
+      pendingConfirmation: "Ждут подтверждения",
+      rescheduleRequests: "Просят перенести",
+      unreadMessages: "Новые сообщения",
+      unansweredReviews: "Отзывы без ответа",
+      scheduleEnding: (date: string) => `Расписание настроено до ${date}`,
     },
     quickActions: {
       title: "Быстрые действия",

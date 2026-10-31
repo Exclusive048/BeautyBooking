@@ -5,19 +5,19 @@ import { Building2, Crown } from "lucide-react";
 import { env } from "@/lib/env";
 import { AnnouncementsSection } from "@/features/master/components/dashboard/announcements-section";
 import { AttentionSection } from "@/features/master/components/dashboard/attention-section";
-import { GreetingHero } from "@/features/master/components/dashboard/greeting-hero";
-import { KpiCardsGrid } from "@/features/master/components/dashboard/kpi-cards-grid";
 import { QuickActionsSection } from "@/features/master/components/dashboard/quick-actions-section";
 import { UpcomingBookingsSection } from "@/features/master/components/dashboard/upcoming-bookings-section";
 import { NewBookingButton } from "@/features/master/components/manual-booking/new-booking-button";
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
 import { FocusHighlighter } from "@/components/cabinet/focus-highlighter";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { AppSetupCard } from "@/features/cabinet/components/app-setup-card";
+import { FreeWindowsPanel } from "@/features/schedule-nav/components/free-windows-panel";
 import { SetupGuideCard } from "@/features/cabinet/setup-guide/setup-guide-card";
 import { loadMasterSetupGuide } from "@/lib/onboarding/setup-guide";
-import { getSessionUser, getSessionUserId } from "@/lib/auth/session";
+import { getSessionUserId } from "@/lib/auth/session";
+import { getActionRequiredBookingCountsForMaster } from "@/lib/bookings/counts";
+import { countUnreadChatMessages } from "@/lib/chat/conversation-aggregator";
 import {
   getCurrentSubscriptionRow,
   isActiveTrial,
@@ -25,83 +25,65 @@ import {
 } from "@/lib/billing/get-current-subscription-row";
 import { getCurrentMasterProviderId, getMasterWorkProfiles } from "@/lib/master/access";
 import { getMasterDashboardData } from "@/lib/master/dashboard.service";
+import { getMasterScheduleWeek } from "@/lib/master/schedule.service";
+import { parseIsoDateKey } from "@/lib/master/schedule-utils";
+import { getUnansweredReviewsCountForMaster } from "@/lib/reviews/counts";
 import { isScheduleEndingSoon } from "@/lib/schedule/calendar-shared";
+import { localDayRangeUtc } from "@/lib/schedule/dateKey";
 import { loadSchedulePlan } from "@/lib/schedule/patterns";
-import { getDayOfWeek } from "@/lib/schedule/timezone";
-import { UI_FMT } from "@/lib/ui/fmt";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
 import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * Master cabinet dashboard — `/cabinet/master/dashboard`.
  *
- * Rewritten in 23b as a thin server-component orchestrator. All data
- * (today's bookings, KPIs, attention items, services for the manual
- * modal) comes from `getMasterDashboardData` which fans out into a single
- * `Promise.all`. Two client islands handle interactive bits:
- *   - `<ManualBookingModal>` — listens to `?manual=1` to open
- *   - `<BookingActionButtons>` — confirm/decline pending bookings inline
- *
- * The pre-23b version was a 1488-line client component with a free-slots
- * carousel, story-card generator, date browser, and inline chat — all
- * removed in favour of the reference design. Free-slots logic now lives
- * inside the dashboard service as a "first big gap" hint surfaced through
- * the attention panel; the rest moved to dedicated pages or got dropped.
+ * Тонкий серверный оркестратор. Порядок (DASHBOARD-REORDER, запрос владельца
+ * 2026-10-31): «Требуют внимания» (сгруппированные счётчики, те же, что
+ * бейджи меню) → ближайшие записи со ссылкой в расписание → «Первые шаги» →
+ * свободные окошки на неделю (расчёт вкладки «Расписание») → приложение,
+ * быстрые действия, анонсы. Аналитика (выручка недели, клиенты) — на странице
+ * «Аналитика»; выручка дня — в подписи ближайших записей.
  */
 export async function MasterDashboardPage() {
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
 
-  const sessionUser = await getSessionUser();
-  if (!sessionUser) redirect("/login");
-
   const masterId = await getCurrentMasterProviderId(userId);
-  // FIX-VISUAL-POLISH F4: the page-header notification bell was removed (the
-  // global topbar already carries the canonical `NotificationsBell` sitewide —
-  // two bells were redundant), so the unread count is no longer fetched here.
-  // The sidebar still surfaces it via the layout's own `getUnreadBadgeCount`.
   // STUDIO-MASTER-PROFILES (этап 4): рабочие списки — по всем профилям мастера.
   const workProfiles = await getMasterWorkProfiles(userId);
-  const [data, schedulePlan, setupGuide, subscription] = await Promise.all([
-    getMasterDashboardData({ masterId, workProfiles }),
-    // SCHEDULE-PATTERNS-01 (этап 3): плашка «расписание скоро закончится».
-    loadSchedulePlan(masterId),
-    // SETUP-GUIDE-01: «Первые шаги» — пока кабинет не настроен до конца.
-    loadMasterSetupGuide(userId),
-    // Вид подписки — только на главной (решение владельца 2026-10-31). Строка
-    // уже прочитана шеллом кабинета: `React.cache`, второго запроса нет.
-    getCurrentSubscriptionRow(userId, SubscriptionScope.MASTER),
-  ]);
-  const scheduleEndsOn = isScheduleEndingSoon(schedulePlan) ? schedulePlan.configuredUntil : null;
-
-  const firstName =
-    sessionUser.firstName?.trim() ||
-    sessionUser.displayName?.trim()?.split(/\s+/)[0] ||
-    data.master.name.split(/\s+/)[0] ||
-    "мастер";
-
   const now = new Date();
-  // FIX-04 (QA-113): weekend computed in the master's own timezone, not the host TZ.
-  const masterWeekday = getDayOfWeek(now, data.master.timezone);
-  const isWeekend = masterWeekday === 0 || masterWeekday === 6;
-  const adviceContext = {
-    bookingsCount: data.todayBookings.length,
-    hasPendingBookings: data.pendingBookings.length > 0,
-    hasFreeSlotInNextHour: Boolean(
-      data.freeSlot &&
-        data.freeSlot.startAtUtc.getTime() - now.getTime() <= 60 * 60_000,
-    ),
-    isWeekend,
-  };
-
-  const next = data.upcomingBookings.find((b) => b.startAtUtc > now) ?? null;
-  const nextBooking = next
-    ? {
-        startAtUtc: next.startAtUtc,
-        clientName: next.clientName,
-        serviceTitle: next.serviceTitle,
-        clientAvatarUrl: null,
-      }
-    : null;
+  const dataPromise = getMasterDashboardData({ masterId, workProfiles, now });
+  // Свободные окошки — неделя с сегодняшнего дня САЛОНА (rule 17): пояс мастера
+  // приходит с данными главной, поэтому неделя стартует следом за ними, не
+  // дожидаясь остальных запросов.
+  const weekPromise = dataPromise.then((dashboard) =>
+    getMasterScheduleWeek({
+      masterId,
+      // Сервис недели строит дни из полуночи процесса — даём ему её для даты салона.
+      weekStart: parseIsoDateKey(toLocalDateKey(now, dashboard.master.timezone))!,
+      workProfiles,
+      now,
+    }),
+  );
+  const [data, week, schedulePlan, setupGuide, subscription, attention, unreadMessages, unansweredReviews] =
+    await Promise.all([
+      dataPromise,
+      weekPromise,
+      // SCHEDULE-PATTERNS-01 (этап 3): «расписание скоро закончится».
+      loadSchedulePlan(masterId),
+      // SETUP-GUIDE-01: «Первые шаги» — пока кабинет не настроен до конца.
+      loadMasterSetupGuide(userId),
+      // Вид подписки — только на главной (решение владельца 2026-10-31). Строка
+      // уже прочитана шеллом кабинета: `React.cache`, второго запроса нет.
+      getCurrentSubscriptionRow(userId, SubscriptionScope.MASTER),
+      // Счётчики «Требуют внимания» — те же, что бейджи меню кабинета.
+      getActionRequiredBookingCountsForMaster(workProfiles.allIds),
+      countUnreadChatMessages({ userId, perspective: "MASTER" }),
+      getUnansweredReviewsCountForMaster(masterId),
+    ]);
+  const scheduleEndsOn = isScheduleEndingSoon(schedulePlan) ? schedulePlan.configuredUntil : null;
+  const timezone = data.master.timezone;
+  const todayKey = toLocalDateKey(now, timezone);
 
   const publicProfileUrl = data.master.publicUsername
     ? `${env.NEXT_PUBLIC_APP_URL ?? ""}/u/${data.master.publicUsername}` || `/u/${data.master.publicUsername}`
@@ -174,64 +156,48 @@ export async function MasterDashboardPage() {
           </div>
         ) : null}
 
-        {scheduleEndsOn ? (
-          <div className="flex flex-col gap-3 rounded-2xl border border-warning-border bg-warning-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-warning-text">
-              {UI_TEXT.cabinetMaster.scheduleSettings.plan.endingSoonHint(
-                // Дата-ключ салона — календарная дата без пояса: подпись в UTC полудня.
-                UI_FMT.dateShort(`${scheduleEndsOn}T12:00:00.000Z`, { timeZone: "UTC" }),
-              )}
-            </p>
-            <Button asChild variant="secondary" size="sm" className="shrink-0 rounded-xl">
-              <Link href="/cabinet/master/schedule/settings">
-                {UI_TEXT.cabinetMaster.scheduleSettings.plan.endingCta}
-              </Link>
-            </Button>
-          </div>
-        ) : null}
+        <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-[1fr_1.4fr]">
+          <AttentionSection
+            pendingConfirmation={attention.pendingConfirmation}
+            rescheduleRequests={attention.rescheduleRequests}
+            unreadMessages={unreadMessages}
+            unansweredReviews={unansweredReviews}
+            scheduleEndsOn={scheduleEndsOn}
+          />
+          <UpcomingBookingsSection
+            upcoming={data.upcomingBookings}
+            totalTodayCount={data.todayBookings.length}
+            todayRevenueKopeks={data.kpis.todayRevenue}
+            timezone={timezone}
+            showWorkContext={data.showWorkContext}
+          />
+        </div>
 
+        {/* «Первые шаги» — под тем, что ждёт ответа сейчас (DASHBOARD-REORDER). */}
         {setupGuide && !setupGuide.hidden ? <SetupGuideCard guide={setupGuide} /> : null}
 
-        <GreetingHero
-          firstName={firstName}
-          now={now}
-          context={adviceContext}
-          nextBooking={nextBooking}
-          timezone={data.master.timezone}
+        <FreeWindowsPanel
+          sections={[
+            {
+              id: "master",
+              title: null,
+              days: week.days.map((day) => ({
+                dateKey: day.iso,
+                isOff: day.isOff,
+                past: day.isPast,
+                windows: day.freeWindows.windows,
+                freeStarts: day.freeWindows.freeStarts,
+              })),
+            },
+          ]}
+          timeZone={timezone}
+          zoneIso={localDayRangeUtc(todayKey, timezone).startUtc.toISOString()}
+          href="/cabinet/master/schedule"
+          linkLabel={UI_TEXT.schedule.freeWindows.toSchedule}
         />
 
         {/* PWA-ONBOARDING-01: установка приложения + уведомления (скрывается сама). */}
         <AppSetupCard />
-
-        <KpiCardsGrid
-          todayRevenue={data.kpis.todayRevenue}
-          todayBookingsCount={data.kpis.todayBookingsCount}
-          todayCapacityHours={data.kpis.todayCapacityHours}
-          weekRevenue={data.kpis.weekRevenue}
-          newClientsCount={data.kpis.newClientsCount}
-          returningClientsCount={data.kpis.returningClientsCount}
-          revenueSplit={
-            data.showWorkContext
-              ? { today: data.kpis.todayRevenueSplit, week: data.kpis.weekRevenueSplit }
-              : null
-          }
-        />
-
-        <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-[1.4fr_1fr]">
-          <UpcomingBookingsSection
-            upcoming={data.upcomingBookings}
-            totalTodayCount={data.todayBookings.length}
-            timezone={data.master.timezone}
-            showWorkContext={data.showWorkContext}
-          />
-          <AttentionSection
-            pendingBookings={data.pendingBookings}
-            unansweredReviews={data.unansweredReviews}
-            freeSlot={data.freeSlot}
-            timezone={data.master.timezone}
-            showWorkContext={data.showWorkContext}
-          />
-        </div>
 
         <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-2">
           <QuickActionsSection publicProfileUrl={publicProfileUrl} />

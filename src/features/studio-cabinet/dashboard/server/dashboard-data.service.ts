@@ -1,7 +1,7 @@
 import { studioReviewsWhere } from "@/lib/reviews/studio-scope";
 import {
+  BookingActionRequiredBy,
   BookingStatus,
-  MembershipStatus,
   ProviderType,
   ScheduleChangeRequestStatus,
 } from "@prisma/client";
@@ -31,6 +31,9 @@ import type {
   StudioTopMasterRow,
 } from "./types";
 import { studioBookingsWhere } from "@/lib/studio/booking-scope";
+import { BOOKING_STATUS_GROUPS } from "@/lib/bookings/status-groups";
+import { listStudioBookings } from "@/features/studio-cabinet/bookings/server/bookings-list.service";
+import type { StudioBookingRow } from "@/features/studio-cabinet/bookings/server/types";
 
 const COMPLETED_STATUSES = [
   BookingStatus.CONFIRMED,
@@ -357,15 +360,19 @@ async function buildTopMasters(
 async function buildAttentionItems(
   ctx: StudioContext,
 ): Promise<{ items: StudioAttentionItem[]; total: number; urgent: number }> {
-  const [pendingMembers, pendingBookings, unansweredReviews, pendingScheduleRequests] =
+  // DASHBOARD-REORDER: пункта «заявки мастеров» больше нет — заявку
+  // `StudioMembership` PENDING не пишет ни один путь (мастер входит в студию
+  // приглашением), счётчик был нулём всегда.
+  const [pendingBookings, unansweredReviews, pendingScheduleRequests] =
     await Promise.all([
-      prisma.studioMembership.count({
-        where: { studioId: ctx.studioId, status: MembershipStatus.PENDING },
-      }),
       prisma.booking.count({
         where: {
           ...studioBookingsWhere(ctx.studioId),
           status: { in: PENDING_BOOKING_STATUSES },
+          // DASHBOARD-REORDER: ход за студией (сторона студии в записи —
+          // MASTER): перенос, который студия сама предложила клиенту, ответа
+          // студии не ждёт — как у мастера (`bookings/counts.ts`).
+          actionRequiredBy: BookingActionRequiredBy.MASTER,
           // BOOKING-FLOW-AUDIT-RESIDUALS: подтвердить можно только до начала
           // (`isBookingPastConfirmWindow`) — прошедшие неподтверждённые записи
           // счётчик «ждут ответа» раздували навсегда.
@@ -388,15 +395,9 @@ async function buildAttentionItems(
 
   const allItems: StudioAttentionItem[] = [
     {
-      id: "pending-master-approvals",
-      count: pendingMembers,
-      href: "/cabinet/studio/team?filter=invited",
-      urgent: pendingMembers > 0,
-    },
-    {
       id: "bookings-awaiting",
       count: pendingBookings,
-      href: "/cabinet/studio/calendar",
+      href: "/cabinet/studio/bookings?status=awaiting&upcoming=1",
       urgent: pendingBookings >= 5,
     },
     {
@@ -615,5 +616,89 @@ export async function loadStudioDashboardData(input: {
     topOccupancyToday,
     popularServices,
     revenueChart,
+  };
+}
+
+/** Ближайших записей на главной (остальные — в календаре). */
+const HOME_UPCOMING_LIMIT = 5;
+
+/** Записи, которые ещё состоятся: ждут подтверждения или подтверждены. */
+const HOME_UPCOMING_STATUSES: BookingStatus[] = [
+  ...BOOKING_STATUS_GROUPS.awaiting,
+  ...BOOKING_STATUS_GROUPS.confirmed,
+];
+
+export type StudioHomeData = {
+  studioId: string;
+  providerId: string;
+  /** Пояс студии (salon-tz): «сегодня», время записей и окошек. */
+  timeZone: string;
+  todayBanner: StudioTodayBannerData;
+  attentionItems: StudioAttentionItem[];
+  /** Оставшиеся на сегодня записи студии: первые `HOME_UPCOMING_LIMIT` и сколько всего. */
+  upcoming: { items: StudioBookingRow[]; total: number };
+};
+
+/**
+ * DASHBOARD-REORDER (запрос владельца 2026-10-31) — главная студии в вебе:
+ * сегодня, «Требуют внимания» и ближайшие записи. Показатели за 30 дней,
+ * топ мастеров, загрузка, популярные услуги и выручка по мастерам — в
+ * аналитике; их запросы здесь не делаются. Приложение по-прежнему читает
+ * полный набор `loadStudioDashboardData`.
+ */
+export async function loadStudioHomeData(input: {
+  studioId: string;
+  now?: Date;
+}): Promise<StudioHomeData> {
+  const studio = await prisma.studio.findUnique({
+    where: { id: input.studioId },
+    select: { id: true, providerId: true, provider: { select: { timezone: true } } },
+  });
+  if (!studio) {
+    throw new Error(`Studio not found: ${input.studioId}`);
+  }
+  const ctx: StudioContext = {
+    studioId: studio.id,
+    providerId: studio.providerId,
+    timeZone: studio.provider.timezone,
+  };
+  const now = input.now ?? new Date();
+  const todayStart = startOfSalonDay(now, ctx.timeZone);
+  const todayEnd = addUtcDays(todayStart, 1);
+
+  // conflict-scope-ok: ближайшие записи главной — скоуп студии, окно «сегодня и ещё не закончилась» — фильтр списка, а не проверка пересечения.
+  const [todayBanner, attention, upcomingPage, upcomingTotal] = await Promise.all([
+    buildTodayBanner(ctx, now),
+    buildAttentionItems(ctx),
+    listStudioBookings({
+      studioId: ctx.studioId,
+      filters: {
+        range: "all",
+        window: { fromUtc: todayStart, toUtcExclusive: todayEnd },
+        status: HOME_UPCOMING_STATUSES,
+        endsAfter: now,
+      },
+      page: { offset: 0, limit: HOME_UPCOMING_LIMIT },
+      withRangeCounts: false,
+    }),
+    prisma.booking.count({
+      where: {
+        AND: [
+          studioBookingsWhere(ctx.studioId),
+          { startAtUtc: { gte: todayStart, lt: todayEnd } },
+          { endAtUtc: { gt: now } },
+          { status: { in: HOME_UPCOMING_STATUSES } },
+        ],
+      },
+    }),
+  ]);
+
+  return {
+    studioId: ctx.studioId,
+    providerId: ctx.providerId,
+    timeZone: ctx.timeZone,
+    todayBanner,
+    attentionItems: attention.items,
+    upcoming: { items: upcomingPage.items, total: upcomingTotal },
   };
 }

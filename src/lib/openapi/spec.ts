@@ -9430,7 +9430,7 @@ export const openApiSpec = {
                     type: "object",
                     required: ["id", "count", "urgent"],
                     properties: {
-                      id: { type: "string", enum: ["pending-master-approvals", "bookings-awaiting", "reviews-unanswered", "schedule-requests"] },
+                      id: { type: "string", enum: ["bookings-awaiting", "reviews-unanswered", "schedule-requests"] },
                       count: { type: "integer" },
                       urgent: { type: "boolean" },
                     },

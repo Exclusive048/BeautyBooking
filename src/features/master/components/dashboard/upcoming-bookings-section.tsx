@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { ArrowRight, Calendar } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { BookingRow } from "@/features/master/components/dashboard/booking-row";
 import type { DashboardBooking } from "@/lib/master/dashboard.service";
+import { UI_FMT } from "@/lib/ui/fmt";
 import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.dashboard.bookings;
@@ -11,6 +12,8 @@ type Props = {
   upcoming: DashboardBooking[];
   /** Total today count for the subtitle ("ещё 3 из 6"). */
   totalTodayCount: number;
+  /** Выручка по записям на сегодня, копейки (DASHBOARD-REORDER: была плиткой KPI). */
+  todayRevenueKopeks: number;
   /** Salon (master) tz — EXP-017: booking times shown in salon-tz, matching the kanban. */
   timezone: string;
   /** STUDIO-MASTER-PROFILES (этап 3): пометка «Личная / Студия» на строках. */
@@ -19,34 +22,44 @@ type Props = {
 
 const VISIBLE_LIMIT = 3;
 
+/**
+ * «Ближайшие записи» главной кабинета мастера: оставшиеся на сегодня, первые
+ * три; всё остальное — в расписании (ссылка «Всё расписание», запрос владельца
+ * 2026-10-31).
+ */
 export function UpcomingBookingsSection({
   upcoming,
   totalTodayCount,
+  todayRevenueKopeks,
   timezone,
   showWorkContext = false,
 }: Props) {
   const visible = upcoming.slice(0, VISIBLE_LIMIT);
   // UX-PASS-01: склонение и «из N» — в тексте домена, а не в компоненте.
-  const subtitle = T.subtitle(upcoming.length, totalTodayCount);
+  const subtitle = T.subtitle(
+    upcoming.length,
+    totalTodayCount,
+    todayRevenueKopeks > 0 ? UI_FMT.priceLabel(todayRevenueKopeks) : null,
+  );
 
   return (
     <section className="rounded-2xl border border-border-subtle bg-bg-card">
-      <header className="flex items-start justify-between gap-3 px-5 pb-3 pt-5">
+      <header className="flex items-start justify-between gap-3 px-4 pb-2 pt-4 md:px-5">
         <div className="min-w-0">
           <h2 className="font-display text-lg text-text-main">{T.title}</h2>
-          <p className="mt-0.5 text-xs text-text-sec">{subtitle}</p>
+          {upcoming.length > 0 ? <p className="mt-0.5 text-xs text-text-sec">{subtitle}</p> : null}
         </div>
         <Link
-          href="/cabinet/master/bookings"
+          href="/cabinet/master/schedule"
           className="inline-flex shrink-0 items-center gap-1 text-sm text-accent-text transition-colors hover:underline"
         >
-          {T.seeAll}
+          {T.toSchedule}
           <ArrowRight className="h-3 w-3" aria-hidden />
         </Link>
       </header>
 
       {visible.length > 0 ? (
-        <div className="divide-y divide-border-subtle">
+        <div className="divide-y divide-border-subtle border-t border-border-subtle">
           {visible.map((booking) => (
             <BookingRow
               key={booking.id}
@@ -57,14 +70,7 @@ export function UpcomingBookingsSection({
           ))}
         </div>
       ) : (
-        <div className="px-5 pb-8 pt-4 text-center">
-          <Calendar
-            aria-hidden
-            className="mx-auto mb-3 h-12 w-12 text-text-sec/50"
-          />
-          <p className="font-display text-base text-text-main">{T.emptyTitle}</p>
-          <p className="mt-1 text-sm text-text-sec">{T.emptyDescription}</p>
-        </div>
+        <p className="px-4 pb-4 text-sm text-text-sec md:px-5">{T.emptyTitle}</p>
       )}
     </section>
   );

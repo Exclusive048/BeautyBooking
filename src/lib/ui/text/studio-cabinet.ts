@@ -110,80 +110,34 @@ export const studioCabinet = {
       reviews: "Отзывы",
     },
   },
+  // DASHBOARD-REORDER (запрос владельца 2026-10-31): главная студии —
+  // сегодня, что ждёт действия, ближайшие записи и свободные окошки.
+  // Показатели за 30 дней, топ мастеров и выручка — в аналитике.
   dashboardV2: {
-    banner: {
-      title: (studioName: string, count: number) =>
-        `«${studioName}»: сегодня ${count} ${pluralize(count, "запись", "записи", "записей")}`,
-      onShiftLabel: "Сейчас на смене",
-      outOfTemplate: "из {total}",
-    },
-    kpis: {
-      revenue: {
-        label: "Выручка за 30 дней",
-        subtitle: "к прошлому месяцу",
-      },
-      bookings: {
-        label: "Записей за 30 дней",
-        averageCheckTemplate: "средний чек {amount}",
-      },
-      occupancy: {
-        label: "Загружаем студию",
-        subtitle: "{count} мастеров на смене",
-      },
-      rating: {
-        label: "Средний рейтинг",
-        subtitle: "{count} отзывов",
-      },
-    },
-    topMasters: {
-      title: "ТОП-мастера",
-      subtitle: "По выручке за 30 дней",
-      seeAll: "Все мастера",
-      bookingsTemplate: "{count} записей",
-      empty: "За последний месяц записей не было.",
+    today: {
+      bookings: (count: number) =>
+        count > 0
+          ? `Сегодня ${count} ${pluralize(count, "запись", "записи", "записей")}`
+          : "Сегодня записей нет",
+      onShift: (count: number, total: number) => `На смене ${count} из ${total}`,
     },
     attention: {
       title: "Требуют внимания",
-      subtitleTemplate: "{count} задач · {urgent} срочных",
-      empty: "Очередь пуста",
-      emptyBody: "Всё под контролем.",
-      urgentLabel: "Срочно",
-      items: {
-        pendingMastersTitle: "Заявок мастеров: {count}",
-        pendingMastersAction: "Открыть",
-        bookingsAwaitingTitle: "Записей ждут подтверждения: {count}",
-        bookingsAwaitingAction: "Записи",
-        reviewsUnansweredTitle: "Отзывов без ответа: {count}",
-        reviewsUnansweredAction: "Ответить",
-        scheduleRequestsTitle: "Заявок на расписание: {count}",
-        scheduleRequestsAction: "Решить",
-      },
+      empty: "Всё под контролем — ничего не ждёт.",
+      bookingsAwaiting: "Ждут подтверждения",
+      unreadMessages: "Новые сообщения",
+      reviewsUnanswered: "Отзывы без ответа",
+      scheduleRequests: "Заявки на график",
     },
-    topOccupancy: {
-      title: "Топ загруженности",
-      subtitle: "Сегодня",
-      slotsTemplate: "{booked} из {total} записей",
-      empty: "Сегодня свободный день.",
-    },
-    popularServices: {
-      title: "Популярные услуги",
-      subtitle: "За 30 дней",
-      countTemplate: "{count} раз · {percent}% всех записей",
-      empty: "Нет данных за выбранный период.",
-    },
-    revenueChart: {
-      periodAria: "Период выручки",
-      title: "Выручка по мастерам",
-      totalLabel: "за период",
-      bookingsTemplate: "{count} записей",
-      periodSelector: {
-        "7d": "7д",
-        "30d": "30д",
-        "90d": "90д",
-        "365d": "Год",
-      },
-      empty: "Нет данных за выбранный период.",
-      error: "Не удалось загрузить данные. Попробуйте ещё раз.",
+    upcoming: {
+      title: "Ближайшие записи",
+      subtitle: (shown: number, total: number) =>
+        total > shown
+          ? `Сегодня · ${shown} из ${total}`
+          : `Сегодня · ещё ${total} ${pluralize(total, "запись", "записи", "записей")}`,
+      toCalendar: "Весь календарь",
+      empty: "На сегодня записей больше нет",
+      awaitingBadge: "Ожидает",
     },
   },
   // STUDIO-SCHEDULE-SETTINGS-A Phase A — page text. Phase B will

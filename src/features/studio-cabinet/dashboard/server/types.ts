@@ -46,11 +46,7 @@ export type StudioTopMasterRow = {
 };
 
 export type StudioAttentionItem = {
-  id:
-    | "pending-master-approvals"
-    | "bookings-awaiting"
-    | "reviews-unanswered"
-    | "schedule-requests";
+  id: "bookings-awaiting" | "reviews-unanswered" | "schedule-requests";
   count: number;
   href: string;
   urgent: boolean;
