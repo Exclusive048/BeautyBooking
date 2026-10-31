@@ -33,6 +33,7 @@ vi.mock("@/lib/prisma", () => ({
     masterService: { findUnique: vi.fn(async () => ({ isEnabled: true, priceOverride: null, durationOverrideMin: null })) },
     provider: { findUnique: providerFindUnique },
     booking: { count: vi.fn(async () => 0) },
+    userProfile: { findUnique: vi.fn(async () => null) },
   },
 }));
 vi.mock("@/lib/studio/accepts-bookings", () => ({ assertStudioAcceptsBookings: vi.fn(async () => undefined) }));

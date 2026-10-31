@@ -8,6 +8,7 @@ import { mapPrismaBookingConflict } from "@/lib/bookings/prisma-conflict";
 import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
+import { resolveVerifiedPhoneOwnerId } from "@/lib/bookings/manual-client-link";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -74,6 +75,7 @@ export async function createSoloMasterBooking(input: {
     bufferMin: normalizeBufferMinutes(master.bufferBetweenBookingsMin),
   };
   await ensureNoConflicts(prisma, conflictScope);
+  const clientUserId = await resolveVerifiedPhoneOwnerId(input.clientPhone);
 
   const created = await bookingTransaction(
     async (tx) => {
@@ -105,15 +107,11 @@ export async function createSoloMasterBooking(input: {
           // (BOOKING-FINALIZE-01 не объявляет визитом неподтверждённое), то есть
           // ручные клиенты не попадали в CRM, «визиты» и выручку.
           status: "CONFIRMED",
-          // R2-01-D: a solo master entering a manual booking is recording a known
-          // appointment — flagging the master to "action" their own booking is a
-          // redundant self-action (it nagged in the dashboard attention panel). Drop
-          // the self-flag. Kept PENDING (lowest-risk: no lifecycle / notification
-          // change); the master can still confirm it from the kanban — PENDING →
-          // CONFIRMED does not gate on actionRequiredBy (confirmBooking.ts checks it
-          // only for CHANGE_REQUESTED). The studio manual path (admin creates → a
-          // different master confirms) is a legitimate two-party flow, left as-is.
+          // R2-01-D: ответа на свою же запись мастер не ждёт.
           actionRequiredBy: null,
+          // MANUAL-BOOKING-CLIENT-LINK: номер, доказанный аккаунтом клиента, —
+          // запись сразу его («Мои записи», напоминания, переписка).
+          clientUserId,
         },
         select: { id: true },
       });

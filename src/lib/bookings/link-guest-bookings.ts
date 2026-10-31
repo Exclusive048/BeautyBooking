@@ -4,6 +4,7 @@ import { normalizePhone } from "@/lib/auth/otp";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { buildPhoneVariants } from "@/lib/crm/card-utils";
 import { logInfo } from "@/lib/logging/logger";
+import { GUEST_CLASS_PROFILE_WHERE } from "@/lib/legal/guest-class-where";
 
 export type LinkGuestBookingsResult = {
   matched: number;
@@ -55,6 +56,28 @@ function maskPhone(input: string): string {
   return `${prefix}${lead}******${suffix}`;
 }
 
+/**
+ * MANUAL-BOOKING-CLIENT-LINK (2026-10-31): чья запись «ничья» для склейки.
+ * Кроме записей без клиента (ручные записи мастера и студии, старые гостевые)
+ * это записи БЕЗНОМЕРНОГО пассивного профиля — того, что никогда не был
+ * аккаунтом (`GUEST_CLASS_PROFILE_WHERE`) и номера не держит. Такие профили
+ * рождаются двумя путями, и оба раньше оставляли записи сиротами:
+ *  - гостевой чекаут на номер, заявленный чужим аккаунтом, — бронь уезжает в
+ *    профиль без номера (`find-or-create-guest.ts`);
+ *  - доказательство номера (OTP, VK / Яндекс) или кабинетная заявка снимают
+ *    номер с пассивного профиля (`releaseUnverifiedPhoneClaims`,
+ *    `claimPhoneForUser`), а его записи оставались на нём.
+ * Доверие то же, что у записей без клиента: и те и другие — номер, введённый
+ * в гостевой форме или ручной записи, а склейку зовут только после
+ * ДОКАЗАННОГО владения номером (инв. #46). Профиль с номером не трогается —
+ * он сам станет аккаунтом при входе по коду (конверсия гостя).
+ */
+const ADOPTABLE_OWNER_WHERE: Prisma.UserProfileWhereInput = {
+  ...GUEST_CLASS_PROFILE_WHERE,
+  phone: null,
+  isDeleted: false,
+};
+
 export async function linkGuestBookingsToUserByPhone(input: {
   userProfileId: string;
   phoneRaw: string;
@@ -78,11 +101,18 @@ export async function linkGuestBookingsToUserByPhone(input: {
     }),
     prisma.booking.count({
       where: {
-        AND: [matchFilter, { clientUserId: { not: null } }, { NOT: { clientUserId: userProfileId } }],
+        AND: [
+          matchFilter,
+          { clientUserId: { not: null } },
+          { NOT: { clientUserId: userProfileId } },
+          { NOT: { clientUser: ADOPTABLE_OWNER_WHERE } },
+        ],
       },
     }),
     prisma.booking.updateMany({
-      where: { AND: [matchFilter, { clientUserId: null }] },
+      where: {
+        AND: [matchFilter, { OR: [{ clientUserId: null }, { clientUser: ADOPTABLE_OWNER_WHERE }] }],
+      },
       data: { clientUserId: userProfileId },
     }),
   ]);

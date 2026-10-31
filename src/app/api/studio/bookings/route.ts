@@ -35,9 +35,9 @@ export async function POST(req: Request) {
       clientPhone: body.clientPhone,
       notes: body.notes,
     });
-    // STUDIO-NEW-BOOKING-NOTIFY-01: запись, созданная администратором, ждёт
-    // подтверждения мастера (PENDING, ответ за MASTER) — а мастер о ней не
-    // узнавал. Создателю не шлём; сбой рассылки запись не откатывает.
+    // STUDIO-NEW-BOOKING-NOTIFY-01: о записи, занесённой администратором,
+    // мастер должен узнать (с MANUAL-BOOKING-CONFIRMED-STUDIO она сразу
+    // подтверждена). Создателю не шлём; сбой рассылки запись не откатывает.
     try {
       const fullBooking = await loadBookingWithRelations(data.id);
       if (fullBooking) await notifyBookingCreated(fullBooking, { excludeUserId: user.id });

@@ -218,6 +218,22 @@ export const createStudioBookingSchema = z.object({
   startAt: z.string().datetime(),
   serviceId: z.string().trim().min(1),
   clientName: z.string().trim().min(1).max(120),
-  clientPhone: z.string().trim().min(3).max(32).optional(),
+  // MANUAL-BOOKING-CLIENT-LINK: номер канонизируется на сервере, как у ручной
+  // записи мастера (`master/schemas.ts`): «8 (999) 123-45-67» из клиента вне
+  // веба иначе не находили ни склейка броней при входе, ни карточка CRM.
+  clientPhone: z
+    .string()
+    .trim()
+    .max(32)
+    .optional()
+    .transform((value, ctx) => {
+      if (!value) return undefined;
+      const normalized = normalizeRussianPhone(value);
+      if (!normalized) {
+        ctx.addIssue({ code: "custom", message: "Проверьте номер телефона." });
+        return z.NEVER;
+      }
+      return normalized;
+    }),
   notes: z.string().trim().max(1000).optional(),
 });
