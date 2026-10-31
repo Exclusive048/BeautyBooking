@@ -3,17 +3,25 @@ import { normalizeRussianPhone } from "@/lib/phone/russia";
 
 /**
  * MANUAL-BOOKING-CLIENT-LINK (запрос владельца 2026-10-31): ручная запись
- * мастера или студии по телефону клиента принадлежит клиенту, если номер
- * ДОКАЗАН его аккаунтом (`phoneVerifiedAt`, инв. #46: только доказанный номер
- * работает ключом). Раньше ручная запись всегда рождалась без клиента и
- * доезжала до аккаунта лишь при следующем входе по коду — клиент, который уже
- * вошёл в приложение и не выходит, её не видел.
+ * мастера или студии по телефону клиента сразу получает клиента, если номер
+ * ДОКАЗАН его аккаунтом (`phoneVerifiedAt`, инв. #46) И этот человек уже
+ * записывался на ту же поверхность (`providerId` — личный профиль мастера либо
+ * студия). Иначе клиент, который вошёл в приложение и не выходит, не видел
+ * запись до следующего входа по коду.
  *
- * Непроверенная заявка номера и пассивный гостевой профиль записи не получают:
- * такую запись (`clientUserId = null`) прикрепит вход по коду или
- * подтверждение номера через VK / Яндекс (`linkGuestBookingsToUserByPhone`).
+ * Второе условие — граница приватности, а не оптимизация: без него оператор,
+ * вписав чужой номер, узнавал бы, зарегистрирован ли человек (в записи
+ * появилось бы имя аккаунта), и получал бы переписку и уведомления к
+ * незнакомцу по одному своему слову. Своего клиента оператор и так знает.
+ *
+ * Новому клиенту запись (`clientUserId = null`) прикрепит ЕГО действие —
+ * вход по коду или подтверждение номера через VK / Яндекс
+ * (`linkGuestBookingsToUserByPhone`).
  */
-export async function resolveVerifiedPhoneOwnerId(phone: string | null | undefined): Promise<string | null> {
+export async function resolveVerifiedPhoneOwnerId(
+  phone: string | null | undefined,
+  surface: { providerId: string },
+): Promise<string | null> {
   const normalized = phone ? normalizeRussianPhone(phone) : null;
   if (!normalized) return null;
   const owner = await prisma.userProfile.findUnique({
@@ -21,5 +29,9 @@ export async function resolveVerifiedPhoneOwnerId(phone: string | null | undefin
     select: { id: true, phoneVerifiedAt: true, isDeleted: true },
   });
   if (!owner || owner.isDeleted || owner.phoneVerifiedAt === null) return null;
-  return owner.id;
+  const known = await prisma.booking.findFirst({
+    where: { providerId: surface.providerId, clientUserId: owner.id },
+    select: { id: true },
+  });
+  return known ? owner.id : null;
 }

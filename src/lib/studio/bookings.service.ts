@@ -224,7 +224,7 @@ export async function createStudioBooking(input: {
         }),
     now,
   });
-  const clientUserId = await resolveVerifiedPhoneOwnerId(input.clientPhone);
+  const clientUserId = await resolveVerifiedPhoneOwnerId(input.clientPhone, { providerId: studio.providerId });
 
   // FIX-R2-04-A: the conflict re-check now runs INSIDE the create
   // transaction under Serializable isolation (was pre-tx with default

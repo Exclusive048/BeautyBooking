@@ -75,7 +75,7 @@ export async function createSoloMasterBooking(input: {
     bufferMin: normalizeBufferMinutes(master.bufferBetweenBookingsMin),
   };
   await ensureNoConflicts(prisma, conflictScope);
-  const clientUserId = await resolveVerifiedPhoneOwnerId(input.clientPhone);
+  const clientUserId = await resolveVerifiedPhoneOwnerId(input.clientPhone, { providerId: input.masterId });
 
   const created = await bookingTransaction(
     async (tx) => {
