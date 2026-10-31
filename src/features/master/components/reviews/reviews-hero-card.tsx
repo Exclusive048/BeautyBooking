@@ -45,26 +45,26 @@ export function ReviewsHeroCard({ stats }: Props) {
         : T.hero.trendDownTemplate.replace("{value}", UI_FMT.decimal(trend, 1));
 
   return (
-    <article className="flex h-full flex-col justify-between rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-6">
+    <article className="flex h-full flex-col justify-between rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-4 sm:p-6">
       <div>
         <div className="flex items-baseline gap-2">
-          <span className="font-display text-5xl font-bold text-accent-text">
+          <span className="font-display text-4xl font-bold text-accent-text sm:text-5xl">
             {UI_FMT.decimal(stats.avgRating, 1)}
           </span>
           <span className="text-lg text-text-sec">{T.hero.outOfFive}</span>
         </div>
 
-        <div className="mt-3">
+        <div className="mt-2 sm:mt-3">
           <StarsDisplay rating={stats.avgRating} size="lg" />
         </div>
 
-        <p className="mt-3 text-sm text-text-sec">{meta}</p>
+        <p className="mt-2 text-sm text-text-sec sm:mt-3">{meta}</p>
       </div>
 
       {trendLabel ? (
         <p
           className={cn(
-            "mt-4 inline-flex items-center gap-1 font-mono text-xs uppercase tracking-[0.18em]",
+            "mt-3 inline-flex items-center gap-1 font-mono text-xs uppercase tracking-[0.18em]",
             trendUp && "text-success-text",
             trendDown && "text-danger-text"
           )}

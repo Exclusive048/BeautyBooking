@@ -69,7 +69,7 @@ export async function MasterSchedulePage({ searchParams }: Props) {
         }
       />
 
-      <div className="space-y-4 px-4 py-6 md:px-6 lg:px-8">
+      <div className="space-y-4 px-4 py-4 md:px-6 md:py-6 lg:px-8">
         <ScheduleControls
           weekStartIso={weekStartIso}
           todayIso={todayIso}

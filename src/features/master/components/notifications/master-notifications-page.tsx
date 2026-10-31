@@ -16,7 +16,6 @@ import { NotificationsEmptyState } from "./empty-state";
 import { MarkAllReadButton } from "./mark-all-read-button";
 import { NotificationCard } from "./notification-card";
 import { NotificationsKpiCards } from "./notifications-kpi-cards";
-import { NotificationsNotice } from "./notifications-notice";
 import { NotificationsTabs } from "./notifications-tabs";
 import { SortSelect } from "./sort-select";
 import { personalMasterProviderWhere, getMasterWorkProfiles } from "@/lib/master/access";
@@ -76,7 +75,6 @@ export async function MasterNotificationsPage({ searchParams }: Props) {
           { label: T.notifications.breadcrumb },
         ]}
         title={T.notifications.title}
-        subtitle={T.notifications.subtitle}
         actions={
           <>
             {data.kpi.unreadCount > 0 ? <MarkAllReadButton /> : null}
@@ -92,7 +90,7 @@ export async function MasterNotificationsPage({ searchParams }: Props) {
         }
       />
 
-      <div className="space-y-6 px-4 py-6 md:px-6 lg:px-8">
+      <div className="space-y-4 px-4 py-4 md:space-y-6 md:px-6 md:py-6 lg:px-8">
         <NotificationsKpiCards stats={data.kpi} />
 
         <NotificationsTabs
@@ -104,8 +102,6 @@ export async function MasterNotificationsPage({ searchParams }: Props) {
         <div className="flex items-center justify-between gap-3">
           <SortSelect value={data.sort} />
         </div>
-
-        <NotificationsNotice />
 
         {data.groups.length === 0 ? (
           <NotificationsEmptyState />

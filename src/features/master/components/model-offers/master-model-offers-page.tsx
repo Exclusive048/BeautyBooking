@@ -71,10 +71,9 @@ export async function MasterModelOffersPage({ searchParams }: Props) {
           { label: T.modelOffers.breadcrumb },
         ]}
         title={T.modelOffers.title}
-        subtitle={T.modelOffers.subtitle}
       />
 
-      <div className="space-y-8 px-4 py-6 md:px-6 lg:px-8">
+      <div className="space-y-4 px-4 py-4 md:space-y-8 md:px-6 md:py-6 lg:px-8">
         <OffersKpiCards kpi={data.kpi} />
 
         <ActiveOffersSection

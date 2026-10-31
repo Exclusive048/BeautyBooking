@@ -1,4 +1,4 @@
-import { PageTitleRow } from "@/components/ui/back-link";
+import { StudioPageHeader } from "@/features/studio-cabinet/components/studio-page-header";
 import { ClientViewLink } from "@/features/cabinet/components/client-view-link";
 import type { ScheduleEditorSnapshot } from "@/lib/schedule/editor-shared";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -39,20 +39,12 @@ export function StudioScheduleSettingsPage({
 }: Props) {
   return (
     <div className="space-y-5 lg:space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <PageTitleRow backHref="/cabinet/studio/schedule/team">
-            <p className="eyebrow">
-              {T.breadcrumb}
-            </p>
-            <h1 className="font-display text-2xl font-bold tracking-tight text-text-main md:text-3xl">
-              {T.title}
-            </h1>
-          </PageTitleRow>
-          <p className="mt-2 text-sm text-text-sec">{T.studioSubtitle}</p>
-        </div>
-        <ClientViewLink publicUsername={studioPublicUsername} />
-      </header>
+      <StudioPageHeader
+        backHref="/cabinet/studio/schedule/team"
+        caption={T.breadcrumb}
+        title={T.title}
+        actions={<ClientViewLink publicUsername={studioPublicUsername} />}
+      />
 
       {masters.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border-subtle bg-bg-card p-10 text-center">

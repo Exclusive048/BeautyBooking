@@ -67,12 +67,11 @@ export async function MasterBookingsPage({ searchParams }: Props) {
           { label: T.bookings.breadcrumb },
         ]}
         title={T.bookings.title}
-        subtitle={T.bookings.subtitle}
         actions={<NewBookingButton label={T.pageHeader.newBookingCta} className="rounded-xl" />}
       />
       <FocusHighlighter />
 
-      <div className="space-y-4 px-4 py-6 md:px-6 lg:px-8">
+      <div className="space-y-4 px-4 py-4 md:px-6 md:py-6 lg:px-8">
         <BookingsToolbar
           initialSearch={filters.search ?? ""}
           initialTab={filters.tab ?? "all"}

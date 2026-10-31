@@ -105,11 +105,10 @@ export async function MasterReviewsPage({ searchParams }: Props) {
           { label: T.reviews.breadcrumb },
         ]}
         title={T.reviews.title}
-        subtitle={T.reviews.subtitle}
       />
       <FocusHighlighter />
 
-      <div className="space-y-6 px-4 py-6 md:px-6 lg:px-8">
+      <div className="space-y-4 px-4 py-4 md:space-y-6 md:px-6 md:py-6 lg:px-8">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
           <div className="lg:col-span-4">
             <ReviewsHeroCard stats={data.stats} />

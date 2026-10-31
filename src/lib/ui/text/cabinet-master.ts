@@ -55,7 +55,6 @@ export const cabinetMaster = {
   scheduleSettings: {
     breadcrumb: "Настройки расписания",
     title: "Настройки расписания",
-    subtitle: "График, календарь, перерывы и правила записи",
     studioApproval: {
       infoTemplate:
         "Вы в команде студии «{studio}». Рабочие дни и часы в студии меняются через одобрение студии — до подтверждения действует текущее расписание. Паузу, шаг окошек и правила записи вы меняете сами.",
@@ -145,7 +144,6 @@ export const cabinetMaster = {
     // SCHEDULE-PATTERNS-01 (этап 3): календарь на 3 месяца и палитра рабочих
     // дней. Кисть — рабочий день палитры; «как по графику» снимает правку.
     calendar: {
-      hint: "Нажмите на день, чтобы изменить его, или выберите кисть и отмечайте дни подряд.",
       brushHint: (name: string) => `Нажимайте на дни — они станут «${name}». Нажмите на кисть ещё раз, чтобы снять её.`,
       brushesLabel: "Кисти",
       offBrush: "Выходной",
@@ -460,7 +458,6 @@ export const cabinetMaster = {
   notifications: {
     breadcrumb: "Уведомления",
     title: "Уведомления",
-    subtitle: "Всё по работе с клиентами",
     emptyTitle: "Здесь пока пусто",
     emptyBody:
       "Новые записи, отзывы и сообщения от клиентов будут появляться тут. А приглашения от студий и новости по аккаунту — на странице «Личные».",
@@ -504,9 +501,6 @@ export const cabinetMaster = {
       newest: "Сначала новые",
       oldest: "Сначала старые",
     },
-    notice:
-      "Здесь всё про клиентов и записи — то же приходит уведомлением на телефон. Приглашения, оплата и аккаунт — на странице ",
-    noticeLink: "Личные уведомления",
     actions: {
       confirm: "Подтвердить",
       decline: "Отклонить",
@@ -531,7 +525,6 @@ export const cabinetMaster = {
   reviews: {
     breadcrumb: "Отзывы",
     title: "Отзывы",
-    subtitle: "Отвечайте на отзывы и слушайте клиентов — так растёт репутация",
     hero: {
       outOfFive: "/ 5",
       basedOnTemplate: "По {count} {word} · вы ответили на {rate}%",
@@ -602,7 +595,6 @@ export const cabinetMaster = {
   clients: {
     breadcrumb: "Клиенты",
     title: "Клиенты",
-    subtitle: "История работы с клиентами и аналитика",
     // PERF-06: подпись окна CRM-данных. Ключ ОДИН на оба кабинета (как
     // соседний `cardNotePlaceholder` — прецедент UI-33), число приходит из
     // CRM_CLIENTS_WINDOW_MONTHS (crm/clients-window.ts) — подпись и окно
@@ -616,7 +608,7 @@ export const cabinetMaster = {
           : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
             ? "месяца"
             : "месяцев";
-      return `данные за последние ${months} ${word}`;
+      return `Данные за последние ${months} ${word}`;
     },
     cardNotePlaceholder: "Запишите важные детали о клиенте",
     // UI-33: ключ ОДИН на оба кабинета — дровер общий для MASTER и STUDIO
@@ -748,8 +740,6 @@ export const cabinetMaster = {
   modelOffers: {
     breadcrumb: "Модели",
     title: "Модели",
-    subtitle:
-      "Опубликуйте окошко для модели — клиенты подадут заявку, а вы выберете подходящую",
     kpi: {
       activeOffersLabel: "Открытые предложения",
       activeOffersEmpty: "Опубликуйте первый",
@@ -919,7 +909,6 @@ export const cabinetMaster = {
   analytics: {
     breadcrumb: "Аналитика",
     title: "Аналитика",
-    subtitle: "Как идут дела и что можно улучшить",
     period: {
       chips: {
         d7: "7 дней",
@@ -1011,13 +1000,9 @@ export const cabinetMaster = {
   profile: {
     breadcrumb: "Профиль",
     title: "Профиль",
-    subtitle: "Что видят клиенты в каталоге и на странице записи",
     sidebar: {
       completionLabel: "Заполнено",
       sectionsHeading: "Разделы профиля",
-      tipEyebrow: "Совет",
-      tipBody:
-        "Полный профиль показывается выше в каталоге и собирает больше записей.",
     },
     nav: {
       header: "Шапка профиля",
@@ -1141,7 +1126,6 @@ export const cabinetMaster = {
   portfolioPage: {
     breadcrumb: "Портфолио",
     title: "Портфолио",
-    subtitle: "Покажите ваши работы клиентам",
     addCta: "Добавить работы",
     kpi: {
       totalLabel: "Всего работ",
@@ -1249,7 +1233,6 @@ export const cabinetMaster = {
   account: {
     breadcrumb: "Настройки аккаунта",
     title: "Настройки аккаунта",
-    subtitle: "Личное — недоступно клиентам",
     tabs: {
       navAria: "Разделы аккаунта",
       notifications: "Уведомления",
@@ -1335,7 +1318,6 @@ export const cabinetMaster = {
   servicesPage: {
     breadcrumb: "Услуги и цены",
     title: "Услуги и цены",
-    subtitle: "Что предлагаете клиентам и за сколько",
     // UI-18: подпись оставлена короткой — обе кнопки стоят в шапке рядом, и
     // на 390px удлинение обеих сжимает заголовок страницы до нечитаемого
     // огрызка (замерено скриншотами до/после). Действие называет `aria-label`:
@@ -1553,7 +1535,6 @@ export const cabinetMaster = {
   bookings: {
     breadcrumb: "Записи",
     title: "Записи",
-    subtitle: "От заявки до завершённой записи",
     toolbar: {
       searchPlaceholder: "Поиск по клиенту или услуге",
       tabAll: "Все",

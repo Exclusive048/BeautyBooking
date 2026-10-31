@@ -118,7 +118,7 @@ export async function MasterDashboardPage() {
       />
       <FocusHighlighter />
 
-      <div className="space-y-6 px-4 py-6 md:px-6 lg:px-8">
+      <div className="space-y-4 px-4 py-4 md:space-y-6 md:px-6 md:py-6 lg:px-8">
         {/* QA-115 (FIX-06): studio context for a studio master (nothing for independent). */}
         {data.master.studio ? (
           <div className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-bg-card px-3 py-1 text-xs text-text-sec">

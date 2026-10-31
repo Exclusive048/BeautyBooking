@@ -81,11 +81,11 @@ export function NotificationsFilters({ activeChip, sort, counts }: Props) {
         value={activeChip}
         onChange={(id) => selectChip(id as StudioNotificationChip)}
       />
-      <div className="ml-auto flex items-center gap-2">
+      <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
         <Select
           value={sort}
           onChange={handleSortChange}
-          className="min-w-[140px]"
+          className="min-w-0 flex-1 sm:min-w-[140px] sm:flex-none"
           aria-label={T.sortNewest}
         >
           <option value="newest">{T.sortNewest}</option>
@@ -94,6 +94,7 @@ export function NotificationsFilters({ activeChip, sort, counts }: Props) {
         <Button
           variant="secondary"
           size="sm"
+          className="shrink-0 whitespace-nowrap"
           onClick={handleMarkAllRead}
           disabled={busy || counts.unread === 0}
         >

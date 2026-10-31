@@ -21,10 +21,9 @@ export async function MasterMessagesPage() {
           { label: C.page.masterTitle },
         ]}
         title={C.page.masterTitle}
-        subtitle={C.page.masterSubtitle}
       />
 
-      <div className="px-4 py-6 md:px-6 lg:px-8">
+      <div className="px-4 py-4 md:px-6 md:py-6 lg:px-8">
         <ChatShell perspective="master" />
       </div>
     </>

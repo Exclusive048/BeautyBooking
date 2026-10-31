@@ -79,10 +79,10 @@ export async function MasterClientsPage({ searchParams }: Props) {
           { label: T.clients.breadcrumb },
         ]}
         title={T.clients.title}
-        subtitle={`${T.clients.subtitle} · ${T.clients.windowNote(CRM_CLIENTS_WINDOW_MONTHS)}`}
+        subtitle={T.clients.windowNote(CRM_CLIENTS_WINDOW_MONTHS)}
       />
 
-      <div className="space-y-6 px-4 py-6 md:px-6 lg:px-8">
+      <div className="space-y-4 px-4 py-4 md:space-y-6 md:px-6 md:py-6 lg:px-8">
         <ClientsKpiCards stats={data.kpi} />
 
         <div className="space-y-4">
