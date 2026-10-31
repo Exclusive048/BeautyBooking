@@ -20,11 +20,11 @@
 # «пропущено», а не «упало»: secrets-контекст недоступен в job-level `if`,
 # поэтому наличие секретов проверяет отдельный preflight-job через outputs.
 #
-# Схема на ВМ: git pull → тег текущих образов как :previous (ДО сборки — иначе
-# откатываться не на что) → docker compose build (последовательно, heap-кап
-# BUILD_NODE_OPTIONS из compose) → СНИМОК БД (pg_dump -Fc, последние 7 в
-# /opt/app/backups — точка возврата после миграций, которые откатом не
-# отменяются) → миграции → up -d готовыми образами (downtime не включает время
+# Схема на ВМ: git pull → тег образов РАБОТАЮЩИХ контейнеров как :previous (ДО
+# сборки — иначе откатываться не на что) → docker compose build
+# (последовательно, heap-кап BUILD_NODE_OPTIONS из compose) → СНИМОК БД
+# (pg_dump -Fc, последние 7 в /opt/app/backups — точка возврата после
+# миграций, которые откатом не отменяются) → миграции → up -d готовыми образами (downtime не включает время
 # сборки) → healthcheck → при неуспехе автооткат на :previous и ненулевой exit.
 # Между миграциями и подъёмом — сид тарифов (`npm run seed:plans`, идемпотентный).
 # Подробности и ручной откат — DEPLOY-BACKLOG.md.
@@ -217,13 +217,26 @@ jobs:
               exit 1
             fi
 
-            echo "=== 2/7 Страховка отката: текущие образы → :previous (строго ДО сборки) ==="
-            $DOCKER image tag beautyhub-app:latest beautyhub-app:previous 2>/dev/null \
-              && echo "app:previous ← прежний latest" \
-              || echo "app: прежнего образа нет (первый деплой) — автоотката не будет"
-            $DOCKER image tag beautyhub-worker:latest beautyhub-worker:previous 2>/dev/null \
-              && echo "worker:previous ← прежний latest" \
-              || echo "worker: прежнего образа нет (первый деплой)"
+            echo "=== 2/7 Страховка отката: работающие образы → :previous (строго ДО сборки) ==="
+            # PRISMA-ENGINE-DOWNLOAD: :previous — образ РАБОТАЮЩЕГО контейнера, а не
+            # тег :latest. Сборка, упавшая на середине (worker собран, web нет), уже
+            # переписала worker:latest новым образом, а контейнеры остались на старом;
+            # тег от :latest сделал бы «откатом» следующего деплоя версию, которая не
+            # запускалась ни разу. :latest — только когда контейнера нет вовсе.
+            tag_previous() { # $1 — сервис compose, $2 — репозиторий образа
+              CID="$($COMPOSE ps -a -q "$1" 2>/dev/null | head -n 1)"
+              IMG=""
+              if [ -n "$CID" ]; then IMG="$($DOCKER inspect -f '{{.Image}}' "$CID" 2>/dev/null || true)"; fi
+              if [ -n "$IMG" ] && $DOCKER image tag "$IMG" "$2:previous" 2>/dev/null; then
+                echo "$2:previous ← образ работающего $1"
+              elif $DOCKER image tag "$2:latest" "$2:previous" 2>/dev/null; then
+                echo "$2:previous ← прежний latest (контейнера $1 нет)"
+              else
+                echo "$2: прежнего образа нет (первый деплой) — автоотката не будет"
+              fi
+            }
+            tag_previous web beautyhub-app
+            tag_previous worker beautyhub-worker
 
             echo "=== 3/7 Сборка НА ВМ (последовательно — параллельная пара сборок = риск OOM) ==="
             export NEXT_PUBLIC_GLITCHTIP_RELEASE="$DEPLOY_SHA"

@@ -15,7 +15,6 @@ import { DaySeparator } from "./day-separator";
 import { NotificationsEmptyState } from "./empty-state";
 import { MarkAllReadButton } from "./mark-all-read-button";
 import { NotificationCard } from "./notification-card";
-import { NotificationsNotice } from "./notifications-notice";
 import { NotificationsTabs } from "./notifications-tabs";
 import { SortSelect } from "./sort-select";
 import { personalMasterProviderWhere } from "@/lib/master/access";
@@ -99,8 +98,6 @@ export async function MasterNotificationsPage({ searchParams }: Props) {
         <div className="flex items-center justify-between gap-3">
           <SortSelect value={data.sort} />
         </div>
-
-        <NotificationsNotice />
 
         {data.groups.length === 0 ? (
           <NotificationsEmptyState />

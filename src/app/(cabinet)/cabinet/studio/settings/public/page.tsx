@@ -4,6 +4,7 @@ import { requireStudioCabinetAdmin } from "@/lib/studio/cabinet-access";
 import { prisma } from "@/lib/prisma";
 import { PublicSettingsClient } from "@/features/billing/components/public-settings-client";
 import { ClientViewLink } from "@/features/cabinet/components/client-view-link";
+import { StudioPageHeader } from "@/features/studio-cabinet/components/studio-page-header";
 import * as UI_TEXT from "@/lib/ui/text";
 
 export const runtime = "nodejs";
@@ -48,15 +49,11 @@ export default async function StudioSettingsPublicPage() {
   // «Посмотреть глазами клиента», что у мастера.
   return (
     <div className="space-y-3 lg:space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <p className="mb-1 eyebrow">{studioName}</p>
-          <h1 className="font-display text-2xl font-bold tracking-tight text-text-main md:text-3xl">
-            {UI_TEXT.billing.publicPage.title}
-          </h1>
-        </div>
-        <ClientViewLink publicUsername={publicUsername} />
-      </header>
+      <StudioPageHeader
+        caption={studioName}
+        title={UI_TEXT.billing.publicPage.title}
+        actions={<ClientViewLink publicUsername={publicUsername} />}
+      />
       <PublicSettingsClient
         endpoint="/api/cabinet/studio/public-username"
         name={studioName}

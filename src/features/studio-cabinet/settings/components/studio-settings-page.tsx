@@ -1,4 +1,5 @@
 import * as UI_TEXT from "@/lib/ui/text";
+import { StudioPageHeader } from "@/features/studio-cabinet/components/studio-page-header";
 import {
   DEFAULT_STUDIO_SETTINGS_SECTION,
   type StudioSettingsData,
@@ -38,11 +39,7 @@ export function StudioSettingsPage({ data, section }: Props) {
 
   return (
     <div className="space-y-3 lg:space-y-6">
-      <header className="min-w-0">
-        <h1 className="font-display text-2xl font-bold tracking-tight text-text-main md:text-3xl">
-          {T.header.title}
-        </h1>
-      </header>
+      <StudioPageHeader title={T.header.title} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[220px_1fr]">
         <SettingsNav active={effectiveSection} canDanger={data.scope.canDanger} />

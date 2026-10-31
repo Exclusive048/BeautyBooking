@@ -53,7 +53,7 @@ export function StudioClientsPage({
         <div className="space-y-3 min-w-0">
           <ClientsFilters search={search} masterId={masterId} masters={data.masterOptions} />
           {/* PERF-06 / решение 31.1: список считается за окно — подпись видна всегда. */}
-          <p className="text-xs text-text-sec">{`${WINDOW_NOTE[0].toUpperCase()}${WINDOW_NOTE.slice(1)}`}</p>
+          <p className="text-xs text-text-sec">{WINDOW_NOTE}</p>
           <ClientsTable
             rows={data.items}
             studioId={studioId}

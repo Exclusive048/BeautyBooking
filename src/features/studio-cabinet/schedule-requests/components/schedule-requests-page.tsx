@@ -1,5 +1,6 @@
 import { CalendarClock } from "lucide-react";
 import * as UI_TEXT from "@/lib/ui/text";
+import { StudioPageHeader } from "@/features/studio-cabinet/components/studio-page-header";
 import type { ScheduleRequestLists } from "../server/list.service";
 import { RequestCard } from "./request-card";
 
@@ -13,10 +14,8 @@ export function ScheduleRequestsPage({ data }: Props) {
   const { pending, resolved } = data;
 
   return (
-    <section className="space-y-4 lg:space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold text-text-main">{T.title}</h1>
-      </header>
+    <section className="space-y-3 lg:space-y-6">
+      <StudioPageHeader title={T.title} />
 
       <div className="space-y-3">
         <div className="flex items-baseline justify-between">

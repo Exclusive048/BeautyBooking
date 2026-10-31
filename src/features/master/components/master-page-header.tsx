@@ -22,9 +22,9 @@ type Props = {
   /** Optional right-side action slot — buttons, badges, anything. */
   actions?: ReactNode;
   /**
-   * PWA-UX-BATCH-01: держать действия на строке заголовка и на телефоне.
-   * Только для страниц с коротким заголовком и одним действием (дашборд);
-   * у остальных действия ниже `sm` уезжают на свою строку (PWA-FIX-05).
+   * PWA-UX-BATCH-01: действия по центру строки заголовка и на `lg` (у прочих
+   * там они прижаты к низу — под крошками). Встают ли действия на строку
+   * заголовка, с CABINET-COMPACT решает ширина, а не этот флаг.
    */
   actionsInline?: boolean;
   /**
@@ -35,6 +35,18 @@ type Props = {
    */
   backHref?: string;
 };
+
+/**
+ * CABINET-COMPACT: родитель вложенного экрана («Кабинет › Профиль › Услуги»)
+ * — его кнопка «Назад». Крошки ниже `lg` скрыты, а в установленном приложении
+ * браузерного «Назад» нет: без кнопки из «Услуг» в «Профиль» вела бы только
+ * нижняя навигация. Двухуровневым экранам («Кабинет › Отзывы») кнопка не нужна
+ * — их родитель и есть «Главная» нижней навигации.
+ */
+function parentHref(breadcrumb: Crumb[]): string | undefined {
+  if (breadcrumb.length < 3) return undefined;
+  return breadcrumb[breadcrumb.length - 2]?.href;
+}
 
 /**
  * Page-level header for /cabinet/master/* routes. Rendered inside each page
@@ -55,10 +67,9 @@ type Props = {
  * сохранено. Ниже `lg` заголовок уезжает со прокруткой; ориентир «где я» на
  * мобильном несёт нижняя навигация, которая никуда не уезжает.
  *
- * Ниже `lg` крошки из двух звеньев («Главная › Раздел») не показываются: первое
- * звено — кнопка «Главная» нижней навигации, второе повторяет заголовок под
- * ними. Глубже двух звеньев (портфолио и услуги — внутри «Профиля») крошки
- * остаются: среднее звено — единственный путь к родителю без кнопки «Назад».
+ * Ниже `lg` крошек нет: первое звено — кнопка «Главная» нижней навигации,
+ * последнее повторяет заголовок, а путь к родителю вложенного экрана
+ * (портфолио и услуги — внутри «Профиля») несёт кнопка «Назад» (`parentHref`).
  *
  * Server component — no client hooks. Pages pass plain props; the header
  * doesn't reach into URL state.
@@ -68,24 +79,33 @@ export function MasterPageHeader({
   title,
   actions,
   actionsInline = false,
-  backHref,
+  backHref: backHrefProp,
 }: Props) {
-  const crumbsRedundantOnPhone = Boolean(backHref) || breadcrumb.length <= 2;
+  const backHref = backHrefProp ?? parentHref(breadcrumb);
   return (
     <header className="z-sticky border-b border-border-subtle bg-bg-page/85 px-4 py-2.5 backdrop-blur-md md:px-6 lg:sticky lg:top-[var(--topbar-h)] lg:px-8 lg:py-4">
       <div
         className={cn(
           "flex flex-wrap justify-between gap-x-4 gap-y-2",
-          actionsInline ? "items-center" : "items-end",
+          actionsInline ? "items-center" : "items-center lg:items-end",
         )}
       >
-        <div className="min-w-0 flex-1">
+        {/*
+          CABINET-COMPACT: `flex-[1_1_auto]` — основа = ширина заголовка, поэтому
+          действия встают на строку заголовка, когда помещаются, и переносятся
+          `flex-wrap`, когда нет (прежде ниже `sm` они всегда занимали свою
+          строку, PWA-FIX-05). С основой 0 (`flex-1`) перенос не случался бы
+          никогда и заголовок снова сжимался бы до «Распи…».
+        */}
+        <div className="min-w-0 flex-[1_1_auto]">
+          {/*
+            CABINET-COMPACT: крошки — только с `lg`. На телефоне место «где я»
+            держит нижняя навигация, вложенный экран — кнопка «Назад»
+            (`parentHref`), а строка 12px над заголовком стоила ~20px.
+          */}
           <nav
             aria-label={UI_TEXT.a11y.breadcrumbs}
-            className={cn(
-              "mb-1 flex items-center gap-1 text-xs text-text-sec lg:mb-1.5",
-              crumbsRedundantOnPhone && "hidden lg:flex",
-            )}
+            className="mb-1.5 hidden items-center gap-1 text-xs text-text-sec lg:flex"
           >
             <Home className="h-3 w-3 shrink-0" aria-hidden />
             {breadcrumb.map((crumb, index) => (
@@ -117,21 +137,11 @@ export function MasterPageHeader({
         </div>
 
         {actions ? (
-          // PWA-FIX-05 — на телефоне действия занимают СВОЮ строку под
-          // заголовком, а не делят строку с ним: `shrink-0` у действий и
-          // `min-w-0 flex-1` у заголовка отдавали ему остаток ширины, и на
-          // 375 px «Расписание» рендерилось как «Распи…», подзаголовок — в
-          // четыре строки. `w-full` ниже `sm` заставляет `flex-wrap`
-          // перенести блок; с `sm` — прежняя раскладка в одну строку.
-          // PWA-UX-BATCH-01: `actionsInline` — страница с коротким заголовком и
-          // одним действием (дашборд) держит его на строке заголовка и на
-          // телефоне; переносить нечего.
-          <div
-            className={cn(
-              "flex items-center justify-end gap-2",
-              actionsInline ? "shrink-0" : "w-full sm:w-auto sm:shrink-0",
-            )}
-          >
+          // CABINET-COMPACT: блок действий растёт (`grow`) — перенесённый на
+          // свою строку он берёт её ширину, и кнопка с `flex-1` (вход в
+          // настройки расписания) растягивается, как при PWA-FIX-05; на строке
+          // заголовка `justify-end` держит кнопки справа.
+          <div className="flex shrink-0 grow flex-wrap items-center justify-end gap-2">
             {actions}
           </div>
         ) : null}

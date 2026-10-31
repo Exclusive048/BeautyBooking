@@ -1,4 +1,5 @@
 import * as UI_TEXT from "@/lib/ui/text";
+import { StudioPageHeader } from "@/features/studio-cabinet/components/studio-page-header";
 
 const T = UI_TEXT.studioCabinet.reviewsV2.header;
 
@@ -10,10 +11,6 @@ const T = UI_TEXT.studioCabinet.reviewsV2.header;
  */
 export function ReviewsHeader() {
   return (
-    <header className="min-w-0">
-      <h1 className="font-display text-2xl font-bold tracking-tight text-text-main md:text-3xl">
-        {T.title}
-      </h1>
-    </header>
+    <StudioPageHeader title={T.title} />
   );
 }

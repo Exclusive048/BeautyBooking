@@ -11,15 +11,21 @@ type Props = {
 /**
  * «Посмотреть глазами клиента» — публичная страница кабинета в новой вкладке.
  * Одна кнопка в шапках «Моей страницы» и «Настроек расписания» у мастера
- * и у студии.
+ * и у студии. CABINET-COMPACT: на телефоне — только значок (подпись остаётся
+ * доступным именем), иначе кнопка уходила под заголовок отдельной строкой.
  */
 export function ClientViewLink({ publicUsername }: Props) {
   if (!publicUsername) return null;
   return (
-    <Button asChild variant="secondary" size="md" className="rounded-xl">
-      <Link href={`/u/${publicUsername}`} target="_blank" rel="noopener noreferrer">
-        <ExternalLink className="mr-1.5 h-4 w-4" aria-hidden />
-        {UI_TEXT.cabinet.clientView.cta}
+    <Button asChild variant="secondary" size="md" className="rounded-xl max-sm:px-3">
+      <Link
+        href={`/u/${publicUsername}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={UI_TEXT.cabinet.clientView.cta}
+      >
+        <ExternalLink className="h-4 w-4 sm:mr-1.5" aria-hidden />
+        <span className="max-sm:sr-only">{UI_TEXT.cabinet.clientView.cta}</span>
       </Link>
     </Button>
   );

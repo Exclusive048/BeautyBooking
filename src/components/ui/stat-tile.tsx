@@ -74,9 +74,9 @@ export type StatTileProps = {
   className?: string;
   /**
    * PWA-UX-BATCH-01: плотная форма для сетки в ЧЕТЫРЕ колонки на телефоне
-   * (`StatTileGrid mobileColumns={4}`): ниже `sm` иконка скрыта, отступ и
-   * кегль значения меньше — иначе четыре плитки по ~80px не вмещают ни
-   * подпись, ни число. С `sm` — обычная плитка.
+   * (`StatTileGrid mobileColumns={4}`): ниже `sm` отступ, подпись и кегль
+   * значения меньше — иначе четыре плитки по ~80px не вмещают ни подпись,
+   * ни число. С `sm` — обычная плитка.
    */
   compact?: boolean;
   /**
@@ -110,7 +110,7 @@ export function StatTile({
         "border border-border-subtle bg-bg-card",
         ACCENT_BORDER[accent],
         "rounded-2xl",
-        compact ? "p-2 sm:p-4" : "p-3 sm:p-4",
+        compact ? "p-2 sm:p-4" : "px-3 py-2.5 sm:p-4",
         className,
       )}
     >
@@ -119,8 +119,10 @@ export function StatTile({
           <span
             aria-hidden
             className={cn(
-              "h-6 w-6 shrink-0 place-items-center rounded-lg bg-primary/10 text-accent-text sm:h-7 sm:w-7",
-              compact ? "hidden sm:grid" : "grid",
+              // CABINET-COMPACT: на телефоне иконки нет ни у одной плитки — строка
+              // подписи с ней 24px вместо 14px, а сетка там одна карточка, где
+              // иконки над каждым числом только шумят.
+              "hidden h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary/10 text-accent-text sm:grid",
             )}
           >
             <Icon className="h-3.5 w-3.5" aria-hidden />
@@ -150,11 +152,11 @@ export function StatTile({
         {badge ? <span className="shrink-0">{badge}</span> : null}
       </div>
 
-      <p className={cn("flex items-baseline gap-1", compact ? "mt-1" : "mt-1.5")}>
+      <p className={cn("flex items-baseline gap-1", compact ? "mt-1" : "mt-1 sm:mt-1.5")}>
         <span
           className={cn(
             "truncate font-display tabular-nums sm:text-2xl",
-            compact ? "text-base" : "text-xl",
+            compact ? "text-base" : "text-lg",
             "leading-tight",
             ACCENT_VALUE[accent],
           )}
@@ -184,20 +186,31 @@ export function StatTile({
  * Сетка плиток. Заведена рядом с примитивом, потому что «сколько колонок на
  * каком брейкпоинте» — тоже расходившееся решение: встречались
  * `gap-3 lg:grid-cols-4`, `md:grid-cols-4`, `md:grid-cols-3 lg:grid-cols-5`.
- * На мобильном всегда две колонки: одна растягивает число на всю ширину и
- * съедает вертикаль, три — обрезают подписи.
+ * На мобильном по умолчанию две колонки: одна растягивает число на всю ширину
+ * и съедает вертикаль; три — только для ровно трёх коротких плиток.
+ *
+ * CABINET-COMPACT: ниже `sm` плитки сливаются в ОДНУ карточку — рамка и
+ * скругление у сетки, плитки разделены волосяной линией (зазор 1px поверх
+ * фона цвета рамки), своих рамок, скруглений и зазоров у плиток нет. Отдельные
+ * карточки с зазором 8px давали на телефоне «плитку из плиток», и четыре числа
+ * занимали ~200px. Нечётная последняя плитка в две колонки растягивается на
+ * всю строку — иначе на её месте осталась бы серая дыра цвета рамки.
  */
+const JOINED_BELOW_SM =
+  "max-sm:gap-px max-sm:overflow-hidden max-sm:rounded-2xl max-sm:border max-sm:border-border-subtle max-sm:bg-border-subtle max-sm:[&>*]:rounded-none max-sm:[&>*]:border-0 max-sm:[&>*]:bg-bg-card";
+
 const GRID_COLUMNS: Record<3 | 4 | 5, string> = {
   3: "sm:grid-cols-3",
   4: "sm:grid-cols-4",
   5: "sm:grid-cols-3 lg:grid-cols-5",
 };
 
-const MOBILE_GRID_COLUMNS: Record<2 | 4, string> = {
-  2: "grid-cols-2 gap-2",
+const MOBILE_GRID_COLUMNS: Record<2 | 3 | 4, string> = {
+  2: "grid-cols-2 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2",
+  3: "grid-cols-3",
   // PWA-UX-BATCH-01: четыре плитки в одну строку на телефоне — только вместе
-  // с `compact` у плиток; зазор у́же, иначе плитки по 76px.
-  4: "grid-cols-4 gap-1.5",
+  // с `compact` у плиток.
+  4: "grid-cols-4",
 };
 
 export function StatTileGrid({
@@ -208,14 +221,23 @@ export function StatTileGrid({
 }: {
   /** Колонки на широком экране. */
   columns?: 3 | 4 | 5;
-  /** Колонки ниже `sm`: по умолчанию 2; 4 — одна строка (плитки — `compact`). */
-  mobileColumns?: 2 | 4;
+  /**
+   * Колонки ниже `sm`: по умолчанию 2; 3 — ровно три плитки с короткими
+   * подписями; 4 — одна строка (плитки — `compact`).
+   */
+  mobileColumns?: 2 | 3 | 4;
   children: ReactNode;
   className?: string;
 }) {
   return (
     <div
-      className={cn("grid sm:gap-3", MOBILE_GRID_COLUMNS[mobileColumns], GRID_COLUMNS[columns], className)}
+      className={cn(
+        "grid sm:gap-3",
+        JOINED_BELOW_SM,
+        MOBILE_GRID_COLUMNS[mobileColumns],
+        GRID_COLUMNS[columns],
+        className,
+      )}
     >
       {children}
     </div>

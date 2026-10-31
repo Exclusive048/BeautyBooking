@@ -11,6 +11,8 @@ export const setupGuide = {
   nextLabel: "Следующий шаг",
   continueCta: "Перейти",
   hideCta: "Скрыть",
+  showSteps: "Показать все шаги",
+  collapseSteps: "Свернуть шаги",
   doneTitle: "Всё готово — вы в каталоге",
   doneBodyMaster: "Клиенты находят вас в каталоге и записываются онлайн.",
   doneBodyStudio: "Клиенты находят студию в каталоге и записываются к мастерам.",

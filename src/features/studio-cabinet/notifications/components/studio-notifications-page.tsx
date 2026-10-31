@@ -1,4 +1,5 @@
 import * as UI_TEXT from "@/lib/ui/text";
+import { StudioPageHeader } from "@/features/studio-cabinet/components/studio-page-header";
 import type { StudioNotificationsData } from "../lib/types";
 import { NotificationsFeed } from "./notifications-feed";
 import { NotificationsFilters } from "./notifications-filters";
@@ -18,11 +19,7 @@ type Props = {
 export function StudioNotificationsPage({ data }: Props) {
   return (
     <div className="space-y-3 lg:space-y-6">
-      <header className="min-w-0">
-        <h1 className="font-display text-2xl font-bold tracking-tight text-text-main md:text-3xl">
-          {H.title}
-        </h1>
-      </header>
+      <StudioPageHeader title={H.title} />
       <NotificationsFilters
         activeChip={data.activeChip}
         sort={data.sort}

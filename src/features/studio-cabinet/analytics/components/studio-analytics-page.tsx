@@ -1,4 +1,5 @@
 import * as UI_TEXT from "@/lib/ui/text";
+import { StudioPageHeader } from "@/features/studio-cabinet/components/studio-page-header";
 import type { StudioAnalyticsViewData } from "../lib/types";
 import { AnalyticsControls } from "./analytics-controls";
 import { AnalyticsKpiBar } from "./analytics-kpi-bar";
@@ -23,11 +24,7 @@ type Props = {
 export function StudioAnalyticsPage({ data }: Props) {
   return (
     <div className="space-y-3 lg:space-y-6">
-      <header className="min-w-0">
-        <h1 className="font-display text-2xl font-bold tracking-tight text-text-main md:text-3xl">
-          {T.header.title}
-        </h1>
-      </header>
+      <StudioPageHeader title={T.header.title} />
 
       <AnalyticsControls period={data.period} view={data.view} compare={data.compare} />
 

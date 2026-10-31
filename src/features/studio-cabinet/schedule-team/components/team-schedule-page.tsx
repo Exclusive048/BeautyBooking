@@ -1,4 +1,4 @@
-import { PageTitleRow } from "@/components/ui/back-link";
+import { StudioPageHeader } from "@/features/studio-cabinet/components/studio-page-header";
 import type { TeamBoardDto } from "@/lib/schedule/calendar-shared";
 import * as UI_TEXT from "@/lib/ui/text";
 import { TeamBoard } from "./team-board";
@@ -14,12 +14,7 @@ export function TeamSchedulePage({ studioId, board }: { studioId: string; board:
     <div className="min-w-0 space-y-3 lg:space-y-6">
       {/* «Назад» — в календарь студии: отдельной страницы `/cabinet/studio/schedule`
           нет, прежняя ссылка туда давала 404 (BACK-BUTTON-01). */}
-      <header>
-        <PageTitleRow backHref="/cabinet/studio/calendar">
-          <p className="eyebrow">{T.breadcrumb}</p>
-          <h1 className="font-display text-2xl font-bold tracking-tight text-text-main md:text-3xl">{T.title}</h1>
-        </PageTitleRow>
-      </header>
+      <StudioPageHeader backHref="/cabinet/studio/calendar" caption={T.breadcrumb} title={T.title} />
       <TeamBoard studioId={studioId} initialBoard={board} />
     </div>
   );

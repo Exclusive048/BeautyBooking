@@ -15,8 +15,28 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Generate Prisma client for the build
-RUN npx prisma generate
+# Generate Prisma client for the build.
+#
+# PRISMA-ENGINE-DOWNLOAD (2026-10-31): движок запросов `prisma generate` качает с
+# binaries.prisma.sh, а сеть ВМ до него рвётся — деплой упал на этом шаге сборки
+# web («Client network socket disconnected before secure TLS connection was
+# established»), хотя воркер минутой раньше скачал тот же движок. Две защиты:
+#   • кэш BuildKit `prisma-engines`, ОБЩИЙ с Dockerfile.worker (тот же id): движок
+#     скачивается один раз на версию Prisma, дальше берётся из кэша со сверкой
+#     sha256 без сети — сборка приложения после воркера в сеть не ходит вовсе;
+#   • повтор с нарастающей паузой — на случай пустого кэша (новая версия Prisma,
+#     чистая ВМ).
+# Путь — `~/.cache/prisma` пользователя сборки (root: USER в этой стадии нет).
+# Держать в локстепе с Dockerfile.worker — сторож scripts/prisma-engine-download.test.ts.
+RUN --mount=type=cache,id=prisma-engines,target=/root/.cache/prisma \
+    for attempt in 1 2 3 4 5; do \
+      npx prisma generate && exit 0; \
+      [ "$attempt" -eq 5 ] && break; \
+      echo "prisma generate: попытка $attempt из 5 не удалась, повтор через $((attempt * 15)) с"; \
+      sleep $((attempt * 15)); \
+    done; \
+    echo "prisma generate: 5 попыток не удались — движок Prisma недоступен"; \
+    exit 1
 
 # ─── NEXT_PUBLIC_* — baked into the CLIENT bundle at BUILD time ───────────────
 # Every var read through src/lib/env.ts `clientEnv` is statically inlined by

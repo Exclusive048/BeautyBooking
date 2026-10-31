@@ -10,7 +10,18 @@ RUN apk add --no-cache libc6-compat
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY prisma ./prisma
-RUN npx prisma generate
+# PRISMA-ENGINE-DOWNLOAD: движок — через общий с Dockerfile кэш BuildKit
+# `prisma-engines` и с повтором (сеть ВМ до binaries.prisma.sh рвётся). Почему
+# так — комментарий у того же шага в Dockerfile; держать в локстепе с ним.
+RUN --mount=type=cache,id=prisma-engines,target=/root/.cache/prisma \
+    for attempt in 1 2 3 4 5; do \
+      npx prisma generate && exit 0; \
+      [ "$attempt" -eq 5 ] && break; \
+      echo "prisma generate: попытка $attempt из 5 не удалась, повтор через $((attempt * 15)) с"; \
+      sleep $((attempt * 15)); \
+    done; \
+    echo "prisma generate: 5 попыток не удались — движок Prisma недоступен"; \
+    exit 1
 
 # ─── Stage 2: Production runtime ─────────────────────────────────────────────
 FROM node:26.13.0-alpine AS runner
