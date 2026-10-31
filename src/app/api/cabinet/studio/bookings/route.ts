@@ -11,7 +11,7 @@ import {
   loadStudioMasterOptions,
 } from "@/features/studio-cabinet/bookings/server/bookings-kpis.service";
 import { listStudioBookings } from "@/features/studio-cabinet/bookings/server/bookings-list.service";
-import { STUDIO_BOOKING_STATUS_GROUPS } from "@/features/studio-cabinet/bookings/lib/status-groups";
+import { BOOKING_STATUS_GROUPS } from "@/lib/bookings/status-groups";
 
 export const runtime = "nodejs";
 
@@ -20,9 +20,9 @@ const ROUTE = "GET /api/cabinet/studio/bookings";
 /**
  * Группы статусов журнала: сохранённые статусы, которые попадают в фильтр.
  * UX-PASS-01: те же группы — у фильтра веб-журнала, источник один
- * (`studio-cabinet/bookings/lib/status-groups.ts`).
+ * (`lib/bookings/status-groups.ts`).
  */
-const STATUS_GROUPS = STUDIO_BOOKING_STATUS_GROUPS;
+const STATUS_GROUPS = BOOKING_STATUS_GROUPS;
 
 const querySchema = z.object({
   range: z.enum(["today", "tomorrow", "week", "all"]).default("today"),

@@ -1553,30 +1553,8 @@ export const cabinetMaster = {
   bookings: {
     breadcrumb: "Записи",
     title: "Записи",
-    subtitle: "От заявки до завершённой записи",
-    toolbar: {
-      searchPlaceholder: "Поиск по клиенту или услуге",
-      tabAll: "Все",
-      tabNew: "Новые клиенты",
-      tabRegular: "Постоянные",
-      statTotal: "Всего",
-      statPending: "В ожидании",
-      statConfirmed: "Подтверждено",
-    },
-    columns: {
-      pending: {
-        title: "Ждут подтверждения",
-        // Срок — `PENDING_EXPIRY_HOURS`: без ответа запись отменяется сама.
-        hint: (hours: number) => `Без ответа за ${hours} ч запись отменится`,
-      },
-      confirmed: { title: "Подтверждены", hint: "Готовы к визиту" },
-      today: { title: "Сегодня", hint: "В работе" },
-      done: { title: "Завершены", hint: "Запросить отзыв" },
-      cancelled: { title: "Отменены", hint: "За 30 дней" },
-    },
     card: {
       newBadge: "Новая",
-      inProgressBadge: "В работе",
       confirm: "Подтвердить",
       decline: "Отклонить",
       reschedule: "Перенести",
@@ -1594,10 +1572,6 @@ export const cabinetMaster = {
       declinePlaceholder: "Например: «Конфликт по времени»",
       declineConfirmLabel: "Отклонить",
       cancelError: "Не удалось отменить запись. Попробуйте ещё раз.",
-      reviewLabelTemplate: "★ {rating} · отзыв оставлен",
-      guestClient: "Без аккаунта",
-      // RESCHEDULE-CURRENT-TIME: запрошенное клиентом время под текущим.
-      proposedWhenPrefix: "Перенос на",
       // RESCHEDULE-DECLINE-NOTIFY-01: ответ на запрос переноса от клиента —
       // это ответ про ВРЕМЯ, а не про запись: запись остаётся в любом случае.
       acceptReschedule: "Принять перенос",
@@ -1612,7 +1586,6 @@ export const cabinetMaster = {
         "Запись отметится неявкой, клиент получит уведомление. Снять отметку потом нельзя.",
       noShowConfirmLabel: "Отметить неявку",
       noShowError: "Не удалось отметить неявку. Попробуйте ещё раз.",
-      noShowBadge: "Не пришёл",
       // BOOKING-FLOW-AUDIT-RESIDUALS: компонент пакета отменяется только
       // вместе со всем пакетом (инв. #34).
       packageCancelTitle: "Отменить весь пакет?",
@@ -1621,7 +1594,6 @@ export const cabinetMaster = {
       packageCancelConfirm: "Отменить пакет",
       packageCancelError: "Не удалось отменить пакет. Попробуйте ещё раз.",
     },
-    empty: "Пока пусто",
     declineError: "Не удалось отклонить запись. Попробуйте ещё раз.",
     confirmError: "Не удалось подтвердить запись. Попробуйте ещё раз.",
   },
