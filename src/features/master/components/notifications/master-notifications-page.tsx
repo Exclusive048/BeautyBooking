@@ -15,10 +15,9 @@ import { DaySeparator } from "./day-separator";
 import { NotificationsEmptyState } from "./empty-state";
 import { MarkAllReadButton } from "./mark-all-read-button";
 import { NotificationCard } from "./notification-card";
-import { NotificationsKpiCards } from "./notifications-kpi-cards";
 import { NotificationsTabs } from "./notifications-tabs";
 import { SortSelect } from "./sort-select";
-import { personalMasterProviderWhere, getMasterWorkProfiles } from "@/lib/master/access";
+import { personalMasterProviderWhere } from "@/lib/master/access";
 
 const T = UI_TEXT.cabinetMaster;
 
@@ -31,7 +30,7 @@ type Props = {
 /**
  * Server orchestrator for `/cabinet/master/notifications`. Replaces the
  * 26-NOTIF-A1 minimal placeholder with the full redesigned page:
- * KPI strip → tabs → toolbar → notice → day-grouped feed.
+ * tabs → toolbar → notice → day-grouped feed.
  *
  * URL-driven state:
  *   - `?tab=` filters the feed (default `all`)
@@ -59,7 +58,6 @@ export async function MasterNotificationsPage({ searchParams }: Props) {
   const data = await getMasterNotificationsData({
     userId: user.id,
     masterId: master.id,
-    workProfileIds: (await getMasterWorkProfiles(user.id)).allIds,
     phone: user.phone ?? null,
     activeTab,
     sort,
@@ -77,7 +75,7 @@ export async function MasterNotificationsPage({ searchParams }: Props) {
         title={T.notifications.title}
         actions={
           <>
-            {data.kpi.unreadCount > 0 ? <MarkAllReadButton /> : null}
+            {data.tabCounts.unread > 0 ? <MarkAllReadButton /> : null}
             <Button asChild variant="ghost" size="icon" className="h-9 w-9 rounded-lg">
               <Link
                 href="/cabinet/master/account?tab=notifications"
@@ -90,9 +88,7 @@ export async function MasterNotificationsPage({ searchParams }: Props) {
         }
       />
 
-      <div className="space-y-4 px-4 py-4 md:space-y-6 md:px-6 md:py-6 lg:px-8">
-        <NotificationsKpiCards stats={data.kpi} />
-
+      <div className="space-y-4 px-4 pb-6 pt-3 md:px-6 md:pt-4 lg:px-8">
         <NotificationsTabs
           activeTab={data.activeTab}
           tabCounts={data.tabCounts}

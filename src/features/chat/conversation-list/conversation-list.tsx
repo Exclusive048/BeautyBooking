@@ -5,7 +5,11 @@ import { MessageSquare } from "lucide-react";
 import { ListHeader } from "@/features/chat/conversation-list/list-header";
 import { ConversationRow } from "@/features/chat/conversation-list/conversation-row";
 import * as UI_TEXT from "@/lib/ui/text";
-import type { ConversationListItemDto, ChatPerspective } from "@/features/chat/types";
+import {
+  isProviderPerspective,
+  type ChatPerspective,
+  type ConversationListItemDto,
+} from "@/features/chat/types";
 
 const T = UI_TEXT.chat;
 
@@ -135,7 +139,7 @@ function EmptyState({
           {T.list.emptyTitle}
         </p>
         <p className="max-w-[220px] text-xs text-text-sec">
-          {perspective === "master"
+          {isProviderPerspective(perspective)
             ? T.list.emptyMasterHint
             : T.list.emptyClientHint}
         </p>

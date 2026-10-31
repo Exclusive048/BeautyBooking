@@ -37,6 +37,22 @@ function salonDayStart(now: Date, timeZone: string, offsetDays: number): Date {
  * parallel; revenue delta vs. 30-day average uses the same proxy
  * formula as the dashboard (no historical snapshots yet).
  */
+/**
+ * BOOKINGS-JOURNAL — сколько записей ждут ответа студии, с начала сегодняшнего
+ * дня салона: то же условие, что плитка «Требуют действий» приложения.
+ */
+export async function countStudioAwaitingBookings(studioId: string, timeZone: string): Promise<number> {
+  return prisma.booking.count({
+    where: {
+      AND: [
+        studioBookingsWhere(studioId),
+        { status: { in: NEEDS_ACTION_STATUSES } },
+        { startAtUtc: { gte: salonDayStart(new Date(), timeZone, 0) } },
+      ],
+    },
+  });
+}
+
 export async function loadStudioBookingsKpis(
   studioId: string,
 ): Promise<StudioBookingsKpis> {

@@ -40,8 +40,8 @@ export async function MasterProfilePage() {
         title={T.profile.title}
       />
 
-      <div className="px-4 py-4 md:px-6 md:py-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-6">
+      <div className="px-4 pb-6 pt-3 md:px-6 md:pt-4 lg:px-8">
+        <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-12">
           <aside className="lg:col-span-3 lg:sticky lg:top-[calc(var(--topbar-h)+1.5rem)] lg:self-start">
             <ProfileSidebar completion={view.completion} />
           </aside>

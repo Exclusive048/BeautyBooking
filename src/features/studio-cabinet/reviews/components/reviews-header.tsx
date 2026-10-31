@@ -3,23 +3,14 @@ import { StudioPageHeader } from "@/features/studio-cabinet/components/studio-pa
 
 const T = UI_TEXT.studioCabinet.reviewsV2.header;
 
-type Props = {
-  totalReviews: number;
-  unansweredCount: number;
-};
-
 /**
- * STUDIO-REVIEWS-A header — caption + title. Per user spec, no «Запрос
- * отзыва» or «Ответить всем» CTAs (both backlogged). That replies go out
- * on behalf of the studio is said by the reply itself («Ответ студии»).
+ * STUDIO-REVIEWS-A header — только заголовок. Per user spec, no «Запрос
+ * отзыва» or «Ответить всем» CTAs (both backlogged). Счётчиков и описания
+ * нет: число отзывов без ответа видно на фильтре, средняя оценка — на главной
+ * кабинета и в аналитике.
  */
-export function ReviewsHeader({ totalReviews, unansweredCount }: Props) {
+export function ReviewsHeader() {
   return (
-    <StudioPageHeader
-      caption={T.caption
-        .replace("{total}", String(totalReviews))
-        .replace("{noReply}", String(unansweredCount))}
-      title={T.title}
-    />
+    <StudioPageHeader title={T.title} />
   );
 }

@@ -229,15 +229,8 @@ export async function listMasterServicePackages(
   });
 }
 
-export type ServicesKpi = {
-  servicesCount: number;
-  bundlesCount: number;
-  disabledCount: number;
-};
-
 export type MasterServicesViewData = {
   providerId: string;
-  kpi: ServicesKpi;
   filterCounts: Record<ServicesFilterId, number>;
   /** Categorised services for the accordion view. Includes only
    * services that pass the active filter. Empty buckets are dropped at
@@ -349,21 +342,15 @@ export async function getMasterServicesView(input: {
     };
   });
 
-  // KPI is over the full population — filter doesn't shift the
-  // dashboard counters.
-  const kpi: ServicesKpi = {
-    servicesCount: servicesFlat.filter((service) => service.isEnabled).length,
-    bundlesCount: bundles.filter((bundle) => bundle.isEnabled).length,
-    disabledCount:
-      servicesFlat.filter((service) => !service.isEnabled).length +
-      bundles.filter((bundle) => !bundle.isEnabled).length,
-  };
-
+  // Chip counts are over the full population — the active filter doesn't
+  // shift them.
   const filterCounts: Record<ServicesFilterId, number> = {
     all: servicesFlat.length + bundles.length,
     services: servicesFlat.length,
     bundles: bundles.length,
-    disabled: kpi.disabledCount,
+    disabled:
+      servicesFlat.filter((service) => !service.isEnabled).length +
+      bundles.filter((bundle) => !bundle.isEnabled).length,
   };
 
   // Apply the active filter — note "disabled" filters BOTH services and
@@ -399,7 +386,6 @@ export async function getMasterServicesView(input: {
 
   return {
     providerId: provider.id,
-    kpi,
     filterCounts,
     categorizedServices,
     bundles: filteredBundles,

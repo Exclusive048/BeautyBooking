@@ -18,8 +18,8 @@ export type ReviewStats = {
   responseRate: number;
   unansweredCount: number;
   /** Mean time-to-reply in milliseconds across answered reviews; null when
-   * none have been answered yet. The UI calls `formatResponseDuration`
-   * on this. */
+   * none have been answered yet. Part of the mobile JSON contract
+   * (`GET /api/cabinet/master/reviews` → `stats`). */
   avgResponseMs: number | null;
   /** Reviews with photo attachments — always 0 in 28a (no schema yet);
    * kept in the shape so the UI tile renders consistently and the field
@@ -31,9 +31,6 @@ export type ReviewStats = {
   trendValue: number | null;
 };
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-const HOUR_MS = 60 * 60 * 1000;
-const MIN_MS = 60 * 1000;
 const TREND_MIN_REVIEWS_PER_MONTH = 2;
 
 function startOfMonth(date: Date): Date {
@@ -126,23 +123,4 @@ export function computeReviewStats(reviews: ReviewDto[], now: Date = new Date())
     withPhotosCount: 0,
     trendValue,
   };
-}
-
-/**
- * "5 мин" / "2 ч" / "3 дн" — short relative duration label for the
- * "average response time" KPI tile. Returns null when the input is null
- * so the UI can render an em-dash without extra branching.
- */
-export function formatResponseDuration(ms: number | null): string | null {
-  if (ms === null || !Number.isFinite(ms) || ms <= 0) return null;
-  if (ms < HOUR_MS) {
-    const minutes = Math.max(1, Math.round(ms / MIN_MS));
-    return `${minutes} мин`;
-  }
-  if (ms < DAY_MS) {
-    const hours = Math.round(ms / HOUR_MS);
-    return `${hours} ч`;
-  }
-  const days = Math.round(ms / DAY_MS);
-  return `${days} дн`;
 }

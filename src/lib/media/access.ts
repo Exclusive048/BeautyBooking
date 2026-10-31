@@ -99,6 +99,8 @@ async function canReadChatAttachmentMedia(user: SessionUser, entityId: string): 
               status: true,
               startAtUtc: true,
               clientUserId: true,
+              providerId: true,
+              provider: { select: { type: true } },
               masterProvider: {
                 select: { ownerUserId: true, name: true },
               },
@@ -120,7 +122,15 @@ async function canReadChatAttachmentMedia(user: SessionUser, entityId: string): 
   // imported as documentation anchor but we apply its membership logic
   // directly here so we can keep the availability bypass explicit.
   void resolveChatAccessForBooking; // imported for invariant cross-ref
-  return isClient || isMaster;
+  if (isClient || isMaster) return true;
+  // STUDIO-CHAT (инв. #26 расширен): переписку записи СТУДИИ ведут её владелец
+  // и администраторы — им видны и вложения этой переписки. Только поверхность
+  // студии (провайдер записи — студия), не команда: мастер студии по-прежнему
+  // читает лишь записи, которые выполняет.
+  if (booking.provider.type === ProviderType.STUDIO) {
+    return isStudioAdminOrOwnerByStudioProviderId(booking.providerId, user.id);
+  }
+  return false;
 }
 
 async function canReadBookingMedia(user: SessionUser, bookingId: string): Promise<boolean> {

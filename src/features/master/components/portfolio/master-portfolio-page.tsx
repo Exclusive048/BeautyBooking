@@ -10,7 +10,6 @@ import { AddButton } from "./add-button";
 import { PortfolioEmptyState } from "./portfolio-empty-state";
 import { PortfolioFilterChips } from "./portfolio-filter-chips";
 import { PortfolioGrid } from "./portfolio-grid";
-import { PortfolioKpiStrip } from "./portfolio-kpi-strip";
 
 const T = UI_TEXT.cabinetMaster;
 
@@ -46,7 +45,7 @@ export async function MasterPortfolioPage({ searchParams }: Props) {
   const view = await getMasterPortfolioView({ userId: user.id, filter, categoryId });
   if (!view) redirect("/403");
 
-  const isFullyEmpty = view.kpi.totalCount === 0;
+  const isFullyEmpty = view.filterCounts.all === 0;
 
   return (
     <>
@@ -62,12 +61,11 @@ export async function MasterPortfolioPage({ searchParams }: Props) {
         }
       />
 
-      <div className="space-y-4 px-4 py-4 md:space-y-6 md:px-6 md:py-6 lg:px-8">
+      <div className="space-y-4 px-4 pb-6 pt-3 md:px-6 md:pt-4 lg:px-8">
         {isFullyEmpty ? (
           <PortfolioEmptyState categories={view.categoriesAll} />
         ) : (
           <>
-            <PortfolioKpiStrip kpi={view.kpi} />
             <PortfolioFilterChips
               filterCounts={view.filterCounts}
               activeFilter={view.activeFilter}

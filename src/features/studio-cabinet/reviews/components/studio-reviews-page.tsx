@@ -1,33 +1,24 @@
-import type {
-  StudioReviewFilter,
-  StudioReviewsListData,
-  StudioReviewsStats,
-} from "../lib/types";
+import type { StudioReviewFilter, StudioReviewsListData } from "../lib/types";
 import { ReviewsFilters } from "./reviews-filters";
 import { ReviewsHeader } from "./reviews-header";
 import { ReviewsList } from "./reviews-list";
 import { ReviewsPagination } from "./reviews-pagination";
-import { ReviewsStatsRow } from "./reviews-stats-row";
 
 type Props = {
   data: StudioReviewsListData;
-  stats: StudioReviewsStats;
   filter: StudioReviewFilter;
   masterId: string;
 };
 
 /**
  * Server orchestrator for `/cabinet/studio/reviews`. Lays out header →
- * 3-up stats row → filters → list → pagination.
+ * filters → list → pagination. Плиток с оценкой, распределением и топом
+ * услуг нет: средняя оценка — на главной кабинета, по мастерам — в аналитике.
  */
-export function StudioReviewsPage({ data, stats, filter, masterId }: Props) {
+export function StudioReviewsPage({ data, filter, masterId }: Props) {
   return (
-    <div className="space-y-5 lg:space-y-6">
-      <ReviewsHeader
-        totalReviews={data.totalReviewsCount}
-        unansweredCount={data.unansweredCount}
-      />
-      <ReviewsStatsRow stats={stats} />
+    <div className="space-y-3 lg:space-y-6">
+      <ReviewsHeader />
       <ReviewsFilters
         filter={filter}
         masterId={masterId}

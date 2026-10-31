@@ -80,9 +80,10 @@ export type ScheduleDayData = {
 };
 
 /**
- * Показатели периода календаря (день либо неделя). SCHEDULE-FLEX-DATE-NAV:
- * загрузка и окошки — по НАСТОЯЩЕМУ графику мастеров (план дня движка), а не
- * «5 записей на мастера = 100%».
+ * Показатели дня календаря — только для приложения (`loadStudioScheduleDay`,
+ * `GET /api/cabinet/studio/calendar/day`); веб-календарь плиток не показывает.
+ * SCHEDULE-FLEX-DATE-NAV: загрузка и окошки — по НАСТОЯЩЕМУ графику мастеров
+ * (план дня движка), а не «5 записей на мастера = 100%».
  */
 export type ScheduleKpis = {
   /** Записи студии периода (личные записи мастеров не считаются). */
@@ -155,7 +156,6 @@ export type StudioScheduleData = {
    */
   timezone: string;
   day: ScheduleDayData;
-  kpis: ScheduleKpis;
   week: ScheduleWeekData | null;
   /** Сегодня в поясе салона. */
   todayKey: string;

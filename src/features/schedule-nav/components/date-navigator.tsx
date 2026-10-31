@@ -30,6 +30,12 @@ type Props = {
   labelTestId?: string;
   /** Кнопки рядом с «Сегодня» («Свободные окошки»). */
   actions?: ReactNode;
+  /**
+   * Показан не период, а другой набор (журнал записей: поиск по всем
+   * предстоящим). Подпись приглушена, «Сегодня» не нажат и ведёт на сегодня
+   * всегда — человек возвращается к дню.
+   */
+  detached?: boolean;
 };
 
 /** Подпись периода: «пт, 30 окт.» / «26 окт. — 1 нояб.»; другой год — с годом. */
@@ -57,11 +63,20 @@ export function periodLabel(view: ScheduleNavView, dateKey: string, todayKey: st
  * индикатор — без него переход на медленной сети выглядел как «стрелки не
  * работают» (жалоба владельца).
  */
-export function DateNavigator({ view, dateKey, todayKey, onNavigate, pending = false, labelTestId, actions }: Props) {
+export function DateNavigator({
+  view,
+  dateKey,
+  todayKey,
+  onNavigate,
+  pending = false,
+  labelTestId,
+  actions,
+  detached = false,
+}: Props) {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const anchorRef = useRef<HTMLDivElement>(null);
   const isDay = view === "day";
-  const periodHasToday = isDay ? dateKey === todayKey : mondayOf(dateKey) === mondayOf(todayKey);
+  const periodHasToday = !detached && (isDay ? dateKey === todayKey : mondayOf(dateKey) === mondayOf(todayKey));
   const label = periodLabel(view, dateKey, todayKey);
 
   const step = (direction: -1 | 1) => onNavigate({ view, dateKey: addDaysToDateKey(dateKey, direction * (isDay ? 1 : 7)) });
@@ -124,7 +139,7 @@ export function DateNavigator({ view, dateKey, todayKey, onNavigate, pending = f
             ) : (
               <CalendarDays className="h-4 w-4 shrink-0 text-text-sec" aria-hidden />
             )}
-            <span data-testid={labelTestId} className="truncate tabular-nums">
+            <span data-testid={labelTestId} className={cn("truncate tabular-nums", detached && "text-text-sec")}>
               {label}
             </span>
             {pending ? <span className="sr-only">{T.loading}</span> : null}

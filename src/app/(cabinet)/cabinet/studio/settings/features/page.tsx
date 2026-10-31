@@ -19,7 +19,6 @@ export default async function StudioFeaturesPage() {
         <h2 className="text-xl font-semibold text-text-main">
           {UI_TEXT.billing.featuresPage.title}
         </h2>
-        <p className="text-sm text-text-sec">{UI_TEXT.billing.featuresPage.subtitle}</p>
       </header>
       <FeaturesPageClient scope="STUDIO" billingHref="/cabinet/studio/billing" />
     </section>

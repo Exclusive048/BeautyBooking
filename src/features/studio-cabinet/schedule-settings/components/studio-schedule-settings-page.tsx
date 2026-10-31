@@ -38,7 +38,7 @@ export function StudioScheduleSettingsPage({
   studioPublicUsername,
 }: Props) {
   return (
-    <div className="space-y-5 lg:space-y-6">
+    <div className="space-y-3 lg:space-y-6">
       <StudioPageHeader
         backHref="/cabinet/studio/schedule/team"
         caption={T.breadcrumb}

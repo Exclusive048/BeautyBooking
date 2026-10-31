@@ -216,7 +216,13 @@ describe("GET /api/cabinet/studio/dashboard", () => {
 
     expect(listStudioBookings).toHaveBeenCalledWith({
       studioId: "studio-1",
-      filters: { range: "all", status: ["PENDING", "CHANGE_REQUESTED"], startsAfter: NOW },
+      filters: {
+        range: "all",
+        status: ["PENDING", "CHANGE_REQUESTED"],
+        startsAfter: NOW,
+        // Ход за студией: перенос, предложенный студией, ждёт клиента.
+        actionRequiredBy: "MASTER",
+      },
       page: { offset: 0, limit: 20 },
       withRangeCounts: false,
     });

@@ -1,4 +1,4 @@
-import { BookingStatus } from "@prisma/client";
+import { BookingActionRequiredBy, BookingStatus } from "@prisma/client";
 import { fail, ok } from "@/lib/api/response";
 import { getSessionUser } from "@/lib/auth/session";
 import { CABINET_NO_STORE_INIT, cabinetReadFailure } from "@/lib/master/cabinet-json";
@@ -22,7 +22,7 @@ const AWAITING_LIMIT = 20;
  * внимания», загрузка сегодня, популярные услуги, выручка по мастерам) числами
  * и без href веба, плюс ближайшие записи, ждущие ответа студии, с действиями
  * (тот же набор, что пункт `bookings-awaiting`: PENDING / CHANGE_REQUESTED,
- * начало впереди). Только владелец / администратор студии.
+ * ход за студией, начало впереди). Только владелец / администратор студии.
  */
 export async function GET(req: Request) {
   try {
@@ -39,6 +39,9 @@ export async function GET(req: Request) {
           range: "all",
           status: [BookingStatus.PENDING, BookingStatus.CHANGE_REQUESTED],
           startsAfter: now,
+          // DASHBOARD-REORDER: ход за студией — перенос, который студия сама
+          // предложила клиенту, ответа студии не ждёт (тот же набор, что счётчик).
+          actionRequiredBy: BookingActionRequiredBy.MASTER,
         },
         page: { offset: 0, limit: AWAITING_LIMIT },
         withRangeCounts: false,

@@ -1,56 +1,75 @@
 import { AppSetupCard } from "@/features/cabinet/components/app-setup-card";
 import { SetupGuideCard } from "@/features/cabinet/setup-guide/setup-guide-card";
+import { FreeWindowsPanel } from "@/features/schedule-nav/components/free-windows-panel";
+import type { StudioScheduleData } from "@/features/studio-cabinet/schedule/server/types";
 import type { SetupGuideDto } from "@/lib/onboarding/setup-guide-shared";
-import { StudioAttentionPanel } from "./studio-attention-panel";
-import { StudioKpiRow } from "./studio-kpi-row";
-import { StudioPopularServices } from "./studio-popular-services";
-import { StudioRevenueChart } from "./studio-revenue-chart";
+import * as UI_TEXT from "@/lib/ui/text";
+import { StudioAttentionSection } from "./studio-attention-section";
 import { StudioTodayBanner } from "./studio-today-banner";
-import { StudioTopMasters } from "./studio-top-masters";
-import { StudioTopOccupancy } from "./studio-top-occupancy";
-import type { StudioDashboardData } from "../server/types";
+import { StudioUpcomingSection } from "./studio-upcoming-section";
+import type { StudioHomeData } from "../server/dashboard-data.service";
 
 type Props = {
-  data: StudioDashboardData;
+  data: StudioHomeData;
   studioName: string;
+  /** Непрочитанные сообщения клиентов в переписке студии; 0 — у мастера студии. */
+  unreadMessages: number;
+  /** Свободное время активных мастеров на неделю с сегодняшнего дня салона. */
+  freeWindows: StudioScheduleData["freeWindows"];
+  /** Момент, на который берётся смещение пояса для метки зоны окошек. */
+  zoneIso: string;
   /** SETUP-GUIDE-01: «Первые шаги»; `null` — не показывать. */
   setupGuide?: SetupGuideDto | null;
+  /** Конец действующего пробного периода (ISO); `null` — пробного нет. */
+  trialEndsAt?: string | null;
 };
 
+/** Дней окошек на мастера в списке главной (неделя — в календаре). */
+const FREE_WINDOW_DAYS_PER_MASTER = 2;
+
 /**
- * Server-component orchestrator for `/cabinet/studio`. Receives the
- * pre-fetched dashboard payload from the page route and lays out
- * sections per the reference: today banner → KPI row → top masters
- * + attention (2-up) → occupancy + popular services (2-up) →
- * revenue chart full width.
+ * Главная кабинета студии (DASHBOARD-REORDER, запрос владельца 2026-10-31):
+ * сегодня (компактно) → «Требуют внимания» и ближайшие записи → «Первые
+ * шаги» → свободные окошки мастеров → установка приложения. Показатели за
+ * 30 дней, топ мастеров, загрузка, популярные услуги и выручка по мастерам —
+ * в аналитике.
  */
-export function StudioDashboardPage({ data, studioName, setupGuide = null }: Props) {
+export function StudioDashboardPage({
+  data,
+  studioName,
+  unreadMessages,
+  freeWindows,
+  zoneIso,
+  setupGuide = null,
+  trialEndsAt = null,
+}: Props) {
   return (
-    <div className="space-y-5 lg:space-y-6">
+    <div className="space-y-4 lg:space-y-6">
+      <StudioTodayBanner data={data.todayBanner} studioName={studioName} trialEndsAt={trialEndsAt} />
+
+      <div className="grid grid-cols-1 gap-4 lg:gap-5 xl:grid-cols-[1fr_1.4fr]">
+        <StudioAttentionSection items={data.attentionItems} unreadMessages={unreadMessages} />
+        <StudioUpcomingSection items={data.upcoming.items} total={data.upcoming.total} timeZone={data.timeZone} />
+      </div>
+
+      {/* «Первые шаги» — под тем, что ждёт ответа сейчас. */}
       {setupGuide && !setupGuide.hidden ? <SetupGuideCard guide={setupGuide} /> : null}
 
-      <StudioTodayBanner data={data.todayBanner} studioName={studioName} />
+      <FreeWindowsPanel
+        sections={freeWindows.map((master) => ({
+          id: master.masterId,
+          title: master.masterName,
+          days: master.days,
+        }))}
+        timeZone={data.timeZone}
+        zoneIso={zoneIso}
+        href="/cabinet/studio/calendar"
+        linkLabel={UI_TEXT.schedule.freeWindows.toCalendar}
+        maxDaysPerSection={FREE_WINDOW_DAYS_PER_MASTER}
+      />
 
       {/* PWA-ONBOARDING-01: установка приложения + уведомления (скрывается сама). */}
       <AppSetupCard />
-
-      <StudioKpiRow kpis={data.kpis} />
-
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.4fr_1fr]">
-        <StudioTopMasters masters={data.topMasters} />
-        <StudioAttentionPanel
-          items={data.attentionItems}
-          total={data.attentionTotal}
-          urgent={data.attentionUrgent}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <StudioTopOccupancy rows={data.topOccupancyToday} />
-        <StudioPopularServices services={data.popularServices} />
-      </div>
-
-      <StudioRevenueChart initialData={data.revenueChart} initialPeriod="30d" />
     </div>
   );
 }

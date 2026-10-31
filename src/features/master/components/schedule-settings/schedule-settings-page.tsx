@@ -97,7 +97,7 @@ export async function ScheduleSettingsPage({ profile = null }: { profile?: strin
         }
       />
 
-      <div className="space-y-4 px-4 py-4 md:px-6 md:py-6 lg:px-8">
+      <div className="space-y-4 px-4 pb-6 pt-3 md:px-6 md:pt-4 lg:px-8">
         {profileSwitchItems.length > 0 ? (
           <ScheduleProfileSwitch
             studioProfiles={profileSwitchItems}

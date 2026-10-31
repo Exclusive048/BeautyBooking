@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { StudioReviewsPage } from "@/features/studio-cabinet/reviews/components/studio-reviews-page";
 import { isStudioReviewFilter } from "@/features/studio-cabinet/reviews/lib/types";
 import { loadStudioReviewsList } from "@/features/studio-cabinet/reviews/server/reviews-data.service";
-import { loadStudioReviewsStats } from "@/features/studio-cabinet/reviews/server/reviews-stats.service";
 import { getSessionUser } from "@/lib/auth/session";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
 
@@ -34,18 +33,13 @@ export default async function StudioReviewsRoute({ searchParams }: Props) {
   const masterId = params?.master?.trim() ?? "all";
   const cursor = params?.cursor?.trim() || undefined;
 
-  const [data, stats] = await Promise.all([
-    loadStudioReviewsList({
-      studioId,
-      currentUserId: user.id,
-      filter,
-      masterId,
-      cursor,
-    }),
-    loadStudioReviewsStats(studioId),
-  ]);
+  const data = await loadStudioReviewsList({
+    studioId,
+    currentUserId: user.id,
+    filter,
+    masterId,
+    cursor,
+  });
 
-  return (
-    <StudioReviewsPage data={data} stats={stats} filter={filter} masterId={masterId} />
-  );
+  return <StudioReviewsPage data={data} filter={filter} masterId={masterId} />;
 }

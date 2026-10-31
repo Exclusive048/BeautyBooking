@@ -36,11 +36,11 @@ export function TrialEndingBanner({ daysLeft }: Props) {
       role="status"
       className="border-b border-warning/30 bg-warning/10 text-warning-text"
     >
-      <div className="mx-auto flex w-full max-w-[1280px] flex-wrap items-center gap-3 px-4 py-3">
-        <AlertCircle className="h-5 w-5 shrink-0 text-warning-text" aria-hidden />
-        <div className="min-w-0 flex-1 text-sm">
+      <div className="mx-auto flex w-full max-w-[1280px] items-center gap-2 px-4 py-1.5">
+        <AlertCircle className="h-4 w-4 shrink-0 text-warning-text" aria-hidden />
+        <div className="min-w-0 flex-1 text-xs leading-snug sm:text-sm">
           <span className="font-medium text-text-main">{title}</span>
-          <span className="ml-2 text-text-sec">{T.bannerDescription}</span>
+          <span className="ml-2 hidden text-text-sec md:inline">{T.bannerDescription}</span>
         </div>
         <Button asChild variant="primary" size="sm">
           <Link href="/pricing">{T.bannerCta}</Link>

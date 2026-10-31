@@ -1,6 +1,5 @@
 export const cabinetRolesPage = {
   title: "Профессиональные кабинеты",
-  subtitle: "Управляйте своими кабинетами",
   createMaster: "Создать кабинет мастера",
   createStudio: "Создать студию",
   deleteFailed: "Не удалось удалить кабинет. Попробуйте ещё раз.",

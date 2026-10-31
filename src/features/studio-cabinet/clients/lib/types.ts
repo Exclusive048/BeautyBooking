@@ -61,6 +61,7 @@ export type StudioClientSegmentKey =
 
 export type StudioClientsSegmentCounts = Record<StudioClientSegmentKey, number>;
 
+/** Показатели базы — только для приложения (`GET /api/cabinet/studio/clients` → `kpi`). */
 export type StudioClientsKpis = {
   total: { count: number; addedThisMonth: number };
   active30d: { count: number; percentOfBase: number };
@@ -72,9 +73,6 @@ export type StudioClientsKpis = {
 export type StudioClientsData = {
   items: StudioClientRow[];
   segmentCounts: StudioClientsSegmentCounts;
-  kpis: StudioClientsKpis;
-  filteredCount: number;
-  totalCount: number;
   /** Next-page cursor (key of the last visible row). `null` when the
    *  current page is the last. */
   nextCursor: string | null;

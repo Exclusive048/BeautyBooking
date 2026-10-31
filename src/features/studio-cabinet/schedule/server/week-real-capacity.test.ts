@@ -173,15 +173,11 @@ describe("веб-неделя студии — загрузка по графи�
     // ср — «Фиксированное время»: все четыре начала свободны.
     expect(marina.cells[2]!.freeWindows.freeStarts).toEqual([600, 720, 840, 960]);
     expect(data.week!.days.map((day) => day.isPast)).toEqual(Array(7).fill(false));
-    // Показатели недели — по графику: 180 занятых минут из 480 + 4 начала по часу.
-    expect(data.kpis).toMatchObject({
-      bookingsCount: 2,
-      occupancyPercent: 25,
-      occupancyHoursDenominator: 12,
-      mastersOnShift: 1,
-      freeWindowsCount: 6,
-    });
+    // Окошки недели (окно «Свободные окошки»): пн — два промежутка, ср — четыре начала.
     expect(data.freeWindows.map((row) => row.masterId)).toEqual(["marina"]);
+    const marinaDays = data.freeWindows[0]!.days;
+    expect(marinaDays[0]!.windows).toHaveLength(2);
+    expect(marinaDays[2]!.freeStarts).toEqual([600, 720, 840, 960]);
   });
 
   it("приглашённый мастер — вся неделя выходная, план движка для него не грузим", async () => {

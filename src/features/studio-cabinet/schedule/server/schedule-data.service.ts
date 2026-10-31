@@ -748,7 +748,6 @@ export async function loadStudioScheduleData(input: {
     todayKey,
     // День — выбранная дата: на неё смотрят диалоги («Перерывы», новая запись).
     day: buildDay(range, effectiveDateKey, timeZone),
-    kpis: computeKpis({ bookings: range.bookings, stats }),
     week,
     freeWindows: freeWindowsByMaster(range, stats, todayKey),
     services,
@@ -756,9 +755,46 @@ export async function loadStudioScheduleData(input: {
 }
 
 /**
+ * DASHBOARD-REORDER (запрос владельца 2026-10-31) — «Свободные окошки» на
+ * главной студии: тот же расчёт, что окно «Свободные окошки» календаря
+ * (`buildMasterDayStats` → `computeFreeWindows` из плана дня движка, записи с
+ * паузой мастера, перерывы и блокировки), по активным мастерам на `days` дней
+ * с сегодняшнего дня салона. Без сетки календаря, недели и каталога услуг.
+ */
+export async function loadStudioFreeWindows(input: {
+  studioId: string;
+  providerId: string;
+  timeZone: string;
+  days?: number;
+  now?: Date;
+}): Promise<{ todayKey: string; masters: StudioScheduleData["freeWindows"] }> {
+  const now = input.now ?? new Date();
+  const days = input.days ?? 7;
+  const todayKey = toLocalDateKey(now, input.timeZone);
+  const range = await loadRange({
+    studioId: input.studioId,
+    providerId: input.providerId,
+    fromKey: todayKey,
+    days,
+    timeZone: input.timeZone,
+    now,
+  });
+  const dateKeys = Array.from({ length: days }, (_, index) => addDaysToDateKey(todayKey, index));
+  const stats = buildMasterDayStats({
+    range,
+    dateKeys,
+    timeZone: input.timeZone,
+    todayKey,
+    nowMinuteOfToday: salonMinuteOfDay(now, input.timeZone),
+  });
+  return { todayKey, masters: freeWindowsByMaster(range, stats, todayKey) };
+}
+
+/**
  * MOBILE-STUDIO-C (ops) — день календаря студии для приложения: та же сборка
- * дня, что у веба (`loadRange` + `buildDay` + `computeKpis`), плюс план дня
- * каждого активного мастера из движка расписания. Без каталога услуг и недели.
+ * дня, что у веба (`loadRange` + `buildDay`), показатели дня (`computeKpis` —
+ * веб их больше не показывает: суммы — в аналитике), плюс план дня каждого
+ * активного мастера из движка расписания. Без каталога услуг и недели.
  */
 export async function loadStudioScheduleDay(input: {
   studioId: string;

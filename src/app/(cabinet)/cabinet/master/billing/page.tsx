@@ -12,5 +12,11 @@ export default async function MasterBillingRoute() {
   const hasProfile = await hasMasterProfile(userId);
   if (!hasProfile) redirect("/403");
 
-  return <BillingPage scope="MASTER" />;
+  // Поля страницы — как у остальных страниц кабинета: без них на телефоне
+  // заголовок и карточки тарифов прижимались к краю экрана.
+  return (
+    <div className="mx-auto w-full max-w-4xl px-4 pb-6 pt-3 md:px-6 md:pt-4 lg:px-8">
+      <BillingPage scope="MASTER" />
+    </div>
+  );
 }

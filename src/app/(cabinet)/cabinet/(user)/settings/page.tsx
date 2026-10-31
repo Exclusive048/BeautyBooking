@@ -20,11 +20,8 @@ export default async function SettingsPage() {
   const vkNotificationsAvailable = (await getVkCommunity()) !== null;
 
   return (
-    <div className="space-y-6">
-      <HeaderBlock
-        title={UI_TEXT.clientCabinet.settings.title}
-        subtitle={UI_TEXT.clientCabinet.settings.subtitle}
-      />
+    <div className="space-y-3 md:space-y-4">
+      <HeaderBlock title={UI_TEXT.clientCabinet.settings.title} />
 
       <div className="grid gap-4">
         {/* FIX-TELEGRAM-KILLSWITCH: absent when off (no mount, no status fetch). */}

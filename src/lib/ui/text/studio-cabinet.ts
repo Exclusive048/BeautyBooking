@@ -7,7 +7,6 @@ export const studioCabinet = {
   },
   teamAdd: {
     title: "Добавить мастера",
-    subtitle: "Приглашайте мастеров по номеру телефона.",
     info: "Перейдите в раздел «Команда» для управления мастерами.",
     back: "Вернуться в Команду",
   },
@@ -82,6 +81,8 @@ export const studioCabinet = {
       clients: "Клиенты",
       reviews: "Отзывы",
       notifications: "Уведомления",
+      // STUDIO-CHAT: переписка с клиентами от имени студии.
+      messages: "Сообщения",
       analytics: "Аналитика",
       billing: "Тариф",
       // Страница студии `/u/<адрес>` в новой вкладке — подпись как у мастера.
@@ -109,81 +110,34 @@ export const studioCabinet = {
       reviews: "Отзывы",
     },
   },
+  // DASHBOARD-REORDER (запрос владельца 2026-10-31): главная студии —
+  // сегодня, что ждёт действия, ближайшие записи и свободные окошки.
+  // Показатели за 30 дней, топ мастеров и выручка — в аналитике.
   dashboardV2: {
-    banner: {
-      title: (studioName: string, count: number) =>
-        `«${studioName}»: сегодня ${count} ${pluralize(count, "запись", "записи", "записей")}`,
-      subtitleTemplate: "{onShift} мастеров на смене, средняя загрузка {load}%.",
-      onShiftLabel: "Сейчас на смене",
-      outOfTemplate: "из {total}",
-    },
-    kpis: {
-      revenue: {
-        label: "Выручка за 30 дней",
-        subtitle: "к прошлому месяцу",
-      },
-      bookings: {
-        label: "Записей за 30 дней",
-        averageCheckTemplate: "средний чек {amount}",
-      },
-      occupancy: {
-        label: "Загружаем студию",
-        subtitle: "{count} мастеров на смене",
-      },
-      rating: {
-        label: "Средний рейтинг",
-        subtitle: "{count} отзывов",
-      },
-    },
-    topMasters: {
-      title: "ТОП-мастера",
-      subtitle: "По выручке за 30 дней",
-      seeAll: "Все мастера",
-      bookingsTemplate: "{count} записей",
-      empty: "За последний месяц записей не было.",
+    today: {
+      bookings: (count: number) =>
+        count > 0
+          ? `Сегодня ${count} ${pluralize(count, "запись", "записи", "записей")}`
+          : "Сегодня записей нет",
+      onShift: (count: number, total: number) => `На смене ${count} из ${total}`,
     },
     attention: {
       title: "Требуют внимания",
-      subtitleTemplate: "{count} задач · {urgent} срочных",
-      empty: "Очередь пуста",
-      emptyBody: "Всё под контролем.",
-      urgentLabel: "Срочно",
-      items: {
-        pendingMastersTitle: "Заявок мастеров: {count}",
-        pendingMastersAction: "Открыть",
-        bookingsAwaitingTitle: "Записей ждут подтверждения: {count}",
-        bookingsAwaitingAction: "Записи",
-        reviewsUnansweredTitle: "Отзывов без ответа: {count}",
-        reviewsUnansweredAction: "Ответить",
-        scheduleRequestsTitle: "Заявок на расписание: {count}",
-        scheduleRequestsAction: "Решить",
-      },
+      empty: "Всё под контролем — ничего не ждёт.",
+      bookingsAwaiting: "Ждут подтверждения",
+      unreadMessages: "Новые сообщения",
+      reviewsUnanswered: "Отзывы без ответа",
+      scheduleRequests: "Заявки на график",
     },
-    topOccupancy: {
-      title: "Топ загруженности",
-      subtitle: "Сегодня",
-      slotsTemplate: "{booked} из {total} записей",
-      empty: "Сегодня свободный день.",
-    },
-    popularServices: {
-      title: "Популярные услуги",
-      subtitle: "За 30 дней",
-      countTemplate: "{count} раз · {percent}% всех записей",
-      empty: "Нет данных за выбранный период.",
-    },
-    revenueChart: {
-      periodAria: "Период выручки",
-      title: "Выручка по мастерам",
-      totalLabel: "за период",
-      bookingsTemplate: "{count} записей",
-      periodSelector: {
-        "7d": "7д",
-        "30d": "30д",
-        "90d": "90д",
-        "365d": "Год",
-      },
-      empty: "Нет данных за выбранный период.",
-      error: "Не удалось загрузить данные. Попробуйте ещё раз.",
+    upcoming: {
+      title: "Ближайшие записи",
+      subtitle: (shown: number, total: number) =>
+        total > shown
+          ? `Сегодня · ${shown} из ${total}`
+          : `Сегодня · ещё ${total} ${pluralize(total, "запись", "записи", "записей")}`,
+      toCalendar: "Весь календарь",
+      empty: "На сегодня записей больше нет",
+      awaitingBadge: "Ожидает",
     },
   },
   // STUDIO-SCHEDULE-SETTINGS-A Phase A — page text. Phase B will
@@ -300,29 +254,6 @@ export const studioCabinet = {
       submitting: "Сохраняем…",
       empty: "На этот день перерывов нет.",
       noMasters: "Сегодня нет доступных мастеров",
-    },
-    // SCHEDULE-FLEX-DATE-NAV: показатели — выбранного ПЕРИОДА (день или
-    // неделя), загрузка и окошки — по графику мастеров.
-    kpis: {
-      bookingsDay: "Записей за день",
-      bookingsWeek: "Записей за неделю",
-      bookingsConfirmedTemplate: "{count} подтверждено",
-      revenueDay: "Выручка дня (план)",
-      revenueWeek: "Выручка недели (план)",
-      revenueSubtitle: "сумма по записям",
-      occupancy: "Загрузка",
-      occupancyContextTemplate: "мастеров по графику: {masters}",
-      freeWindows: "Свободные окошки",
-      freeWindowsHintNow: "с текущего времени",
-      freeWindowsHintPeriod: "промежутки по графику",
-      // Свёрнутые показатели — одна строка: «12 записей · 45 000 ₽ · загрузка 62% · 8 окошек».
-      summaryBookingOne: "запись",
-      summaryBookingFew: "записи",
-      summaryBookingMany: "записей",
-      summaryLoadTemplate: "загрузка {pct}%",
-      summaryWindowOne: "окошко",
-      summaryWindowFew: "окошка",
-      summaryWindowMany: "окошек",
     },
     legend: {
       confirmed: "Подтверждено",
@@ -466,20 +397,8 @@ export const studioCabinet = {
   },
   servicesV2: {
     header: {
-      caption: "ПРАЙС · {services} услуг в {categories} категориях",
       title: "Услуги студии",
       addService: "Добавить услугу",
-    },
-    kpis: {
-      total: "Услуг в прайсе",
-      totalContext: "{count} категорий",
-      popular: "Самая популярная",
-      popularContext: "{count} раз / 30 дней",
-      averageCheck: "Средний чек студии",
-      averageCheckDelta: "за 30 дней",
-      withoutMaster: "Услуги без мастера",
-      withoutMasterContext: "все услуги назначены",
-      withoutMasterWarn: "нужен мастер",
     },
     categories: {
       title: "Категории",
@@ -520,9 +439,6 @@ export const studioCabinet = {
       mastersEmpty: "Назначьте хотя бы одного мастера, чтобы клиенты могли записаться.",
       assignMaster: "Назначить мастера",
       unassignMaster: "Снять мастера",
-      statsTitle: "Статистика · 30 дней",
-      statsBookings: "Записей",
-      statsRevenue: "Выручка",
       save: "Сохранить",
       saving: "Сохраняем…",
       saved: "Изменения сохранены",
@@ -650,54 +566,6 @@ export const studioCabinet = {
       title: "Журнал записей",
       newBooking: "Новая запись",
     },
-    kpis: {
-      today: "Сегодня",
-      todayContext: "{completed} завершено · {upcoming} впереди",
-      needsAction: "Требуют действий",
-      needsActionContext: "{count} неподтверждены",
-      confirmed: "Подтверждено",
-      confirmedContext: "на ближайшие 7 дней",
-      revenue: "Выручка дня",
-      revenueDelta: "к среднему",
-      noShow: "Не пришли",
-      noShowContext: "за последние 7 дней",
-    },
-    filters: {
-      rangeAria: "Период записей",
-      ranges: {
-        today: "Сегодня",
-        tomorrow: "Завтра",
-        week: "Неделя",
-        all: "Все",
-      },
-      statusAll: "Все записи",
-      masterAll: "Все мастера",
-      searchPlaceholder: "Поиск клиента или услуги",
-      statusLabels: {
-        NEW: "Новая",
-        PENDING: "Ожидает",
-        CONFIRMED: "Подтверждена",
-        CHANGE_REQUESTED: "Изменение",
-        REJECTED: "Отклонена",
-        IN_PROGRESS: "Идёт",
-        PREPAID: "Оплачена",
-        STARTED: "Начата",
-        FINISHED: "Завершена",
-        CANCELLED: "Отменена",
-        NO_SHOW: "Не пришёл",
-      },
-    },
-    table: {
-      colWhen: "Когда",
-      colMaster: "Мастер",
-      colClient: "Клиент",
-      colService: "Услуга",
-      colPrice: "Цена",
-      colSource: "Источник",
-      colStatus: "Состояние",
-      todayPrefix: "сегодня",
-      tomorrowPrefix: "завтра",
-    },
     client: {
       newBadge: "новый",
       vipBadge: "VIP",
@@ -710,20 +578,9 @@ export const studioCabinet = {
     actions: {
       menu: "Действия",
     },
-    empty: {
-      title: "Нет записей",
-      hint: "Записи появятся после первых клиентов.",
-      filteredTitle: "Под фильтр ничего не попало",
-      filteredHint: "Измените условия или сбросьте фильтры.",
-      resetCta: "Сбросить фильтры",
-    },
-    pagination: {
-      loadMore: "Показать ещё",
-    },
   },
   settingsV2: {
     header: {
-      caption: "НАСТРОЙКИ СТУДИИ",
       title: "Настройки",
     },
     nav: {
@@ -840,7 +697,6 @@ export const studioCabinet = {
   analyticsV2: {
     viewsAria: "Раздел аналитики",
     header: {
-      caption: "АНАЛИТИКА · последние {days} дней",
       title: "Бизнес-показатели",
     },
     periodLabel: "Период",
@@ -913,17 +769,7 @@ export const studioCabinet = {
   },
   notificationsV2: {
     header: {
-      caption: "УВЕДОМЛЕНИЯ · {unread} непрочитано из {total}",
       title: "Уведомления",
-    },
-    kpis: {
-      unread: "Непрочитанных",
-      unreadTemplate: "из {total}",
-      today: "Сегодня",
-      needsDecision: "Ждут решения",
-      push: "Уведомления на телефон",
-      pushEnabled: "Включены",
-      pushDisabled: "Выключены",
     },
     filters: {
       aria: "Какие уведомления показать",
@@ -972,16 +818,7 @@ export const studioCabinet = {
   },
   reviewsV2: {
     header: {
-      caption: "ОТЗЫВЫ · {total} всего · из них {noReply} без ответа",
       title: "Отзывы клиентов",
-    },
-    stats: {
-      avgTitle: "Средний рейтинг студии",
-      avgBasis: "На основе {count} отзывов · {percent}% положительные",
-      distributionTitle: "Распределение оценок",
-      topServicesTitle: "Топ услуг по отзывам",
-      topServicesCount: "{count} отзывов",
-      topServicesEmpty: "Пока нет отзывов с привязкой к услугам",
     },
     filters: {
       aria: "Какие отзывы показать",
@@ -1028,21 +865,8 @@ export const studioCabinet = {
   },
   clientsV2: {
     header: {
-      caption: "КЛИЕНТСКАЯ БАЗА · {total} человек · {filtered} отфильтровано",
       title: "Клиенты студии",
       addClient: "Клиент",
-    },
-    kpis: {
-      total: "Всего клиентов",
-      totalSub: "+{count} за месяц",
-      active: "Активных за 30 дней",
-      activeSub: "{percent}% от базы",
-      avgLifetime: "Приносит в среднем",
-      avgLifetimeSub: "по студии в среднем",
-      vip: "VIP-клиенты",
-      vipSub: "{percent}% выручки",
-      sleeping: "Спящие · 60+ дней",
-      sleepingSub: "их можно вернуть",
     },
     segments: {
       title: "Сегменты",
@@ -1089,11 +913,7 @@ export const studioCabinet = {
   },
   mastersV2: {
     header: {
-      caption: (count: number) =>
-        `КОМАНДА · ${count} ${pluralize(count, "мастер", "мастера", "мастеров")}`,
       title: "Мастера студии",
-      subtitle: (active: number, disabled: number, invited: number) =>
-        `${active} ${pluralize(active, "активный", "активных", "активных")} · ${disabled} в паузе · ${invited} ${pluralize(invited, "новый", "новых", "новых")}`,
       inviteButton: "Пригласить мастера",
     },
     filters: {
@@ -1159,18 +979,6 @@ export const studioCabinet = {
       // студии можно только после их переноса или отмены.
       blockingBookings: (count: number) =>
         `Будущих записей в студии: ${count} — перед удалением перенесите их на другого мастера или отмените.`,
-      kpis: {
-        revenue: "Выручка · 30д",
-        bookings: "Записей · 30д",
-        bookingsSubtitle: "за последние 30 дней",
-        averageCheckTemplate: "ср.чек {amount}",
-        occupancy: "Загрузка",
-        occupancyAboveNorm: "выше нормы",
-        occupancyOnNorm: "норма",
-        occupancyBelowNorm: "ниже нормы",
-        rating: "Рейтинг",
-        reviewsTemplate: "{count} отзывов",
-      },
       weekSchedule: {
         title: "Расписание · эта неделя",
         subtitle: "Мастер меняет своё расписание через заявку вам",

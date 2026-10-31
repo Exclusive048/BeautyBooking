@@ -14,14 +14,11 @@ export type Crumb = {
 type Props = {
   /** Ordered ancestors → current page. The Home icon is rendered before the list. */
   breadcrumb: Crumb[];
-  title: string;
   /**
-   * CABINET-COMPACT (2026-10-31): только для ФАКТА о данных страницы (окно
-   * CRM у «Клиентов»), не для девиза. Описательные подзаголовки сняты со всех
-   * экранов кабинета: заголовок и содержимое говорят сами, а строка текста под
-   * заголовком на телефоне стоила ~40px до первого числа.
+   * Строки под заголовком нет (решение владельца 2026-10-31: описание под
+   * заголовком — лишний текст между шапкой и содержимым).
    */
-  subtitle?: string;
+  title: string;
   /** Optional right-side action slot — buttons, badges, anything. */
   actions?: ReactNode;
   /**
@@ -70,13 +67,16 @@ function parentHref(breadcrumb: Crumb[]): string | undefined {
  * сохранено. Ниже `lg` заголовок уезжает со прокруткой; ориентир «где я» на
  * мобильном несёт нижняя навигация, которая никуда не уезжает.
  *
+ * Ниже `lg` крошек нет: первое звено — кнопка «Главная» нижней навигации,
+ * последнее повторяет заголовок, а путь к родителю вложенного экрана
+ * (портфолио и услуги — внутри «Профиля») несёт кнопка «Назад» (`parentHref`).
+ *
  * Server component — no client hooks. Pages pass plain props; the header
  * doesn't reach into URL state.
  */
 export function MasterPageHeader({
   breadcrumb,
   title,
-  subtitle,
   actions,
   actionsInline = false,
   backHref: backHrefProp,
@@ -134,9 +134,6 @@ export function MasterPageHeader({
               {title}
             </h1>
           </PageTitleRow>
-          {subtitle ? (
-            <p className="mt-0.5 text-xs text-text-sec sm:text-sm">{subtitle}</p>
-          ) : null}
         </div>
 
         {actions ? (

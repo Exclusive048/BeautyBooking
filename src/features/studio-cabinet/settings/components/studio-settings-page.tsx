@@ -38,8 +38,8 @@ export function StudioSettingsPage({ data, section }: Props) {
       : section;
 
   return (
-    <div className="space-y-5 lg:space-y-6">
-      <StudioPageHeader caption={T.header.caption} title={T.header.title} />
+    <div className="space-y-3 lg:space-y-6">
+      <StudioPageHeader title={T.header.title} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[220px_1fr]">
         <SettingsNav active={effectiveSection} canDanger={data.scope.canDanger} />

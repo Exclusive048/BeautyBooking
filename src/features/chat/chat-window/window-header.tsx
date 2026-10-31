@@ -9,7 +9,11 @@ import { useToast } from "@/components/ui/toast";
 import { useConfirm } from "@/hooks/use-confirm";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
-import type { ChatPerspective, ConversationPartnerDto } from "@/features/chat/types";
+import {
+  isProviderPerspective,
+  type ChatPerspective,
+  type ConversationPartnerDto,
+} from "@/features/chat/types";
 
 const T = UI_TEXT.chat;
 
@@ -128,7 +132,10 @@ export function WindowHeader({
             <span className="text-text-sec"> · {partner.roleSummary}</span>
             {!canSend && !blocked ? (
               <span className="ml-1 text-text-sec/80">
-                · {perspective === "master" ? T.header.composeHintMaster : T.header.composeHintClient}
+                ·{" "}
+                {isProviderPerspective(perspective)
+                  ? T.header.composeHintMaster
+                  : T.header.composeHintClient}
               </span>
             ) : null}
           </p>
@@ -160,21 +167,25 @@ export function WindowHeader({
             </a>
           </Button>
         ) : null}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="gap-1.5"
-          onClick={() => void toggleBlock()}
-          disabled={blockBusy}
-          aria-label={blockedByMe ? T.block.unblockAria : T.block.blockAria}
-        >
-          {blockedByMe ? (
-            <LockOpen className="h-4 w-4" aria-hidden strokeWidth={1.6} />
-          ) : (
-            <Ban className="h-4 w-4" aria-hidden strokeWidth={1.6} />
-          )}
-          <span className="hidden sm:inline">{blockedByMe ? T.block.unblock : T.block.block}</span>
-        </Button>
+        {/* STUDIO-CHAT: блок — между людьми (клиент ↔ владелец кабинета);
+            администратор студии ставить его за владельца не может (403). */}
+        {perspective === "studio" ? null : (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => void toggleBlock()}
+            disabled={blockBusy}
+            aria-label={blockedByMe ? T.block.unblockAria : T.block.blockAria}
+          >
+            {blockedByMe ? (
+              <LockOpen className="h-4 w-4" aria-hidden strokeWidth={1.6} />
+            ) : (
+              <Ban className="h-4 w-4" aria-hidden strokeWidth={1.6} />
+            )}
+            <span className="hidden sm:inline">{blockedByMe ? T.block.unblock : T.block.block}</span>
+          </Button>
+        )}
       </div>
       {confirmModal}
     </header>

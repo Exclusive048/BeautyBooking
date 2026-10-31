@@ -406,7 +406,6 @@ export function BillingPage({ scope }: BillingPageProps) {
     <section className="space-y-8">
       <header>
         <h1 className="text-2xl font-semibold text-text-main">Подписка</h1>
-        <p className="mt-1 text-sm text-text-sec">Тарифы вашего кабинета.</p>
       </header>
 
       {error ? (

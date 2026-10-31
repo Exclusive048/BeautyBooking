@@ -25,6 +25,7 @@ import {
   resolveSalonLocalParts,
 } from "@/lib/bookings/policy-enforcement";
 import { invalidateSlotsForBookingMove, invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
+import { resolveVerifiedPhoneOwnerId } from "@/lib/bookings/manual-client-link";
 import { prisma } from "@/lib/prisma";
 import { resolveMasterWorkWindow } from "@/lib/schedule/master-work-window";
 import { requireActiveStudioMaster } from "@/lib/studio/master-eligibility";
@@ -223,6 +224,7 @@ export async function createStudioBooking(input: {
         }),
     now,
   });
+  const clientUserId = await resolveVerifiedPhoneOwnerId(input.clientPhone, { providerId: studio.providerId });
 
   // FIX-R2-04-A: the conflict re-check now runs INSIDE the create
   // transaction under Serializable isolation (was pre-tx with default
@@ -279,8 +281,16 @@ export async function createStudioBooking(input: {
             clientPhone: input.clientPhone?.trim() || "",
             clientPhoneSnapshot: input.clientPhone?.trim() || null,
             notes: input.notes?.trim() || null,
-            status: "PENDING",
-            actionRequiredBy: "MASTER",
+            // MANUAL-BOOKING-CLIENT-LINK: номер, доказанный аккаунтом клиента, —
+            // запись сразу его («Мои записи», напоминания, переписка).
+            clientUserId,
+            // MANUAL-BOOKING-CONFIRMED-STUDIO (решение владельца 2026-10-31):
+            // администратор заносит уже договорённый визит — подтверждать его
+            // ещё раз (мастеру или самой студии) лишнее действие. Раньше запись
+            // рождалась PENDING с ответом за мастером: висела в «Ждут ответа»,
+            // без напоминаний и через сутки отменялась сама (PENDING-EXPIRY).
+            status: "CONFIRMED",
+            actionRequiredBy: null,
             // Администратор студии заносит запись, полученную вне сайта
             // (звонок / визит) — MANUAL здесь и есть правда.
             source: BookingSource.MANUAL,
@@ -328,6 +338,9 @@ export async function createStudioBooking(input: {
     endAtUtc: endAt,
   });
   await invalidateAdvisorCache(master.id);
+  // Подтверждённой записи нужны напоминания; пост-коммитная обёртка — сбой
+  // очереди не даёт 500 на уже созданную запись (RES-03).
+  await scheduleBookingRemindersSafe(created.id);
 
   return { id: created.id };
 }

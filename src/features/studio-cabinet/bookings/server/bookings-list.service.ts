@@ -2,6 +2,7 @@ import {
   BookingStatus,
   Prisma,
   ProviderType,
+  type BookingActionRequiredBy,
   type BookingSource,
 } from "@prisma/client";
 import { CLIENT_STATUS_THRESHOLDS } from "@/lib/master/clients-classifier";
@@ -18,6 +19,7 @@ import type {
   StudioBookingsRangeCounts,
 } from "./types";
 import { studioBookingsWhere } from "@/lib/studio/booking-scope";
+import { journalSearchWhere } from "@/features/bookings-journal/server/journal-where";
 
 const COMPLETED_STATUSES = [
   BookingStatus.CONFIRMED,
@@ -37,6 +39,18 @@ export type StudioBookingsFilters = {
   search?: string;
   /** MOBILE-STUDIO-C (ops): только записи, начинающиеся строго позже этого момента. */
   startsAfter?: Date;
+  /** DASHBOARD-REORDER: только записи, которые ещё не закончились к этому моменту. */
+  endsAfter?: Date;
+  /**
+   * DASHBOARD-REORDER: только записи, где ход за этой стороной (`actionRequiredBy`):
+   * «ждут ответа студии» — без переносов, которые студия сама предложила клиенту.
+   */
+  actionRequiredBy?: BookingActionRequiredBy;
+  /**
+   * BOOKINGS-JOURNAL: окно журнала (полночь салона → полночь салона; без
+   * конца — «все предстоящие»). Задано — `range` не действует.
+   */
+  window?: { fromUtc: Date; toUtcExclusive: Date | null };
 };
 
 function resolveBookingPriceKopeks(input: {
@@ -64,30 +78,13 @@ function clientKeyOf(input: {
   return `phone:${normalized}`;
 }
 
-function buildSearchFilter(search: string | undefined): Prisma.BookingWhereInput | null {
-  const trimmed = search?.trim();
-  if (!trimmed) return null;
-  return {
-    OR: [
-      { clientName: { contains: trimmed, mode: "insensitive" } },
-      { clientPhone: { contains: trimmed } },
-      {
-        service: {
-          OR: [
-            { name: { contains: trimmed, mode: "insensitive" } },
-            { title: { contains: trimmed, mode: "insensitive" } },
-          ],
-        },
-      },
-    ],
-  };
-}
-
 /**
  * Lists bookings for the studio cabinet journal page. Supports filter
- * by time range / status / master, plus search across client name +
- * phone + service. Counts for the time-range chips are computed in
- * parallel via grouped queries.
+ * by time range (or an explicit salon-day window) / status / master, plus
+ * search: every word must match the client (name in the booking, account
+ * first/last/display name, phone digits), the service or the master
+ * (`journalSearchWhere`, BOOKINGS-JOURNAL). Counts for the time-range chips
+ * are computed in parallel via grouped queries.
  *
  * New client / VIP detection are batched per-page:
  *  - `prior bookings count per clientKey` via groupBy → drives "новый"
@@ -132,9 +129,16 @@ export async function listStudioBookings(input: {
 
   const filters = input.filters;
   const bounds = bookingsTimeRangeBounds(filters.range, timezone);
-  const whereRange: Prisma.BookingWhereInput = bounds.from
-    ? { startAtUtc: { gte: bounds.from, lt: bounds.toExclusive ?? undefined } }
-    : {};
+  const whereRange: Prisma.BookingWhereInput = filters.window
+    ? {
+        startAtUtc: {
+          gte: filters.window.fromUtc,
+          ...(filters.window.toUtcExclusive ? { lt: filters.window.toUtcExclusive } : {}),
+        },
+      }
+    : bounds.from
+      ? { startAtUtc: { gte: bounds.from, lt: bounds.toExclusive ?? undefined } }
+      : {};
   const whereStatus: Prisma.BookingWhereInput = Array.isArray(filters.status)
     ? { status: { in: filters.status } }
     : filters.status && filters.status !== "all"
@@ -143,11 +147,17 @@ export async function listStudioBookings(input: {
   const whereStartsAfter: Prisma.BookingWhereInput = filters.startsAfter
     ? { startAtUtc: { gt: filters.startsAfter } }
     : {};
+  const whereEndsAfter: Prisma.BookingWhereInput = filters.endsAfter
+    ? { endAtUtc: { gt: filters.endsAfter } }
+    : {};
+  const whereActionBy: Prisma.BookingWhereInput = filters.actionRequiredBy
+    ? { actionRequiredBy: filters.actionRequiredBy }
+    : {};
   const whereMaster: Prisma.BookingWhereInput =
     filters.masterId && filters.masterId !== "all"
       ? { masterProviderId: filters.masterId }
       : {};
-  const whereSearch = buildSearchFilter(filters.search);
+  const whereSearch = filters.search ? journalSearchWhere(filters.search, { includeMaster: true }) : null;
 
   const where: Prisma.BookingWhereInput = {
     AND: [
@@ -156,11 +166,14 @@ export async function listStudioBookings(input: {
       whereStatus,
       whereMaster,
       whereStartsAfter,
+      whereEndsAfter,
+      whereActionBy,
       ...(whereSearch ? [whereSearch] : []),
     ],
   };
   const pageSize = input.page?.limit ?? PAGE_SIZE;
   const withRangeCounts = input.withRangeCounts ?? true;
+  // conflict-scope-ok: журнал студии — скоуп студии (поверхность записи), окно «ещё не закончилась» — фильтр списка, а не проверка пересечения перед записью.
   const countIf = (where: Prisma.BookingWhereInput) =>
     withRangeCounts ? prisma.booking.count({ where }) : Promise.resolve(0);
 
@@ -171,6 +184,7 @@ export async function listStudioBookings(input: {
   const tomorrowBounds = bookingsTimeRangeBounds("tomorrow", timezone);
   const weekBounds = bookingsTimeRangeBounds("week", timezone);
 
+  // conflict-scope-ok: журнал студии — скоуп студии (поверхность записи), окно «ещё не закончилась» — фильтр списка, а не проверка пересечения перед записью.
   const [bookings, todayCount, tomorrowCount, weekCount, allCount] =
     await Promise.all([
       prisma.booking.findMany({

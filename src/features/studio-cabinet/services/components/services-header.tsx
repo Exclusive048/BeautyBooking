@@ -12,24 +12,15 @@ const T = UI_TEXT.studioCabinet.servicesV2.header;
 
 type Props = {
   studioId: string;
-  servicesCount: number;
-  categoriesCount: number;
   pickerOptions: StudioCategoryPickerOption[];
 };
 
-export function ServicesHeader({
-  studioId,
-  servicesCount,
-  categoriesCount,
-  pickerOptions,
-}: Props) {
+/** Заголовок и «Добавить услугу»; описания и строки со счётчиками нет. */
+export function ServicesHeader({ studioId, pickerOptions }: Props) {
   const [open, setOpen] = useState(false);
   return (
     <>
       <StudioPageHeader
-        caption={T.caption
-          .replace("{services}", String(servicesCount))
-          .replace("{categories}", String(categoriesCount))}
         title={T.title}
         actions={
           <Button variant="primary" onClick={() => setOpen(true)} data-guide="services">

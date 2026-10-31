@@ -72,7 +72,7 @@ export default async function Page({ searchParams }: PageProps) {
     // pages instead of the previous bare full-width section.
     return (
       <MasterCabinetShell userId={user.id}>
-        <div className="mx-auto w-full max-w-4xl px-4 py-6 md:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-4xl px-4 pb-6 pt-3 md:px-6 md:pt-4 lg:px-8">
           {masterContext.studioId ? (
             <section className="space-y-4">
               <div className="lux-card rounded-3xl p-6">

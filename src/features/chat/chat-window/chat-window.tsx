@@ -6,7 +6,7 @@ import { Thread } from "@/features/chat/chat-window/thread";
 import { Composer } from "@/features/chat/composer/composer";
 import { useConversationThread } from "@/features/chat/hooks/use-conversation-thread";
 import * as UI_TEXT from "@/lib/ui/text";
-import type { ChatPerspective } from "@/features/chat/types";
+import { isProviderPerspective, type ChatPerspective } from "@/features/chat/types";
 import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.chat;
@@ -83,7 +83,7 @@ export function ChatWindow({
       ? T.composer.disabledBlockedByMe
       : detail.readonlyOnly
         ? T.composer.disabledReadonly
-        : perspective === "master"
+        : isProviderPerspective(perspective)
           ? T.composer.disabledMaster
           : T.composer.disabledClient;
 

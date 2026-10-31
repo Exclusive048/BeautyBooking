@@ -1,11 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { listReviews } from "@/lib/reviews/service";
 import type { ReviewDto } from "@/lib/reviews/types";
-import {
-  computeReviewStats,
-  formatResponseDuration,
-  type ReviewStats,
-} from "@/lib/master/reviews-stats";
+import { computeReviewStats, type ReviewStats } from "@/lib/master/reviews-stats";
 
 /**
  * Server aggregator for `/cabinet/master/reviews` (28a).
@@ -38,9 +34,6 @@ export function parseFilter(value: string | null | undefined): ReviewsFilterId {
 
 export type MasterReviewsViewData = {
   stats: ReviewStats;
-  /** Mean response time formatted for the KPI tile, or null when none
-   * answered yet. Rendered as em-dash by the UI when null. */
-  avgResponseLabel: string | null;
   filterCounts: Record<ReviewsFilterId, number>;
   activeFilter: ReviewsFilterId;
   /** The filtered + sorted list, newest first. Each item is a ready-to-render
@@ -141,7 +134,6 @@ export async function getMasterReviewsView(input: {
 
   return {
     stats,
-    avgResponseLabel: formatResponseDuration(stats.avgResponseMs),
     filterCounts,
     activeFilter: input.filter,
     reviews: decorate(filtered, now),

@@ -1,12 +1,15 @@
-import { MasterBookingsPage } from "@/features/master/components/bookings/master-bookings-page";
+import {
+  MasterBookingsPage,
+  type MasterBookingsSearchParams,
+} from "@/features/master/components/bookings/master-bookings-page";
 
 export const runtime = "nodejs";
 
 type RouteProps = {
-  searchParams?:
-    | Promise<Record<string, string | string[] | undefined>>
-    | Record<string, string | string[] | undefined>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
+
+const KEYS = ["date", "view", "q", "upcoming", "limit", "status", "client", "focus"] as const;
 
 function pickString(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) return value[0];
@@ -14,20 +17,13 @@ function pickString(value: string | string[] | undefined): string | undefined {
 }
 
 export default async function MasterBookingsRoute({ searchParams }: RouteProps) {
-  const params = searchParams instanceof Promise ? await searchParams : searchParams ?? {};
-  return (
-    <MasterBookingsPage
-      searchParams={{
-        q: pickString(params.q),
-        tab: pickString(params.tab),
-        // MASTER-CLIENTS-FIX-A #7а: opaque HMAC token from the «Вся
-        // история» link. Decoded server-side against the current
-        // master's provider id. Previously this param was silently
-        // ignored — that was the «грубая ошибка»: link looked
-        // functional but the page showed every booking instead of
-        // the selected client's.
-        client: pickString(params.client),
-      }}
-    />
-  );
+  const params = (await searchParams) ?? {};
+  const picked: MasterBookingsSearchParams = {};
+  for (const key of KEYS) {
+    const value = pickString(params[key]);
+    if (value) picked[key] = value;
+  }
+  // MASTER-CLIENTS-FIX-A #7а: `client` — HMAC-токен из «Вся история» карточки
+  // клиента; проверяется против текущего мастера на странице.
+  return <MasterBookingsPage searchParams={picked} />;
 }

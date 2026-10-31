@@ -1,5 +1,6 @@
-import { BookingStatus, type Booking } from "@prisma/client";
+import { BookingStatus, ProviderType, type Booking } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { isStudioSideUser } from "@/lib/chat/studio-side";
 import {
   OPEN_STATUSES,
   READONLY_WINDOW_HOURS,
@@ -31,7 +32,14 @@ import type { ConversationKey } from "@/lib/chat/conversation-slug";
  * See BACKLOG → "Historical privacy expansion" for the legal/audit
  * trail when the change goes live.
  */
-export type ConversationParticipant = "MASTER" | "CLIENT";
+/**
+ * STUDIO-CHAT: третья сторона — студия. Переписка пары (провайдер-студия,
+ * клиент) у студии ведётся её владельцем и администраторами от имени студии
+ * (`chat/studio-side.ts`). Сторона мастера — только у провайдера-мастера:
+ * у провайдера-студии `ownerUserId` — владелец студии, и без проверки типа он
+ * открыл бы переписку студии из кабинета мастера.
+ */
+export type ConversationParticipant = "MASTER" | "CLIENT" | "STUDIO";
 
 export type ConversationAccess =
   | {
@@ -63,7 +71,7 @@ export async function resolveConversationAccess(input: {
       status: true,
       startAtUtc: true,
       clientUserId: true,
-      provider: { select: { ownerUserId: true } },
+      provider: { select: { ownerUserId: true, type: true } },
     },
   });
 
@@ -71,10 +79,18 @@ export async function resolveConversationAccess(input: {
     return { ok: false, reason: "not-found" };
   }
 
+  const providerType = bookings[0]?.provider?.type ?? null;
   const isClient = bookings.some((b) => b.clientUserId === userId);
-  const isMaster = bookings.some((b) => b.provider?.ownerUserId === userId);
+  const isMaster =
+    providerType === ProviderType.MASTER && bookings.some((b) => b.provider?.ownerUserId === userId);
+  // Сторону студии считаем только когда она может понадобиться — лишний запрос
+  // у каждой переписки мастера и клиента не нужен.
+  const isStudio =
+    providerType === ProviderType.STUDIO &&
+    (hintedPerspective === "STUDIO" || (!isClient && !isMaster)) &&
+    (await isStudioSideUser(userId, key.providerId));
 
-  if (!isClient && !isMaster) {
+  if (!isClient && !isMaster && !isStudio) {
     return { ok: false, reason: "forbidden" };
   }
 
@@ -82,11 +98,15 @@ export async function resolveConversationAccess(input: {
   // verify it matches the actual relationship — defence in depth so a
   // master in the master cabinet can't view a thread where they're only
   // the client by some data quirk.
-  const perspective: ConversationParticipant = hintedPerspective ?? (isMaster ? "MASTER" : "CLIENT");
+  const perspective: ConversationParticipant =
+    hintedPerspective ?? (isMaster ? "MASTER" : isStudio ? "STUDIO" : "CLIENT");
   if (hintedPerspective === "MASTER" && !isMaster) {
     return { ok: false, reason: "forbidden" };
   }
   if (hintedPerspective === "CLIENT" && !isClient) {
+    return { ok: false, reason: "forbidden" };
+  }
+  if (hintedPerspective === "STUDIO" && !isStudio) {
     return { ok: false, reason: "forbidden" };
   }
 

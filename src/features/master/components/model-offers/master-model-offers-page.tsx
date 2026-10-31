@@ -6,7 +6,6 @@ import { prisma } from "@/lib/prisma";
 import * as UI_TEXT from "@/lib/ui/text";
 import { ActiveOffersSection } from "./active-offers-section";
 import { ArchiveSection } from "./archive-section";
-import { OffersKpiCards } from "./offers-kpi-cards";
 import { PendingApplicationsSection } from "./pending-applications-section";
 import { getMasterWorkProfiles, personalMasterProviderWhere } from "@/lib/master/access";
 
@@ -29,7 +28,6 @@ function readString(value: string | string[] | undefined): string | null {
  * Layout:
  *   ┌────────────────────────────────────┐
  *   │  Page header                       │
- *   │  KPI cards (4)                     │
  *   │  Active offers                     │
  *   │  Pending applications              │
  *   │  Archive                           │
@@ -73,9 +71,7 @@ export async function MasterModelOffersPage({ searchParams }: Props) {
         title={T.modelOffers.title}
       />
 
-      <div className="space-y-4 px-4 py-4 md:space-y-8 md:px-6 md:py-6 lg:px-8">
-        <OffersKpiCards kpi={data.kpi} />
-
+      <div className="space-y-6 px-4 pb-6 pt-3 md:space-y-8 md:px-6 md:pt-4 lg:px-8">
         <ActiveOffersSection
           offers={data.activeOffers}
           services={data.availableServices}

@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
-import { AccountType } from "@prisma/client";
 import { z } from "zod";
 import { getSessionUser } from "@/lib/auth/access";
+import { resolveChatPerspective } from "@/lib/chat/perspective";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { parseBody } from "@/lib/validation";
@@ -42,10 +42,7 @@ export async function POST(
     const slug = decodeURIComponent(params.slug);
 
     const url = new URL(req.url);
-    const asParam = url.searchParams.get("as");
-    const isMaster = user.roles.includes(AccountType.MASTER);
-    const perspective =
-      asParam === "client" ? "CLIENT" : asParam === "master" ? "MASTER" : isMaster ? "MASTER" : "CLIENT";
+    const perspective = resolveChatPerspective(url.searchParams.get("as"), user.roles);
 
     // FIX-C12: путь `/api/chat/threads` чувствителен (FIX-B12; с 29.09 · 15 —
     // единственным признаком, шаблоном пути в ключе), то есть при обрыве Redis

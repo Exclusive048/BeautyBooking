@@ -19,7 +19,7 @@ type Props = {
  */
 export function ReviewsDistribution({ distribution, totalCount }: Props) {
   return (
-    <section className="rounded-2xl border border-border-subtle bg-bg-card p-4 sm:p-5">
+    <section className="h-full rounded-2xl border border-border-subtle bg-bg-card p-4 sm:p-5">
       <p className="mb-3 text-sm font-medium text-text-main sm:mb-4">{T.heading}</p>
       <ul className="space-y-1.5 sm:space-y-2">
         {([5, 4, 3, 2, 1] as const).map((star) => {

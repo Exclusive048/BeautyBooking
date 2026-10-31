@@ -1,4 +1,4 @@
-import { ChatSenderType, ProviderType } from "@prisma/client";
+import { ChatSenderType, ProviderType, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isBookingChatOpen } from "@/lib/chat/status";
 import {
@@ -13,7 +13,7 @@ import type { ConversationParticipant } from "@/lib/chat/conversation-access";
 import { buildChatAttachmentUrl } from "@/lib/media/private-delivery";
 import { decodeCursor, encodeCursor } from "@/lib/pagination/cursor";
 import { CHAT_THREAD_PAGE_SIZE, chatConversationsWindowStart } from "@/lib/chat/conversation-window";
-import { getChatBlockStates } from "@/lib/chat/blocks";
+import { getChatBlockStates, type ChatBlockState } from "@/lib/chat/blocks";
 
 /**
  * Per-pair conversation aggregator (33a, updated by chat-url-fix).
@@ -118,6 +118,49 @@ function deriveClientDisplayName(user: {
   return "Клиент";
 }
 
+/**
+ * STUDIO-CHAT: сторона провайдера — мастер ИЛИ студия. Обе пишут сообщениями
+ * `ChatSenderType.MASTER` (сторона кабинета) и читают сообщения клиента.
+ */
+function isProviderSide(perspective: ConversationParticipant): boolean {
+  return perspective !== "CLIENT";
+}
+
+/** Чьи сообщения адресованы смотрящему — их и считаем непрочитанными. */
+function incomingSenderType(perspective: ConversationParticipant): ChatSenderType {
+  return isProviderSide(perspective) ? ChatSenderType.CLIENT : ChatSenderType.MASTER;
+}
+
+/** Своё сообщение смотрящего. */
+function ownSenderType(perspective: ConversationParticipant): ChatSenderType {
+  return isProviderSide(perspective) ? ChatSenderType.MASTER : ChatSenderType.CLIENT;
+}
+
+export type ConversationViewer = {
+  userId: string;
+  perspective: ConversationParticipant;
+  /** Студия, от имени которой смотрят (`perspective: "STUDIO"`) — Provider.id студии. */
+  studioProviderId?: string | null;
+};
+
+/**
+ * Какие записи образуют переписки смотрящего: мастер — записи своего
+ * кабинета мастера, студия — записи поверхности студии (инв. #45), клиент —
+ * свои записи к мастерам и студиям.
+ */
+function viewerBookingWhere(viewer: ConversationViewer): Prisma.BookingWhereInput {
+  if (viewer.perspective === "MASTER") {
+    return { provider: { ownerUserId: viewer.userId, type: ProviderType.MASTER } };
+  }
+  if (viewer.perspective === "STUDIO") {
+    if (!viewer.studioProviderId) {
+      throw new Error("conversation viewer: studioProviderId is required for STUDIO perspective");
+    }
+    return { providerId: viewer.studioProviderId, provider: { type: ProviderType.STUDIO } };
+  }
+  return { clientUserId: viewer.userId };
+}
+
 function previewBody(body: string): string {
   const trimmed = body.trim();
   if (trimmed.length <= 80) return trimmed;
@@ -130,24 +173,17 @@ function previewBody(body: string): string {
  */
 /**
  * NAV-ATTENTION-01 — сколько сообщений ждёт прочтения у участника переписки.
- * Тот же скоуп и тот же счётчик, что у `listConversations` (брони мастера либо
- * клиента, сообщения ДРУГОЙ стороны без `readAt`, чат только у мастеров), но
- * одним `count` — для точки на вкладке навигации, без выборки карточек.
+ * Тот же скоуп и тот же счётчик, что у `listConversations` (брони мастера,
+ * студии либо клиента, сообщения ДРУГОЙ стороны без `readAt`), но одним
+ * `count` — для точки на вкладке навигации, без выборки карточек.
  */
-export async function countUnreadChatMessages(input: {
-  userId: string;
-  perspective: ConversationParticipant;
-}): Promise<number> {
-  const { userId, perspective } = input;
+export async function countUnreadChatMessages(input: ConversationViewer): Promise<number> {
   return prisma.chatMessage.count({
     where: {
       readAt: null,
-      senderType: perspective === "MASTER" ? ChatSenderType.CLIENT : ChatSenderType.MASTER,
+      senderType: incomingSenderType(input.perspective),
       chat: {
-        booking:
-          perspective === "MASTER"
-            ? { provider: { ownerUserId: userId, type: ProviderType.MASTER } }
-            : { clientUserId: userId, provider: { type: ProviderType.MASTER } },
+        booking: viewerBookingWhere(input),
         // 29.09 доработки · 31: считаем ровно те чаты, что видны в списке
         // диалогов (окно активности), — иначе бейдж звал бы к переписке,
         // которой в списке нет.
@@ -157,11 +193,8 @@ export async function countUnreadChatMessages(input: {
   });
 }
 
-export async function listConversations(input: {
-  userId: string;
-  perspective: ConversationParticipant;
-}): Promise<ConversationListItem[]> {
-  const { userId, perspective } = input;
+export async function listConversations(input: ConversationViewer): Promise<ConversationListItem[]> {
+  const { perspective } = input;
 
   // Find every chat the caller participates in (any booking, any
   // status). We pull last message + unread count via subqueries to
@@ -170,10 +203,7 @@ export async function listConversations(input: {
   // год — список растёт с каждой записью. Подпись окна — у шапки списка.
   const windowFilter = { messages: { some: { createdAt: { gte: chatConversationsWindowStart() } } } };
   const chats = await prisma.bookingChat.findMany({
-    where:
-      perspective === "MASTER"
-        ? { booking: { provider: { ownerUserId: userId } }, ...windowFilter }
-        : { booking: { clientUserId: userId }, ...windowFilter },
+    where: { booking: viewerBookingWhere(input), ...windowFilter },
     select: {
       id: true,
       createdAt: true,
@@ -202,10 +232,7 @@ export async function listConversations(input: {
           messages: {
             where: {
               readAt: null,
-              senderType:
-                perspective === "MASTER"
-                  ? ChatSenderType.CLIENT
-                  : ChatSenderType.MASTER,
+              senderType: incomingSenderType(perspective),
             },
           },
         },
@@ -217,7 +244,7 @@ export async function listConversations(input: {
   // into a single conversation card.
   type Accumulator = {
     key: ConversationKey;
-    /** Собеседник-человек: клиент для мастера, владелец кабинета для клиента. */
+    /** Собеседник-человек: клиент для мастера и студии, владелец кабинета для клиента. */
     otherUserId: string | null;
     partner: ConversationPartner;
     lastMessage: ConversationListItem["lastMessage"];
@@ -229,8 +256,7 @@ export async function listConversations(input: {
 
   for (const chat of chats) {
     const booking = chat.booking;
-    if (!booking || !booking.clientUserId) continue;
-    if (booking.provider?.type !== ProviderType.MASTER) continue; // chat only for master-style providers
+    if (!booking || !booking.clientUserId || !booking.provider) continue;
 
     const key: ConversationKey = {
       providerId: booking.providerId,
@@ -245,10 +271,7 @@ export async function listConversations(input: {
       ? {
           body: previewBody(lastRaw.body),
           createdAt: lastRaw.createdAt.toISOString(),
-          mine:
-            perspective === "MASTER"
-              ? lastRaw.senderType === ChatSenderType.MASTER
-              : lastRaw.senderType === ChatSenderType.CLIENT,
+          mine: lastRaw.senderType === ownSenderType(perspective),
         }
       : null;
     const latestActivityAt = lastRaw?.createdAt ?? chat.createdAt;
@@ -264,8 +287,9 @@ export async function listConversations(input: {
       });
       grouped.set(pairId, {
         key,
-        otherUserId:
-          perspective === "MASTER" ? booking.clientUserId : (booking.provider?.ownerUserId ?? null),
+        otherUserId: isProviderSide(perspective)
+          ? booking.clientUserId
+          : (booking.provider?.ownerUserId ?? null),
         partner,
         lastMessage,
         unreadCount: chat._count.messages,
@@ -293,10 +317,15 @@ export async function listConversations(input: {
   // `getOrCreateConversationSlug`.
   const [slugs, blocks] = await Promise.all([
     Promise.all(ordered.map((entry) => getOrCreateConversationSlug(entry.key))),
-    // MOBILE-POLISH: блоки со всеми собеседниками — одним запросом.
-    getChatBlockStates(
-      userId,
-      ordered.map((entry) => entry.otherUserId),
+    // MOBILE-POLISH: блоки со всеми собеседниками — одним запросом. Блок —
+    // между людьми (`chat/blocks.ts`); у студии сторона — её владелец.
+    resolveBlockViewerId(input).then((viewerId) =>
+      viewerId
+        ? getChatBlockStates(
+            viewerId,
+            ordered.map((entry) => entry.otherUserId),
+          )
+        : new Map<string, ChatBlockState>(),
     ),
   ]);
 
@@ -313,6 +342,21 @@ export async function listConversations(input: {
       blockedByOther: block?.blockedByOther ?? false,
     };
   });
+}
+
+/**
+ * Чьими глазами смотреть на блоки переписки: у мастера и клиента — сам
+ * смотрящий; у студии — владелец студии (блок клиента ставится на владельца
+ * кабинета, `chat/blocks.ts`).
+ */
+async function resolveBlockViewerId(viewer: ConversationViewer): Promise<string | null> {
+  if (viewer.perspective !== "STUDIO") return viewer.userId;
+  if (!viewer.studioProviderId) return null;
+  const provider = await prisma.provider.findUnique({
+    where: { id: viewer.studioProviderId },
+    select: { ownerUserId: true },
+  });
+  return provider?.ownerUserId ?? null;
 }
 
 type ProviderSrc = {
@@ -340,8 +384,11 @@ function buildPartner(input: {
   clientSrc: ClientSrc | null;
   bookingId: string | null;
 }): ConversationPartner {
-  if (input.perspective === "MASTER") {
+  if (isProviderSide(input.perspective)) {
     const c = input.clientSrc;
+    const bookingsPath =
+      input.perspective === "STUDIO" ? "/cabinet/studio/bookings" : "/cabinet/master/bookings";
+    const bookingUrl = input.bookingId ? `${bookingsPath}?focus=${input.bookingId}` : null;
     if (!c) {
       return {
         id: "unknown",
@@ -349,9 +396,7 @@ function buildPartner(input: {
         avatarUrl: null,
         phone: null,
         roleSummary: "Клиент",
-        bookingUrl: input.bookingId
-          ? `/cabinet/master/bookings?focus=${input.bookingId}`
-          : null,
+        bookingUrl,
         publicProfileUrl: null,
       };
     }
@@ -361,9 +406,7 @@ function buildPartner(input: {
       avatarUrl: c.externalPhotoUrl ?? null,
       phone: c.phone,
       roleSummary: "Клиент",
-      bookingUrl: input.bookingId
-        ? `/cabinet/master/bookings?focus=${input.bookingId}`
-        : null,
+      bookingUrl,
       publicProfileUrl: null,
     };
   }
@@ -385,7 +428,7 @@ function buildPartner(input: {
     name: p.name,
     avatarUrl: p.avatarUrl ?? null,
     phone: null, // master phone hidden from public chat view by default
-    roleSummary: "Мастер",
+    roleSummary: p.type === ProviderType.STUDIO ? "Студия" : "Мастер",
     bookingUrl: p.publicUsername ? `/u/${p.publicUsername}` : null,
     publicProfileUrl: p.publicUsername ? `/u/${p.publicUsername}` : null,
   };
@@ -583,10 +626,7 @@ export async function markConversationRead(input: {
   const updated = await prisma.chatMessage.updateMany({
     where: {
       readAt: null,
-      senderType:
-        input.perspective === "MASTER"
-          ? ChatSenderType.CLIENT
-          : ChatSenderType.MASTER,
+      senderType: incomingSenderType(input.perspective),
       chat: {
         booking: {
           providerId: input.key.providerId,

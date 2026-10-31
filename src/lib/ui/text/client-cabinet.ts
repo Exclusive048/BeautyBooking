@@ -6,7 +6,6 @@ export const clientCabinet = {
   },
   settings: {
     title: "Настройки",
-    subtitle: "Ваш профиль и настройки.",
   },
   common: {
     save: "Сохранить",

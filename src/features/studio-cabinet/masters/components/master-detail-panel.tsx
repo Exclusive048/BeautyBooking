@@ -3,7 +3,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioMasterDetail } from "../server/types";
 import { MasterDetailHeader } from "./master-detail-header";
-import { MasterDetailKpis } from "./master-detail-kpis";
 import { MasterDetailWeekSchedule } from "./master-detail-week-schedule";
 
 const T = UI_TEXT.studioCabinet.mastersV2.detail;
@@ -31,7 +30,6 @@ export function MasterDetailPanel({
   return (
     <div className="space-y-4">
       <MasterDetailHeader studioId={studioId} detail={detail} />
-      <MasterDetailKpis detail={detail} />
       <MasterDetailWeekSchedule cells={detail.weekSchedule} viewToken={detail.viewToken} />
     </div>
   );

@@ -22,21 +22,9 @@ type Props = {
  * data is fetched server-side (see `loadStudioAnalyticsView` dispatch).
  */
 export function StudioAnalyticsPage({ data }: Props) {
-  const days =
-    data.period === "7d"
-      ? 7
-      : data.period === "30d"
-        ? 30
-        : data.period === "90d"
-          ? 90
-          : 365;
-
   return (
-    <div className="space-y-5 lg:space-y-6">
-      <StudioPageHeader
-        caption={T.header.caption.replace("{days}", String(days))}
-        title={T.header.title}
-      />
+    <div className="space-y-3 lg:space-y-6">
+      <StudioPageHeader title={T.header.title} />
 
       <AnalyticsControls period={data.period} view={data.view} compare={data.compare} />
 

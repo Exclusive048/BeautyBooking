@@ -48,7 +48,7 @@ export default async function StudioSettingsPublicPage() {
   // Шапка — как у остальных страниц кабинета студии; справа та же кнопка
   // «Посмотреть глазами клиента», что у мастера.
   return (
-    <div className="space-y-5 lg:space-y-6">
+    <div className="space-y-3 lg:space-y-6">
       <StudioPageHeader
         caption={studioName}
         title={UI_TEXT.billing.publicPage.title}

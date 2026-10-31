@@ -278,9 +278,6 @@ export async function loadStudioClientsData(input: LoadStudioClientsInput): Prom
     slice.pop();
   }
 
-  // KPIs derived from the full set, not the filtered slice.
-  const kpis = computeKpis(allRows, new Date(now.getTime() - MONTH_MS), now);
-
   await recordPdAccess({
     surface: "studio.clients.list",
     actorType: PdAccessActorType.STUDIO,
@@ -303,9 +300,6 @@ export async function loadStudioClientsData(input: LoadStudioClientsInput): Prom
   return {
     items: slice,
     segmentCounts,
-    kpis,
-    filteredCount: filtered.length,
-    totalCount: allRows.length,
     nextCursor,
     timezone: base.timezone,
     masterOptions: base.masterOptions,
@@ -317,7 +311,13 @@ export type LoadStudioClientsPageInput = Omit<LoadStudioClientsInput, "cursor"> 
   limit: number;
 };
 
-export type StudioClientsPage = Omit<StudioClientsData, "nextCursor" | "filteredCount"> & {
+/**
+ * Показатели базы (`kpi`) и её размер (`totalCount`) — только у приложения:
+ * веб-страница «Клиенты» плиток не показывает (суммы — в аналитике).
+ */
+export type StudioClientsPage = Omit<StudioClientsData, "nextCursor"> & {
+  kpis: StudioClientsKpis;
+  totalCount: number;
   /** Непрозрачный курсор смещения (`lib/pagination/offset-cursor`); `null` — последняя страница. */
   nextCursor: string | null;
   /** Сколько клиентов под фильтрами. */
@@ -340,7 +340,7 @@ export async function loadStudioClientsPage(input: LoadStudioClientsPageInput): 
     return {
       items: [],
       segmentCounts: empty.segmentCounts,
-      kpis: empty.kpis,
+      kpis: EMPTY_KPIS,
       totalCount: 0,
       total: 0,
       nextCursor: null,
@@ -426,19 +426,18 @@ function computeKpis(rows: StudioClientRow[], monthAgo: Date, now: Date): Studio
   };
 }
 
+const EMPTY_KPIS: StudioClientsKpis = {
+  total: { count: 0, addedThisMonth: 0 },
+  active30d: { count: 0, percentOfBase: 0 },
+  avgLifetime: { kopeks: 0 },
+  vip: { count: 0, revenuePercent: 0 },
+  sleeping: { count: 0 },
+};
+
 function emptyResult(): StudioClientsData {
   return {
     items: [],
     segmentCounts: { all: 0, vip: 0, regular: 0, new: 0, sleeping: 0 },
-    kpis: {
-      total: { count: 0, addedThisMonth: 0 },
-      active30d: { count: 0, percentOfBase: 0 },
-      avgLifetime: { kopeks: 0 },
-      vip: { count: 0, revenuePercent: 0 },
-      sleeping: { count: 0 },
-    },
-    filteredCount: 0,
-    totalCount: 0,
     nextCursor: null,
     // No studio → platform-default tz fallback (matches Provider.timezone default).
     timezone: "Europe/Moscow",

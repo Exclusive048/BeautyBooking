@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
-import { AccountType } from "@prisma/client";
 import { getSessionUser } from "@/lib/auth/access";
+import { resolveChatPerspective } from "@/lib/chat/perspective";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { resolveConversationSlug } from "@/lib/chat/conversation-slug";
@@ -30,10 +30,7 @@ export async function GET(
     }
 
     const url = new URL(req.url);
-    const asParam = url.searchParams.get("as");
-    const isMaster = user.roles.includes(AccountType.MASTER);
-    const perspective =
-      asParam === "client" ? "CLIENT" : asParam === "master" ? "MASTER" : isMaster ? "MASTER" : "CLIENT";
+    const perspective = resolveChatPerspective(url.searchParams.get("as"), user.roles);
 
     const access = await resolveConversationAccess({
       key,
@@ -64,7 +61,7 @@ export async function GET(
         viewerTimezone: tzHint || "Europe/Moscow",
         before,
       }),
-      getConversationBlockState(key, user.userId),
+      getConversationBlockState(key, user.userId, perspective),
     ]);
     if (!detail) {
       return jsonFail(404, "Переписка не найдена.", "NOT_FOUND");

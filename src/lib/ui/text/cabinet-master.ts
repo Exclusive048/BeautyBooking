@@ -139,7 +139,6 @@ export const cabinetMaster = {
       endingSoonHint: (date: string) =>
         `Расписание закончится ${date} — после этого клиенты не увидят окошек.`,
       manualHint: "Рабочие дни отмечаются в календаре ниже.",
-      endingCta: "Продлить график",
     },
     // SCHEDULE-PATTERNS-01 (этап 3): календарь на 3 месяца и палитра рабочих
     // дней. Кисть — рабочий день палитры; «как по графику» снимает правку.
@@ -465,26 +464,6 @@ export const cabinetMaster = {
     markAllRead: "Прочитать всё",
     markRead: "Отметить прочитанным",
     settingsAria: "Настройки уведомлений",
-    kpi: {
-      unreadLabel: "Непрочитанных",
-      unreadValueTemplate: "{unread} из {total}",
-      todayLabel: "Сегодня",
-      todayValueTemplate: "{count} {word}",
-      todayWordOne: "уведомление",
-      todayWordFew: "уведомления",
-      todayWordMany: "уведомлений",
-      waitingLabel: "Ждут ответа",
-      waitingValueTemplate: "{count} {word}",
-      waitingWordOne: "запись",
-      waitingWordFew: "записи",
-      waitingWordMany: "записей",
-      waitingNone: "Нет ожидающих",
-      pushLabel: "Уведомления на телефон",
-      pushOn: "Включены",
-      pushOff: "Выключены",
-      pushOnHint: "Приходят автоматически",
-      pushOffCta: "Включить уведомления",
-    },
     tabs: {
       all: "Все",
       unread: "Непрочитанные",
@@ -539,14 +518,6 @@ export const cabinetMaster = {
       rowAria: (star: number, count: number, percent: number) =>
         `${star} звёзд: ${count} (${percent}%)`,
       rowTemplate: "{count} · {percent}%",
-    },
-    kpi: {
-      unansweredLabel: "Без ответа",
-      unansweredNone: "Все отвечены",
-      responseTimeLabel: "Среднее время ответа",
-      responseTimeNone: "—",
-      photosLabel: "С фото",
-      photosNone: "—",
     },
     filters: {
       all: "Все",
@@ -614,18 +585,6 @@ export const cabinetMaster = {
     // UI-33: ключ ОДИН на оба кабинета — дровер общий для MASTER и STUDIO
     // (как и соседний `cardNotePlaceholder`), иначе формулировки разъедутся.
     cardPhotoAltTemplate: "Фото работы для клиента {name} № {n}",
-    kpi: {
-      totalLabel: "Всего клиентов",
-      totalSubtextTemplate: "+{count} за месяц",
-      totalSubtextNone: "новых нет",
-      ltvLabel: "Общая выручка",
-      ltvLabelTooltip: "Сумма всех завершённых записей всех клиентов",
-      ltvSubtextTemplate: "средняя {avg}",
-      frequencyLabel: "Средняя частота",
-      frequencySubtext: "визитов на клиента",
-      retentionLabel: "Возвращаемость",
-      retentionSubtext: "из новых стали постоянными",
-    },
     tabs: {
       all: "Все",
       new: "Новые",
@@ -740,16 +699,6 @@ export const cabinetMaster = {
   modelOffers: {
     breadcrumb: "Модели",
     title: "Модели",
-    kpi: {
-      activeOffersLabel: "Открытые предложения",
-      activeOffersEmpty: "Опубликуйте первый",
-      pendingLabel: "Ждут решения",
-      pendingEmpty: "Все рассмотрены",
-      conversionLabel: "Дошли до записи",
-      conversionEmpty: "—",
-      archivedLabel: "В архиве",
-      archivedEmpty: "—",
-    },
     activeSection: {
       heading: "Открытые предложения",
       soonAction: "Создать предложение",
@@ -1127,11 +1076,6 @@ export const cabinetMaster = {
     breadcrumb: "Портфолио",
     title: "Портфолио",
     addCta: "Добавить работы",
-    kpi: {
-      totalLabel: "Всего работ",
-      publicLabel: "В каталоге",
-      hiddenLabel: "Скрытые",
-    },
     filters: {
       all: "Все",
       public: "В каталоге",
@@ -1327,11 +1271,6 @@ export const cabinetMaster = {
     addServiceAria: "Добавить услугу",
     addBundleCta: "Пакет",
     addBundleAria: "Добавить пакет",
-    kpi: {
-      servicesLabel: "Услуг",
-      bundlesLabel: "Пакетов",
-      disabledLabel: "Отключено",
-    },
     filters: {
       all: "Все",
       services: "Услуги",
@@ -1458,23 +1397,6 @@ export const cabinetMaster = {
       // расписания (CTA-инфинитив: действие со страницы, не имя раздела).
       settings: "Настроить расписание",
     },
-    kpi: {
-      weekBookings: "Записей на неделе",
-      // PWA-UX-BATCH-01: короткие подписи для плиток 4-в-ряд на телефоне.
-      weekBookingsShort: "Записей",
-      freeTodayShort: "Свободно",
-      weekRevenue: "Доход",
-      load: "Загрузка",
-      loadHoursTemplate: "из {hours} ч",
-      freeToday: "Свободно сегодня",
-      freeTodaySlotOne: "окошко",
-      freeTodaySlotFew: "окошка",
-      freeTodaySlotMany: "окошек",
-      freeTodayAfterTemplate: "ближайшее в {time}",
-      freeTodayNone: "нет окошек",
-      // SCHEDULE-FLEX-DATE-NAV: свёрнутые показатели — одна строка.
-      summaryLoadTemplate: "загрузка {pct}%",
-    },
     legend: {
       confirmed: "Подтверждено",
       pending: "Ожидает",
@@ -1535,29 +1457,8 @@ export const cabinetMaster = {
   bookings: {
     breadcrumb: "Записи",
     title: "Записи",
-    toolbar: {
-      searchPlaceholder: "Поиск по клиенту или услуге",
-      tabAll: "Все",
-      tabNew: "Новые клиенты",
-      tabRegular: "Постоянные",
-      statTotal: "Всего",
-      statPending: "В ожидании",
-      statConfirmed: "Подтверждено",
-    },
-    columns: {
-      pending: {
-        title: "Ждут подтверждения",
-        // Срок — `PENDING_EXPIRY_HOURS`: без ответа запись отменяется сама.
-        hint: (hours: number) => `Без ответа за ${hours} ч запись отменится`,
-      },
-      confirmed: { title: "Подтверждены", hint: "Готовы к визиту" },
-      today: { title: "Сегодня", hint: "В работе" },
-      done: { title: "Завершены", hint: "Запросить отзыв" },
-      cancelled: { title: "Отменены", hint: "За 30 дней" },
-    },
     card: {
       newBadge: "Новая",
-      inProgressBadge: "В работе",
       confirm: "Подтвердить",
       decline: "Отклонить",
       reschedule: "Перенести",
@@ -1575,10 +1476,6 @@ export const cabinetMaster = {
       declinePlaceholder: "Например: «Конфликт по времени»",
       declineConfirmLabel: "Отклонить",
       cancelError: "Не удалось отменить запись. Попробуйте ещё раз.",
-      reviewLabelTemplate: "★ {rating} · отзыв оставлен",
-      guestClient: "Без аккаунта",
-      // RESCHEDULE-CURRENT-TIME: запрошенное клиентом время под текущим.
-      proposedWhenPrefix: "Перенос на",
       // RESCHEDULE-DECLINE-NOTIFY-01: ответ на запрос переноса от клиента —
       // это ответ про ВРЕМЯ, а не про запись: запись остаётся в любом случае.
       acceptReschedule: "Принять перенос",
@@ -1593,7 +1490,6 @@ export const cabinetMaster = {
         "Запись отметится неявкой, клиент получит уведомление. Снять отметку потом нельзя.",
       noShowConfirmLabel: "Отметить неявку",
       noShowError: "Не удалось отметить неявку. Попробуйте ещё раз.",
-      noShowBadge: "Не пришёл",
       // BOOKING-FLOW-AUDIT-RESIDUALS: компонент пакета отменяется только
       // вместе со всем пакетом (инв. #34).
       packageCancelTitle: "Отменить весь пакет?",
@@ -1602,49 +1498,33 @@ export const cabinetMaster = {
       packageCancelConfirm: "Отменить пакет",
       packageCancelError: "Не удалось отменить пакет. Попробуйте ещё раз.",
     },
-    empty: "Пока пусто",
     declineError: "Не удалось отклонить запись. Попробуйте ещё раз.",
     confirmError: "Не удалось подтвердить запись. Попробуйте ещё раз.",
-  },
-  userChip: {
-    trialStatusTemplate: "PREMIUM · {days} дн.",
-    planLabels: {
-      free: "FREE",
-      pro: "PRO",
-      premium: "PREMIUM",
-    },
   },
   dashboard: {
     // QA-115 (FIX-06): studio context for a studio master (null for independent).
     studioChipTemplate: "Студия «{name}»",
-    hero: {
-      nextClientLabel: "Следующий клиент",
-      nextClientIn: "через",
-      minutesShort: "мин",
-    },
-    kpi: {
-      todayRevenue: "Выручка сегодня",
-      // QA-112: was a hardcoded "vs прошлая суббота" — a comparison that is
-      // never computed (KPI tiles carry no trend deltas yet). Honest
-      // descriptive sublabel instead of a false/misleading comparison.
-      todayRevenueSub: "По записям на сегодня",
-      todayBookings: "Записей сегодня",
-      todayBookingsSub: "загрузка дня",
-      todayBookingsValueTemplate: "{count} из {capacity}ч",
-      weekRevenue: "Выручка за неделю",
-      weekRevenueSub: "к прошлой неделе",
-      newClients: "Новые клиенты",
-      newClientsValueTemplate: "{count} за 7д",
-      returningClientsTemplate: "повторных: {count}",
+    // Решение владельца 2026-10-31: вид подписки — только здесь, плашкой у
+    // «Новой записи» (раньше — в чипе сайдбара на каждой странице).
+    planBadge: {
+      labels: {
+        free: "FREE",
+        pro: "PRO",
+        premium: "PREMIUM",
+      },
+      /** Пробный период: тариф + сколько дней осталось (с `sm`; уже — только тариф). */
+      trialDays: (days: number) => `· ${days} дн.`,
+      aria: (plan: string) => `Тариф ${plan} — открыть подписку`,
     },
     bookings: {
       title: "Ближайшие записи",
-      subtitle: (count: number, totalToday: number) =>
+      // DASHBOARD-REORDER: выручка дня — здесь, а не плиткой KPI.
+      subtitle: (count: number, totalToday: number, revenue: string | null) =>
         `Сегодня · ещё ${count} ${pluralize(count, "запись", "записи", "записей")}` +
-        (totalToday > 0 ? ` из ${totalToday}` : ""),
-      seeAll: "Все записи",
-      emptyTitle: "На сегодня записей нет",
-      emptyDescription: "Можно поправить расписание или добавить запись вручную.",
+        (totalToday > 0 ? ` из ${totalToday}` : "") +
+        (revenue ? ` · ${revenue}` : ""),
+      toSchedule: "Всё расписание",
+      emptyTitle: "На сегодня записей больше нет",
       pendingBadge: "Ожидает",
       confirmAction: "Подтвердить",
       declineAction: "Отклонить",
@@ -1661,31 +1541,17 @@ export const cabinetMaster = {
       confirmWindowExpiredTooltip:
         "Время записи уже наступило — подтверждать уже поздно.",
     },
+    // DASHBOARD-REORDER (запрос владельца 2026-10-31): что ждёт действия —
+    // сгруппировано, без деталей отдельных записей; строка ведёт туда, где
+    // это разбирают.
     attention: {
       title: "Требуют внимания",
-      subtitle: (count: number) => `${count} ${pluralize(count, "задача", "задачи", "задач")}`,
-      sortLabel: "Сортировка: важность",
-      emptyTitle: "Всё под контролем",
-      emptyDescription:
-        "Нет срочных задач. Можно сосредоточиться на работе с клиентами.",
-      confirmBookingTitle: "Подтвердить запись",
-      // RESCHEDULE-CURRENT-TIME: запрос переноса — отдельная задача, время
-      // в описании «прежнее → запрошенное».
-      rescheduleRequestTitle: "Подтвердить перенос",
-      confirmBookingCta: "Подтвердить",
-      confirmBookingBusy: "Подтверждаем…",
-      unansweredReviewTitle: "Ответить на отзыв",
-      unansweredReviewCta: "Ответить",
-      freeSlotTitle: "Свободное окошко {from}–{to}",
-      // FIX-FREE-HOURS: раньше здесь стояли минуты («435 мин сегодня
-      // пустуют») — величина, которую мастер всё равно переводит в часы в
-      // уме, причём тем дольше, чем крупнее окошко. Часы округляются ВНИЗ:
-      // окошко всегда >= 60 мин (см. `findFirstFreeSlotToday`), поэтому
-      // значение никогда не ноль, и округление вниз не обещает больше, чем
-      // есть. Точные границы окошка остаются в заголовке карточки.
-      freeSlotDescription: (hours: number) =>
-        `Сегодня пустует ${hours} ${pluralize(hours, "час", "часа", "часов")}. Настройте автоматические скидки.`,
-      freeSlotCta: "Настроить горящие окошки",
+      empty: "Всё под контролем — ничего не ждёт.",
+      pendingConfirmation: "Ждут подтверждения",
+      rescheduleRequests: "Просят перенести",
+      unreadMessages: "Новые сообщения",
+      unansweredReviews: "Отзывы без ответа",
+      scheduleEnding: (date: string) => `Расписание настроено до ${date}`,
     },
     quickActions: {
       title: "Быстрые действия",

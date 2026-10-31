@@ -14,7 +14,7 @@ export function ScheduleRequestsPage({ data }: Props) {
   const { pending, resolved } = data;
 
   return (
-    <section className="space-y-5 lg:space-y-6">
+    <section className="space-y-3 lg:space-y-6">
       <StudioPageHeader title={T.title} />
 
       <div className="space-y-3">
