@@ -6,6 +6,7 @@ import {
   CalendarRange,
   CreditCard,
   Home,
+  MessageSquare,
   ListChecks,
   Scissors,
   Settings,
@@ -19,7 +20,8 @@ import {
 export type StudioNavBadgeKey =
   | "scheduleRequestsPending"
   | "reviewsUnanswered"
-  | "notificationsUnread";
+  | "notificationsUnread"
+  | "messagesUnread";
 
 export type StudioNavItem = {
   id: string;
@@ -44,6 +46,7 @@ export type StudioNavItem = {
     | "clients"
     | "reviews"
     | "notifications"
+    | "messages"
     | "analytics"
     | "settings"
     | "billing";
@@ -97,6 +100,14 @@ export const STUDIO_NAV: StudioNavGroup[] = [
         labelKey: "notifications",
         icon: Bell,
         badgeKey: "notificationsUnread",
+      },
+      // STUDIO-CHAT: переписка с клиентами от имени студии.
+      {
+        id: "messages",
+        href: "/cabinet/studio/messages",
+        labelKey: "messages",
+        icon: MessageSquare,
+        badgeKey: "messagesUnread",
       },
       {
         id: "schedule",

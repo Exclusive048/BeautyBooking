@@ -40,10 +40,9 @@ export type ClientBookingDTO = {
    */
   reviewDeadlineUtc: string | null;
   /**
-   * Чат — только у записей к мастеру (`provider.type === MASTER`): переписка
-   * ключуется записанным провайдером, а список диалогов и счётчик непрочитанных
-   * студийные записи не показывают (`conversation-aggregator.ts`; чат студии —
-   * открытый продуктовый вопрос, BACKLOG, инв. #26). У студийной записи `null`.
+   * Переписка — по записанному провайдеру: у записи к мастеру — с мастером, у
+   * записи студии — со студией (STUDIO-CHAT: её ведут владелец и
+   * администраторы, `chat/studio-side.ts`).
    */
   chatSlug: string | null;
   /**
@@ -202,15 +201,11 @@ type ClientBookingRow = Prisma.BookingGetPayload<{ select: typeof CLIENT_BOOKING
 
 /**
  * B3: ключ переписки — записанный провайдер (`Booking.providerId`), как у
- * `resolveConversationAccess`, и только у записи к мастеру: студийные записи
- * в мессенджер не попадают (`listConversations` пропускает провайдеров не
- * MASTER). Раньше слаг создавался по `providerId`, а искался по отображаемому
- * мастеру — у студийной записи с мастером он не находился «случайно», а у
- * студийной записи без мастера находился и вёл в переписку, которой нет ни в
- * одном списке.
+ * `resolveConversationAccess`. STUDIO-CHAT: у записи студии это студия —
+ * переписка со студией видна клиенту в «Сообщениях», а студии — в её кабинете.
  */
 function chatProviderIdFor(row: Pick<ClientBookingRow, "providerId" | "provider">): string | null {
-  return row.provider.type === "MASTER" ? row.providerId : null;
+  return row.provider.type === "MASTER" || row.provider.type === "STUDIO" ? row.providerId : null;
 }
 
 /** One round trip per unique providerId so a long history with the same master

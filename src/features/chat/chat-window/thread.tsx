@@ -7,7 +7,7 @@ import { MessageBubble } from "@/features/chat/chat-window/message-bubble";
 import { DaySeparator } from "@/features/chat/chat-window/day-separator";
 import { SystemMessage } from "@/features/chat/chat-window/system-message";
 import * as UI_TEXT from "@/lib/ui/text";
-import type { ChatPerspective, ThreadItemDto } from "@/features/chat/types";
+import { isProviderPerspective, type ChatPerspective, type ThreadItemDto } from "@/features/chat/types";
 
 const T = UI_TEXT.chat;
 
@@ -103,7 +103,7 @@ export function Thread({ items, perspective, viewerTimezone, hasOlder, isLoading
           );
         }
         const isMine =
-          perspective === "master"
+          isProviderPerspective(perspective)
             ? item.senderType === "MASTER"
             : item.senderType === "CLIENT";
         return (

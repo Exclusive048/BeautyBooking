@@ -81,6 +81,8 @@ export const studioCabinet = {
       clients: "Клиенты",
       reviews: "Отзывы",
       notifications: "Уведомления",
+      // STUDIO-CHAT: переписка с клиентами от имени студии.
+      messages: "Сообщения",
       analytics: "Аналитика",
       billing: "Тариф",
       // Страница студии `/u/<адрес>` в новой вкладке — подпись как у мастера.

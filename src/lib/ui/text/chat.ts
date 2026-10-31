@@ -25,6 +25,8 @@ export const chat = {
   page: {
     masterTitle: "Сообщения",
     clientTitle: "Сообщения",
+    // STUDIO-CHAT: экран переписки кабинета студии.
+    studioTitle: "Сообщения",
   },
   shell: {
     loading: "Загружаем переписки…",

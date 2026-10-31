@@ -163,19 +163,21 @@ describe("чат (B3)", () => {
     expect(dto?.chatSlug).toBe("slug-master-1");
   });
 
-  it("студийная запись — без чата и без строки слага (мессенджер студий не показывает)", async () => {
+  it("студийная запись — переписка со студией, а не с мастером (STUDIO-CHAT)", async () => {
     bookingFindFirst.mockResolvedValue(studioRow());
-    expect((await getClientBooking(USER, "bk-1"))?.chatSlug).toBeNull();
+    expect((await getClientBooking(USER, "bk-1"))?.chatSlug).toBe("slug-studio-1");
     bookingFindFirst.mockResolvedValue(studioRow({ masterProvider: null }));
-    expect((await getClientBooking(USER, "bk-1"))?.chatSlug).toBeNull();
-    expect(getOrCreateConversationSlug).not.toHaveBeenCalled();
+    expect((await getClientBooking(USER, "bk-1"))?.chatSlug).toBe("slug-studio-1");
+    expect(getOrCreateConversationSlug).not.toHaveBeenCalledWith(
+      expect.objectContaining({ providerId: "studio-master-1" }),
+    );
   });
 
-  it("список: один слаг на мастера, студийные записи слаг не создают", async () => {
+  it("список: один слаг на провайдера записи", async () => {
     bookingFindMany.mockResolvedValue([row({ id: "a" }), row({ id: "b" }), studioRow({ id: "c" })]);
     const { bookings } = await listClientBookings(USER);
-    expect(getOrCreateConversationSlug).toHaveBeenCalledTimes(1);
-    expect(bookings.map((b) => b.chatSlug)).toEqual(["slug-master-1", "slug-master-1", null]);
+    expect(getOrCreateConversationSlug).toHaveBeenCalledTimes(2);
+    expect(bookings.map((b) => b.chatSlug)).toEqual(["slug-master-1", "slug-master-1", "slug-studio-1"]);
   });
 });
 

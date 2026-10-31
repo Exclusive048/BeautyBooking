@@ -3,11 +3,15 @@ import { ScheduleChangeRequestStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getStudioNotificationCounts } from "@/lib/notifications/studio-feed";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
+import { countUnreadChatMessages } from "@/lib/chat/conversation-aggregator";
+import { isStudioSideUser } from "@/lib/chat/studio-side";
 
 export type StudioSidebarCounts = {
   scheduleRequestsPending: number;
   reviewsUnanswered: number;
   notificationsUnread: number;
+  /** STUDIO-CHAT: непрочитанные сообщения клиентов студии; 0 — мастеру студии. */
+  messagesUnread: number;
 };
 
 /**
@@ -31,7 +35,7 @@ export async function getStudioSidebarCounts(input: {
     where: { id: input.studioId },
     select: { id: true, providerId: true },
   });
-  const [scheduleRequestsPending, reviewsUnanswered, notifications] = await Promise.all([
+  const [scheduleRequestsPending, reviewsUnanswered, notifications, messagesUnread] = await Promise.all([
     prisma.scheduleChangeRequest.count({
       where: { studioId: input.studioId, status: ScheduleChangeRequestStatus.PENDING },
     }),
@@ -45,11 +49,26 @@ export async function getStudioSidebarCounts(input: {
       },
     }),
     getStudioNotificationCounts(input.userId),
+    countStudioUnreadMessages(input.userId, studio?.providerId ?? null),
   ]);
 
   return {
     scheduleRequestsPending,
     reviewsUnanswered,
     notificationsUnread: notifications.unreadCount,
+    messagesUnread,
   };
+}
+
+/**
+ * STUDIO-CHAT: переписку студии читают только владелец и администраторы
+ * (`chat/studio-side.ts`), поэтому мастеру студии счётчик не считается.
+ */
+async function countStudioUnreadMessages(
+  userId: string,
+  studioProviderId: string | null,
+): Promise<number> {
+  if (!studioProviderId) return 0;
+  if (!(await isStudioSideUser(userId, studioProviderId))) return 0;
+  return countUnreadChatMessages({ userId, perspective: "STUDIO", studioProviderId });
 }

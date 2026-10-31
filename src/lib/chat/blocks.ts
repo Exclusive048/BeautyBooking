@@ -2,7 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
-import { resolveConversationAccess } from "@/lib/chat/conversation-access";
+import { resolveConversationAccess, type ConversationParticipant } from "@/lib/chat/conversation-access";
 import type { ConversationKey } from "@/lib/chat/conversation-slug";
 
 /**
@@ -123,11 +123,23 @@ export async function resolveConversationCounterpart(
   };
 }
 
-/** Состояние блока для экрана переписки. */
+/**
+ * Состояние блока для экрана переписки. STUDIO-CHAT: у студии сторона блока —
+ * её владелец (владелец кабинета), за которого пишет администратор.
+ */
 export async function getConversationBlockState(
   key: ConversationKey,
   viewerUserId: string,
+  perspective?: ConversationParticipant,
 ): Promise<ChatBlockState> {
+  if (perspective === "STUDIO") {
+    const provider = await prisma.provider.findUnique({
+      where: { id: key.providerId },
+      select: { ownerUserId: true },
+    });
+    if (!provider?.ownerUserId) return NO_BLOCK;
+    return getChatBlockState(provider.ownerUserId, key.clientUserId);
+  }
   const { otherUserId } = await resolveConversationCounterpart(key, viewerUserId);
   return getChatBlockState(viewerUserId, otherUserId);
 }
@@ -141,6 +153,11 @@ async function requireParticipantCounterpart(
   if (!access.ok) {
     if (access.reason === "not-found") throw new AppError("Переписка не найдена.", 404, "NOT_FOUND");
     throw new AppError("Эта переписка вам недоступна.", 403, "FORBIDDEN");
+  }
+  // STUDIO-CHAT: блок — между людьми, а администратор студии пишет за её
+  // владельца; блокировать клиента от имени студии нельзя.
+  if (access.perspective === "STUDIO") {
+    throw new AppError("В переписке студии блокировка недоступна.", 403, "FORBIDDEN");
   }
   const { otherUserId } = await resolveConversationCounterpart(key, userId);
   if (!otherUserId) throw new AppError("Переписка не найдена.", 404, "NOT_FOUND");

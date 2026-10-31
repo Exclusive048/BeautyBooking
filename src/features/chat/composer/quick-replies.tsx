@@ -2,7 +2,7 @@
 
 import { Zap } from "lucide-react";
 import * as UI_TEXT from "@/lib/ui/text";
-import type { ChatPerspective } from "@/features/chat/types";
+import { isProviderPerspective, type ChatPerspective } from "@/features/chat/types";
 import { Button } from "@/components/ui/button";
 import { ChipButton } from "@/components/ui/chip-button";
 
@@ -16,7 +16,7 @@ type Props = {
 
 export function QuickReplies({ perspective, onPick, onHide }: Props) {
   const replies =
-    perspective === "master" ? T.quickReplies.master : T.quickReplies.client;
+    isProviderPerspective(perspective) ? T.quickReplies.master : T.quickReplies.client;
   return (
     <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
       <span className="mr-1 inline-flex items-center gap-1 eyebrow">

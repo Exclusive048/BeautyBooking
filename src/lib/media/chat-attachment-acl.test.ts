@@ -16,8 +16,11 @@ import {
  *   - client (booking.clientUserId === user.id) → ✅
  *   - master (booking.masterProvider.ownerUserId === user.id) → ✅
  *   - outsider (unrelated user) → 403
- *   - studio admin → 403 (privacy 152-ФЗ — chat is 1:1, see
- *     `resolveChatAccess` boundary)
+ *   - studio admin → 403 on a MASTER-surface booking (privacy 152-ФЗ —
+ *     chat is 1:1, see `resolveChatAccess` boundary)
+ *   - STUDIO-CHAT (инв. #26 расширен): на записи СТУДИИ (провайдер записи —
+ *     студия) переписку ведут её владелец и OWNER/ADMIN — им вложения видны;
+ *     мастеру студии и постороннему — нет.
  *
  * Availability gate (`isAvailable`) is intentionally bypassed for read
  * access — participants must remain able to view attachments after a
@@ -25,15 +28,18 @@ import {
  */
 
 const chatMessageFindUnique = vi.hoisted(() => vi.fn());
+const providerFindUnique = vi.hoisted(() => vi.fn());
+const studioFindUnique = vi.hoisted(() => vi.fn());
+const studioMembershipFindFirst = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     chatMessage: { findUnique: chatMessageFindUnique },
     // Stubs for other ensureCanReadMedia branches we don't exercise here.
-    provider: { findUnique: vi.fn() },
+    provider: { findUnique: providerFindUnique },
     booking: { findUnique: vi.fn() },
-    studio: { findUnique: vi.fn() },
-    studioMembership: { findFirst: vi.fn() },
+    studio: { findUnique: studioFindUnique },
+    studioMembership: { findFirst: studioMembershipFindFirst },
     clientCard: { findUnique: vi.fn() },
     modelApplication: { findUnique: vi.fn() },
   },
@@ -53,6 +59,7 @@ function makeUser(id: string, roles: AccountType[] = [AccountType.CLIENT]): User
 function setBookingFor(chatMessageId: string, booking: {
   clientUserId: string | null;
   masterOwnerUserId: string | null;
+  providerType?: "MASTER" | "STUDIO";
 }) {
   chatMessageFindUnique.mockResolvedValueOnce({
     id: chatMessageId,
@@ -62,6 +69,8 @@ function setBookingFor(chatMessageId: string, booking: {
         status: BookingStatus.CONFIRMED,
         startAtUtc: new Date(),
         clientUserId: booking.clientUserId,
+        providerId: booking.providerType === "STUDIO" ? "studio-provider-1" : "master-provider-1",
+        provider: { type: booking.providerType ?? "MASTER" },
         masterProvider: booking.masterOwnerUserId
           ? { ownerUserId: booking.masterOwnerUserId, name: "Master" }
           : null,
@@ -75,6 +84,18 @@ const ENTITY_ID = "chat-message:msg_abc";
 describe("ensureCanReadMedia — CHAT_MESSAGE entityType", () => {
   beforeEach(() => {
     chatMessageFindUnique.mockReset();
+    providerFindUnique.mockReset();
+    studioFindUnique.mockReset();
+    studioMembershipFindFirst.mockReset();
+    providerFindUnique.mockResolvedValue({
+      id: "studio-provider-1",
+      type: "STUDIO",
+      ownerUserId: "studio-owner-1",
+    });
+    studioFindUnique.mockResolvedValue({ id: "studio-1", ownerUserId: "studio-owner-1" });
+    studioMembershipFindFirst.mockImplementation(async ({ where }: { where: { userId: string } }) =>
+      where.userId === "studio-admin-1" ? { id: "m-1" } : null,
+    );
   });
 
   it("admits the client participant", async () => {
@@ -120,6 +141,54 @@ describe("ensureCanReadMedia — CHAT_MESSAGE entityType", () => {
         // Even with elevated roles (studio admin profile), the chat
         // boundary is participant-only by-design.
         makeUser("studio-admin-1", [AccountType.STUDIO_ADMIN, AccountType.CLIENT]),
+        MediaEntityType.CHAT_MESSAGE,
+        ENTITY_ID,
+        MediaKind.CHAT_ATTACHMENT,
+      ),
+    ).rejects.toMatchObject({ status: 403, code: "FORBIDDEN" });
+  });
+
+  it("STUDIO-CHAT: admits studio admin on a studio-surface booking", async () => {
+    setBookingFor("msg_abc", {
+      clientUserId: "client-1",
+      masterOwnerUserId: "master-1",
+      providerType: "STUDIO",
+    });
+    await expect(
+      ensureCanReadMedia(
+        makeUser("studio-admin-1", [AccountType.STUDIO_ADMIN, AccountType.CLIENT]),
+        MediaEntityType.CHAT_MESSAGE,
+        ENTITY_ID,
+        MediaKind.CHAT_ATTACHMENT,
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("STUDIO-CHAT: admits studio owner on a studio-surface booking", async () => {
+    setBookingFor("msg_abc", {
+      clientUserId: "client-1",
+      masterOwnerUserId: "master-1",
+      providerType: "STUDIO",
+    });
+    await expect(
+      ensureCanReadMedia(
+        makeUser("studio-owner-1", [AccountType.STUDIO]),
+        MediaEntityType.CHAT_MESSAGE,
+        ENTITY_ID,
+        MediaKind.CHAT_ATTACHMENT,
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("STUDIO-CHAT: denies another studio master on a studio-surface booking", async () => {
+    setBookingFor("msg_abc", {
+      clientUserId: "client-1",
+      masterOwnerUserId: "master-1",
+      providerType: "STUDIO",
+    });
+    await expect(
+      ensureCanReadMedia(
+        makeUser("other-master-1", [AccountType.MASTER]),
         MediaEntityType.CHAT_MESSAGE,
         ENTITY_ID,
         MediaKind.CHAT_ATTACHMENT,

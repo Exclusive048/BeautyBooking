@@ -78,7 +78,9 @@ function BookingCard({
   const detailHref =
     perspective === "client"
       ? `/cabinet/bookings#${card.id}`
-      : `/cabinet/master/bookings#${card.id}`;
+      : perspective === "studio"
+        ? `/cabinet/studio/bookings?focus=${encodeURIComponent(card.id)}`
+        : `/cabinet/master/bookings#${card.id}`;
 
   // FIX-TZ-SYSTEM-MESSAGE (tz-source: salon-tz): this card is bilateral — a
   // client of an out-of-zone salon must read the salon's wall clock, not their

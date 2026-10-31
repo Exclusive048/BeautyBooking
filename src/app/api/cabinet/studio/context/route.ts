@@ -58,6 +58,7 @@ export async function GET(req: Request) {
               scheduleRequestsPending: counts.scheduleRequestsPending,
               reviewsUnanswered: counts.reviewsUnanswered,
               notificationsUnread: counts.notificationsUnread,
+              messagesUnread: counts.messagesUnread,
             }
           : null,
       },

@@ -1,6 +1,15 @@
 /** Client-side DTOs mirroring `src/lib/chat/conversation-aggregator.ts`. */
 
-export type ChatPerspective = "master" | "client";
+/**
+ * Сторона переписки. `studio` (STUDIO-CHAT) — владелец или администратор
+ * студии пишет от её имени; это сторона провайдера, как и `master`.
+ */
+export type ChatPerspective = "master" | "client" | "studio";
+
+/** Сторона провайдера — мастер либо студия: пишет клиенту, читает клиента. */
+export function isProviderPerspective(perspective: ChatPerspective): boolean {
+  return perspective !== "client";
+}
 
 export type ConversationPartnerDto = {
   id: string;
@@ -89,7 +98,7 @@ export type ConversationThreadDto = {
   /** Курсор более ранних сообщений («Показать раньше»); null — загружено всё. */
   olderCursor: string | null;
   partner: ConversationPartnerDto;
-  perspective: "MASTER" | "CLIENT";
+  perspective: "MASTER" | "CLIENT" | "STUDIO";
   canSend: boolean;
   openBookingId: string | null;
   readonlyOnly: boolean;

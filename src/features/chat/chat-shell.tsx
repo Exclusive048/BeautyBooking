@@ -8,7 +8,7 @@ import { ChatWindow } from "@/features/chat/chat-window/chat-window";
 import { useConversations } from "@/features/chat/hooks/use-conversations";
 import * as UI_TEXT from "@/lib/ui/text";
 import { cn } from "@/lib/cn";
-import type { ChatPerspective } from "@/features/chat/types";
+import { isProviderPerspective, type ChatPerspective } from "@/features/chat/types";
 import { getViewerTimeZone } from "@/lib/time/use-viewer-timezone";
 
 const T = UI_TEXT.chat;
@@ -122,7 +122,7 @@ export function ChatShell({ perspective }: Props) {
               {T.shell.emptyTitle}
             </p>
             <p className="max-w-xs text-sm text-text-sec">
-              {perspective === "master"
+              {isProviderPerspective(perspective)
                 ? T.shell.emptyMaster
                 : T.shell.emptyClient}
             </p>

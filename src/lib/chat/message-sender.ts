@@ -1,4 +1,4 @@
-import { ChatSenderType, NotificationType, Prisma } from "@prisma/client";
+import { ChatSenderType, NotificationType, Prisma, ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import { deliverNotification } from "@/lib/notifications/delivery";
@@ -14,6 +14,7 @@ import {
   validateChatAttachmentAsset,
 } from "@/lib/chat/attachment";
 import { assertChatNotBlocked } from "@/lib/chat/blocks";
+import { listStudioSideUserIds } from "@/lib/chat/studio-side";
 
 const MAX_BODY_LENGTH = 1000;
 
@@ -65,7 +66,7 @@ function deriveSenderName(input: {
   userLastName?: string | null;
   userPhone?: string | null;
 }): string {
-  if (input.perspective === "MASTER") {
+  if (input.perspective !== "CLIENT") {
     return input.providerName?.trim() || "Мастер";
   }
   const dn = input.userDisplayName?.trim();
@@ -126,22 +127,43 @@ export async function sendConversationMessage(
     select: {
       id: true,
       clientUserId: true,
-      provider: { select: { id: true, name: true, ownerUserId: true } },
+      provider: { select: { id: true, name: true, ownerUserId: true, type: true } },
     },
   });
   if (!booking) {
     throw new AppError("Запись не найдена.", 404, "NOT_FOUND");
   }
 
+  // STUDIO-CHAT: студия пишет стороной провайдера — тем же `MASTER`, что и
+  // мастер; подпись — название студии (`provider.name` записи студии).
   const senderType: ChatSenderType =
-    input.perspective === "MASTER" ? ChatSenderType.MASTER : ChatSenderType.CLIENT;
+    input.perspective === "CLIENT" ? ChatSenderType.CLIENT : ChatSenderType.MASTER;
+  const studioSurface = booking.provider.type === ProviderType.STUDIO;
 
-  const recipientUserId =
-    senderType === ChatSenderType.MASTER ? booking.clientUserId : booking.provider.ownerUserId;
+  // Кому уходит уведомление: клиенту — от стороны провайдера; от клиента —
+  // владельцу кабинета мастера либо всей стороне студии (владелец и
+  // OWNER/ADMIN, `chat/studio-side.ts`), кроме самого отправителя.
+  const recipientUserIds =
+    senderType === ChatSenderType.MASTER
+      ? [booking.clientUserId]
+      : studioSurface
+        ? await listStudioSideUserIds(booking.provider.id)
+        : [booking.provider.ownerUserId];
+  const recipients = [
+    ...new Set(recipientUserIds.filter((id): id is string => Boolean(id) && id !== input.userId)),
+  ];
 
   // MOBILE-POLISH (App Store 1.2): блок в любую сторону закрывает отправку —
-  // 403 CHAT_BLOCKED до записи сообщения и уведомления.
-  await assertChatNotBlocked(input.userId, recipientUserId);
+  // 403 CHAT_BLOCKED до записи сообщения и уведомления. Блок — между людьми:
+  // клиент ↔ владелец кабинета (у студии — её владелец, за которого пишет
+  // администратор).
+  if (senderType === ChatSenderType.CLIENT) {
+    await assertChatNotBlocked(input.userId, booking.provider.ownerUserId);
+  } else if (input.perspective === "STUDIO" && booking.provider.ownerUserId) {
+    await assertChatNotBlocked(booking.provider.ownerUserId, booking.clientUserId);
+  } else {
+    await assertChatNotBlocked(input.userId, booking.clientUserId);
+  }
 
   // Sender name uses the same logic as the existing per-booking route
   // — snapshotted into ChatMessage.senderName.
@@ -208,32 +230,43 @@ export async function sendConversationMessage(
   // routing: payload carries the conversationSlug so receivers can
   // open the right thread in the new chat surface, plus the
   // bookingId for the legacy <BookingChat> in booking detail.
-  if (recipientUserId) {
+  if (recipients.length > 0) {
     // Reuse the slug for the same pair when notifying the recipient —
     // it's the same conversation regardless of perspective.
     const conversationSlug = await getOrCreateConversationSlug(key);
     const preview = previewBody(message.body);
+    const slugParam = encodeURIComponent(conversationSlug);
     const recipientPath: string =
-      senderType === ChatSenderType.CLIENT
-        ? `/cabinet/master/messages?c=${encodeURIComponent(conversationSlug)}`
-        : `/cabinet/messages?c=${encodeURIComponent(conversationSlug)}`;
-    await deliverNotification({
-      userId: recipientUserId,
-      type: NotificationType.CHAT_MESSAGE_RECEIVED,
-      title: `Сообщение от ${senderName}`,
-      body: preview,
-      payloadJson: {
-        bookingId: booking.id,
-        chatId: chat.id,
-        messageId: message.id,
-        conversationSlug,
-        senderType,
-        senderName,
-        bodyPreview: preview,
-      } satisfies Prisma.InputJsonValue,
-      pushUrl: recipientPath,
-      pushTag: `chat:${chat.id}`,
-    });
+      senderType === ChatSenderType.MASTER
+        ? `/cabinet/messages?c=${slugParam}`
+        : studioSurface
+          ? `/cabinet/studio/messages?c=${slugParam}`
+          : `/cabinet/master/messages?c=${slugParam}`;
+    for (const recipientUserId of recipients) {
+      await deliverNotification({
+        userId: recipientUserId,
+        type: NotificationType.CHAT_MESSAGE_RECEIVED,
+        title: `Сообщение от ${senderName}`,
+        body: preview,
+        payloadJson: {
+          bookingId: booking.id,
+          chatId: chat.id,
+          messageId: message.id,
+          conversationSlug,
+          senderType,
+          senderName,
+          bodyPreview: preview,
+          // STUDIO-CHAT: куда вести из центра уведомлений — в переписку студии.
+          ...(studioSurface && senderType === ChatSenderType.CLIENT ? { chatSurface: "studio" } : {}),
+        } satisfies Prisma.InputJsonValue,
+        // Запись — чтобы центр отнёс сообщение клиента к каналу студии
+        // (`classifyNotificationChannel`: запись студии, где получатель —
+        // владелец или администратор).
+        ...(studioSurface && senderType === ChatSenderType.CLIENT ? { bookingId: booking.id } : {}),
+        pushUrl: recipientPath,
+        pushTag: `chat:${chat.id}`,
+      });
+    }
   }
 
   return {

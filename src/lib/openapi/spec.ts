@@ -3403,6 +3403,10 @@ export const openApiSpec = {
                 type: "integer",
                 description: "MOBILE-STUDIO-C (ops): уведомления канала студии + ожидающие заявки на график.",
               },
+              messagesUnread: {
+                type: "integer",
+                description: "STUDIO-CHAT: непрочитанные сообщения клиентов в переписке студии.",
+              },
             },
           },
         },

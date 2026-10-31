@@ -151,7 +151,21 @@ function resolveChatOpenHref(type: NotificationCenterNotificationItem["type"], p
   if (type !== "CHAT_MESSAGE_RECEIVED") return undefined;
   const payload = parseJsonPayload(payloadJson);
   if (!payload || typeof payload !== "object") return undefined;
-  const record = payload as { bookingId?: unknown; senderType?: unknown };
+  const record = payload as {
+    bookingId?: unknown;
+    senderType?: unknown;
+    chatSurface?: unknown;
+    conversationSlug?: unknown;
+  };
+  // STUDIO-CHAT: сообщение клиента студии — в переписку студии.
+  if (
+    record.chatSurface === "studio" &&
+    record.senderType === "CLIENT" &&
+    typeof record.conversationSlug === "string" &&
+    record.conversationSlug.length > 0
+  ) {
+    return `/cabinet/studio/messages?c=${encodeURIComponent(record.conversationSlug)}`;
+  }
   if (typeof record.bookingId !== "string" || record.bookingId.trim().length === 0) return undefined;
   const params = new URLSearchParams({ focus: record.bookingId, chat: "open" });
   if (record.senderType === "CLIENT") {
