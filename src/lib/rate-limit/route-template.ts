@@ -28,7 +28,7 @@
  */
 const API_STATIC_SEGMENTS: ReadonlySet<string> = new Set([
   "accept", "account", "address",
-  "admin", "advisor", "analytics", "api", "app-settings",
+  "admin", "advisor", "ai-analysis", "analytics", "api", "app-settings",
   "applications", "apply", "approve", "assign-master",
   "at-risk", "attachment", "attention", "auth", "auto-publish-stories", "auto-renew",
   "autocomplete", "availability", "available-today", "billing", "block", "blocks",

@@ -16,6 +16,11 @@ import * as UI_TEXT from "@/lib/ui/text";
  * deeply equal [ 'booking:b3', 'booking:b2', …(5) ]» — `booking:b1`,
  * `admin_action:a2`, `admin_action:a1` из той же миллисекунды за границей
  * первой страницы пропали. Остальные шесть тестов при этом зелёные.
+ *
+ * @probe 2026-11-01 (ADMIN-EVENTS-CONTACTS): ветка гостевого профиля в
+ * `bookingContactLines` заменена на `if (false)` — покраснел ровно тест
+ * «гостевая запись: какой телефон получил мастер и что аккаунта нет»
+ * (гость читался «клиентом с аккаунтом»), остальные зелёные.
  */
 
 type Row = Record<string, unknown>;
@@ -108,7 +113,32 @@ const T = UI_TEXT.adminPanel.dashboard.feed;
 const T0 = new Date("2026-10-20T10:00:00.000Z");
 const T1 = new Date("2026-10-20T09:00:00.000Z");
 
-const client = { id: "u-client", displayName: null, firstName: "Елена", lastName: "Петрова", phone: null, email: null };
+/** Клиент с аккаунтом: входил (есть сессия), номер подтверждён. */
+const client = {
+  id: "u-client",
+  displayName: null,
+  firstName: "Елена",
+  lastName: "Петрова",
+  phone: "+79995000000",
+  email: null,
+  phoneVerifiedAt: new Date("2026-09-01T00:00:00.000Z"),
+  roles: ["CLIENT"],
+  emailVerifiedAt: null,
+  telegramId: null,
+  vkLink: null,
+  yandexLink: null,
+  _count: { refreshSessions: 2 },
+};
+/** Пассивный профиль гостевой записи: ни одного входа, ни одной связи. */
+const guest = {
+  ...client,
+  id: "u-guest",
+  firstName: null,
+  lastName: null,
+  phone: "+79991234567",
+  phoneVerifiedAt: null,
+  _count: { refreshSessions: 0 },
+};
 const admin = { id: "u-admin", displayName: "Артём", firstName: null, lastName: null, phone: null, email: null };
 const master = { id: "p-master", name: "Анна Соколова", type: "MASTER", ownerUserId: "u-master", timezone: "Europe/Moscow" };
 
@@ -124,6 +154,8 @@ function booking(id: string, createdAt: Date, extra: Row = {}): Row {
     source: "WEB",
     clientNameSnapshot: null,
     clientName: null,
+    clientPhone: "+79995000000",
+    clientPhoneSnapshot: null,
     clientUser: client,
     provider: master,
     masterProvider: null,
@@ -213,6 +245,37 @@ describe("getAdminEvents — что видно в строке", () => {
     expect(items[0]!.action).toBe(T.actions.bookingManual);
     expect(items[0]!.actor?.name).toBe("Анна Соколова");
     expect(items[0]!.subject?.name).toBe("Елена Петрова");
+  });
+
+  it("гостевая запись: какой телефон получил мастер и что аккаунта нет", async () => {
+    store.booking = [booking("b1", T0, { clientUser: guest, clientPhone: "8 999 123-45-67" })];
+    store.adminAuditLog = [];
+    const { items } = await getAdminEvents({ limit: 5 });
+    expect(items[0]!.details).toContain(T.details.contactPhone("+7 (999) 123-45-67"));
+    expect(items[0]!.details).toContain(T.details.clientKind.guest);
+  });
+
+  it("клиент с аккаунтом: номер подтверждён, только если мастеру ушёл именно он", async () => {
+    store.booking = [
+      booking("b1", T0),
+      booking("b2", T1, { clientPhoneSnapshot: "+79990001122" }),
+    ];
+    store.adminAuditLog = [];
+    const { items } = await getAdminEvents({ limit: 5 });
+    const [same, other] = items;
+    expect(same!.details).toContain(T.details.contactPhone("+7 (999) 500-00-00"));
+    expect(same!.details).toContain(T.details.clientKind.accountVerified);
+    // Снимок записи главнее телефона строки — его и видит мастер.
+    expect(other!.details).toContain(T.details.contactPhone("+7 (999) 000-11-22"));
+    expect(other!.details).toContain(T.details.clientKind.account);
+  });
+
+  it("ручная запись без клиента и без номера говорит об этом прямо", async () => {
+    store.booking = [booking("b1", T0, { source: "MANUAL", clientUser: null, clientPhone: "", clientName: "Ольга" })];
+    store.adminAuditLog = [];
+    const { items } = await getAdminEvents({ limit: 5 });
+    expect(items[0]!.details).toContain(T.details.contactNoPhone);
+    expect(items[0]!.details).toContain(T.details.clientKind.none);
   });
 
   it("действие админа называет админа и город", async () => {

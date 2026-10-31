@@ -188,6 +188,14 @@ export const adminPanel = {
         visit: (when: string) => `Визит: ${when}`,
         master: (name: string) => `Мастер: ${name}`,
         bookedWith: (name: string) => `Запись к: ${name}`,
+        contactPhone: (phone: string) => `Телефон для мастера: ${phone}`,
+        contactNoPhone: "Телефон мастеру не передан",
+        clientKind: {
+          guest: "Гостевая запись — без аккаунта, номер не подтверждён",
+          account: "Клиент с аккаунтом, номер не подтверждён",
+          accountVerified: "Клиент с аккаунтом, номер подтверждён",
+          none: "Без аккаунта клиента",
+        },
         source: {
           WEB: "Через сайт",
           APP: "Через приложение",

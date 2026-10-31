@@ -269,6 +269,7 @@ const KNOWN_PAID_CONSUMERS = [
   "lib/ai/review-reply.ts",
   "lib/ai/review-summary.ts",
   "lib/ai/service-description.ts",
+  "lib/cabinet-insights/ai-analysis.ts",
   "lib/visual-search/classifier.ts",
   "lib/visual-search/indexer.ts",
   "lib/visual-search/searcher.ts",

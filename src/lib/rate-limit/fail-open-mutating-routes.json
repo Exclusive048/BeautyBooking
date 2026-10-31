@@ -19,6 +19,7 @@
   "/api/admin/vk-community",
   "/api/billing/mrr/snapshot/run",
   "/api/billing/renew/run",
+  "/api/cabinet/ai-analysis",
   "/api/cabinet/master/leave-studio",
   "/api/cabinet/master/public-username",
   "/api/cabinet/studio/members/[memberId]/remove",

@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { SubscriptionScope } from "@prisma/client";
 import { Building2, Crown } from "lucide-react";
 import { env } from "@/lib/env";
-import { AnnouncementsSection } from "@/features/master/components/dashboard/announcements-section";
 import { AttentionSection } from "@/features/master/components/dashboard/attention-section";
 import { QuickActionsSection } from "@/features/master/components/dashboard/quick-actions-section";
 import { UpcomingBookingsSection } from "@/features/master/components/dashboard/upcoming-bookings-section";
@@ -12,6 +11,7 @@ import { MasterPageHeader } from "@/features/master/components/master-page-heade
 import { FocusHighlighter } from "@/components/cabinet/focus-highlighter";
 import { Badge } from "@/components/ui/badge";
 import { AppSetupCard } from "@/features/cabinet/components/app-setup-card";
+import { CabinetHomeLower } from "@/features/cabinet/home/cabinet-home-lower";
 import { FreeWindowsPanel } from "@/features/schedule-nav/components/free-windows-panel";
 import { SetupGuideCard } from "@/features/cabinet/setup-guide/setup-guide-card";
 import { loadMasterSetupGuide } from "@/lib/onboarding/setup-guide";
@@ -23,6 +23,7 @@ import {
   isActiveTrial,
   trialDaysLeft,
 } from "@/lib/billing/get-current-subscription-row";
+import { loadCabinetHomeInsights } from "@/lib/cabinet-insights/home";
 import { getCurrentMasterProviderId, getMasterWorkProfiles } from "@/lib/master/access";
 import { getMasterDashboardData } from "@/lib/master/dashboard.service";
 import { getMasterScheduleWeek } from "@/lib/master/schedule.service";
@@ -40,8 +41,9 @@ import * as UI_TEXT from "@/lib/ui/text";
  * Тонкий серверный оркестратор. Порядок (DASHBOARD-REORDER, запрос владельца
  * 2026-10-31): «Требуют внимания» (сгруппированные счётчики, те же, что
  * бейджи меню) → ближайшие записи со ссылкой в расписание → «Первые шаги» →
- * свободные окошки на неделю (расчёт вкладки «Расписание») → приложение,
- * быстрые действия, анонсы. Аналитика (выручка недели, клиенты) — на странице
+ * свободные окошки на неделю (расчёт вкладки «Расписание») → приложение →
+ * быстрые действия и ИИ-разбор кабинета, советы и «Новое в МастерРядом»
+ * (AI-CABINET-ANALYSIS, `lib/cabinet-insights/`). Аналитика (выручка недели, клиенты) — на странице
  * «Аналитика»; выручка дня — в подписи ближайших записей.
  */
 export async function MasterDashboardPage() {
@@ -65,14 +67,19 @@ export async function MasterDashboardPage() {
       now,
     }),
   );
-  const [data, week, schedulePlan, setupGuide, subscription, attention, unreadMessages, unansweredReviews] =
+  // SETUP-GUIDE-01: «Первые шаги» — пока кабинет не настроен до конца. Советы
+  // молчат о шагах, на которые карточка ещё ведёт, поэтому идут следом за ней.
+  const setupGuidePromise = loadMasterSetupGuide(userId);
+  const insightsPromise = setupGuidePromise.then((setupGuide) =>
+    loadCabinetHomeInsights({ userId, scope: "master", setupGuide, now }),
+  );
+  const [data, week, schedulePlan, setupGuide, subscription, attention, unreadMessages, unansweredReviews, insights] =
     await Promise.all([
       dataPromise,
       weekPromise,
       // SCHEDULE-PATTERNS-01 (этап 3): «расписание скоро закончится».
       loadSchedulePlan(masterId),
-      // SETUP-GUIDE-01: «Первые шаги» — пока кабинет не настроен до конца.
-      loadMasterSetupGuide(userId),
+      setupGuidePromise,
       // Вид подписки — только на главной (решение владельца 2026-10-31). Строка
       // уже прочитана шеллом кабинета: `React.cache`, второго запроса нет.
       getCurrentSubscriptionRow(userId, SubscriptionScope.MASTER),
@@ -80,6 +87,7 @@ export async function MasterDashboardPage() {
       getActionRequiredBookingCountsForMaster(workProfiles.allIds),
       countUnreadChatMessages({ userId, perspective: "MASTER" }),
       getUnansweredReviewsCountForMaster(masterId),
+      insightsPromise,
     ]);
   const scheduleEndsOn = isScheduleEndingSoon(schedulePlan) ? schedulePlan.configuredUntil : null;
   const timezone = data.master.timezone;
@@ -199,10 +207,13 @@ export async function MasterDashboardPage() {
         {/* PWA-ONBOARDING-01: установка приложения + уведомления (скрывается сама). */}
         <AppSetupCard />
 
-        <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-2">
-          <QuickActionsSection publicProfileUrl={publicProfileUrl} />
-          <AnnouncementsSection />
-        </div>
+        <CabinetHomeLower
+          scope="master"
+          quickActions={<QuickActionsSection publicProfileUrl={publicProfileUrl} />}
+          insights={insights}
+          billingHref="/cabinet/master/billing"
+          timeZone={timezone}
+        />
       </div>
 
     </>

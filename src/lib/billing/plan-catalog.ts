@@ -29,8 +29,12 @@ import type { BillingPeriodMonths } from "@/lib/billing/constants";
  * досоздаёт отсутствующее. Так правка тарифа из /admin/billing переживает
  * обычный деплой, а осознанная правка каталога в коде доезжает до прода.
  * Меняете тарифы здесь — поднимите версию.
+ *
+ * Версия 2 (AI-CABINET-ANALYSIS, 2026-11-01): PREMIUM получил «ИИ-разбор
+ * кабинета» (`aiCabinetAnalysis`). Первый деплой с ней перезапишет тарифы
+ * каталогом — правки из /admin/billing, сделанные до него, не сохранятся.
  */
-export const PLAN_CATALOG_VERSION = 1;
+export const PLAN_CATALOG_VERSION = 2;
 
 /** Ключ метки применённой версии в `SystemConfig`. */
 export const PLAN_CATALOG_VERSION_KEY = "billingPlanCatalogVersion";
@@ -95,6 +99,7 @@ const FREE_EXTRAS: FeatureMap = {
   analytics_booking_insights: false,
   analytics_cohorts: false,
   analytics_forecast: false,
+  aiCabinetAnalysis: false,
 };
 
 // PRO: рабочий инструмент — клиентская база (история визитов + заметки),
@@ -112,10 +117,12 @@ const PRO_EXTRAS: FeatureMap = {
   analytics_booking_insights: true,
   analytics_cohorts: false,
   analytics_forecast: false,
+  aiCabinetAnalysis: false,
 };
 
 // PREMIUM: всё, что есть в продукте, на максимальных объёмах — плюс выделение
-// карточки в каталоге, возвращаемость клиентов и прогноз выручки.
+// карточки в каталоге, возвращаемость клиентов, прогноз выручки и ИИ-разбор
+// кабинета.
 const PREMIUM_EXTRAS: FeatureMap = {
   onlinePayments: true,
   hotSlots: true,
@@ -128,6 +135,7 @@ const PREMIUM_EXTRAS: FeatureMap = {
   analytics_booking_insights: true,
   analytics_cohorts: true,
   analytics_forecast: true,
+  aiCabinetAnalysis: true,
 };
 
 const EXTRAS_BY_TIER: Record<PlanTier, FeatureMap> = {

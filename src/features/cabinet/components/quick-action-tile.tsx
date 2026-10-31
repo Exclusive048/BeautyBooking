@@ -26,9 +26,9 @@ type ButtonTileProps = CommonProps & {
 type Props = LinkTileProps | ButtonTileProps;
 
 /**
- * Quick-action tile — either a Link (default) or a `<button>` (when caller
- * needs onClick for a modal trigger). Two visual variants: `primary` for
- * the headline tile and `default` for secondary actions.
+ * Плитка быстрого действия на главной кабинетов мастера и студии
+ * (AI-CABINET-ANALYSIS): ссылка либо кнопка (действие открывается на месте —
+ * новая запись, «Поделиться»). `primary` — главная плитка, `default` — остальные.
  */
 export function QuickActionTile({
   icon: Icon,

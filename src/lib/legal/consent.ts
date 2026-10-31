@@ -1,6 +1,6 @@
 import "server-only";
 
-import { AccountType, ConsentType, type Prisma } from "@prisma/client";
+import { ConsentType, type Prisma } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { logError, logInfo } from "@/lib/logging/logger";
 import {
@@ -10,6 +10,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { LEGAL_DOCUMENTS, type LegalDocumentKey } from "@/lib/legal/documents";
 import { hasRequiredConsents, type ConsentFlags } from "@/lib/legal/consent-flags";
+import { GUEST_CLASS_PROFILE_SELECT, isGuestClassProfileRow } from "@/lib/legal/guest-class-where";
 
 /**
  * RKN-FIX-01 — the single writer of `UserConsent`.
@@ -177,28 +178,10 @@ export async function recordUserConsents(input: RecordConsentsInput): Promise<vo
 export async function isGuestClassProfile(userId: string): Promise<boolean> {
   const profile = await prisma.userProfile.findUnique({
     where: { id: userId },
-    select: {
-      roles: true,
-      email: true,
-      emailVerifiedAt: true,
-      telegramId: true,
-      vkLink: { select: { id: true } },
-      yandexLink: { select: { id: true } },
-      _count: { select: { refreshSessions: true } },
-    },
+    select: GUEST_CLASS_PROFILE_SELECT,
   });
   if (!profile) return false;
-
-  return (
-    profile._count.refreshSessions === 0 &&
-    !profile.email &&
-    !profile.emailVerifiedAt &&
-    !profile.telegramId &&
-    !profile.vkLink &&
-    !profile.yandexLink &&
-    profile.roles.length === 1 &&
-    profile.roles[0] === AccountType.CLIENT
-  );
+  return isGuestClassProfileRow(profile);
 }
 
 /**

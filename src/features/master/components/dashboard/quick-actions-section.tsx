@@ -1,99 +1,63 @@
 "use client";
 
-import { ImagePlus, Lock, Plus, Share2, UserPlus } from "lucide-react";
-import { QuickActionTile } from "@/features/master/components/dashboard/quick-action-tile";
+import { CalendarCog, ImagePlus, Plus, Scissors, Share2 } from "lucide-react";
+import { QuickActionTile } from "@/features/cabinet/components/quick-action-tile";
+import { HomeSection } from "@/features/cabinet/home/home-section";
+import { useShareLink } from "@/features/cabinet/home/use-share-link";
 import { useManualBooking } from "@/features/master/components/manual-booking/manual-booking-provider";
-import { useToast } from "@/components/ui/toast";
 import * as UI_TEXT from "@/lib/ui/text";
 
-const T = UI_TEXT.cabinetMaster.dashboard.quickActions;
+const T = UI_TEXT.cabinetHome.quickActions;
 
 type Props = {
-  /** Public profile URL — passed to the share button when available. */
+  /** Публичная страница мастера; `null` — адреса ещё нет, плитки «Поделиться» нет. */
   publicProfileUrl: string | null;
 };
 
 /**
- * 5-tile quick-action panel. The headline tile spans the full row and uses
- * the brand gradient; the rest are secondary tiles in a 2-up grid below.
- * "Добавить запись" opens the manual-booking modal inline on the current
- * route (fix-01: previously navigated to /dashboard regardless of
- * caller).
+ * Быстрые действия главной мастера (AI-CABINET-ANALYSIS). Каждая плитка делает
+ * то, что написано: «Новая запись» открывает ручную запись на месте, «Изменить
+ * день» — календарь расписания (кисть «Выходной» и «Свои часы» на дату),
+ * остальные ведут на страницу, где действие делается. Прежние плитки «Закрыть
+ * время» и «Пригласить» вели в расписание и клиентов, где такого действия нет.
  */
 export function QuickActionsSection({ publicProfileUrl }: Props) {
   const { open: openManualBooking } = useManualBooking();
-  const toast = useToast();
-
-  const handleAddBooking = () => {
-    openManualBooking();
-  };
-
-  const handleShareProfile = async () => {
-    if (!publicProfileUrl) return;
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({ url: publicProfileUrl });
-        return;
-      } catch (error) {
-        // Шторку закрыли сами — это не отказ, копировать молча не нужно.
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        // Иначе (share недоступен в контексте) — к буферу обмена.
-      }
-    }
-    // UX-PASS-01: копирование шло молча — и успех, и отказ были невидимы.
-    if (typeof navigator === "undefined" || !navigator.clipboard) {
-      toast.error(T.shareCopyFailed);
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(publicProfileUrl);
-      toast.success(T.shareCopied);
-    } catch {
-      toast.error(T.shareCopyFailed);
-    }
-  };
+  const share = useShareLink(publicProfileUrl);
 
   return (
-    <section className="rounded-2xl border border-border-subtle bg-bg-card p-5">
-      <header className="mb-4">
-        <h2 className="font-display text-lg text-text-main">{T.title}</h2>
-        <p className="mt-0.5 text-xs text-text-sec">{T.subtitle}</p>
-      </header>
-
+    <HomeSection title={T.title} subtitle={T.subtitle} testId="cabinet-home-quick-actions">
       <div className="grid grid-cols-2 gap-3">
         <QuickActionTile
           icon={Plus}
           label={T.addBooking}
           sublabel={T.addBookingSub}
           variant="primary"
-          onClick={handleAddBooking}
+          onClick={() => openManualBooking()}
           className="col-span-2"
         />
         <QuickActionTile
-          icon={Lock}
-          label={T.blockTime}
-          sublabel={T.blockTimeSub}
-          href="/cabinet/master/schedule"
+          icon={CalendarCog}
+          label={T.editDay}
+          sublabel={T.editDaySub}
+          href="/cabinet/master/schedule/settings"
         />
+        {share ? (
+          <QuickActionTile icon={Share2} label={T.sharePage} sublabel={T.sharePageSub} onClick={share} />
+        ) : null}
         <QuickActionTile
-          icon={Share2}
-          label={T.sharePublic}
-          sublabel={T.sharePublicSub}
-          onClick={handleShareProfile}
-        />
-        <QuickActionTile
-          icon={UserPlus}
-          label={T.invitePeople}
-          sublabel={T.invitePeopleSub}
-          href="/cabinet/master/clients"
+          icon={Scissors}
+          label={T.addService}
+          sublabel={T.addServiceSub}
+          href="/cabinet/master/services"
         />
         <QuickActionTile
           icon={ImagePlus}
           label={T.addPortfolio}
           sublabel={T.addPortfolioSub}
-          href="/cabinet/master/profile"
+          href="/cabinet/master/portfolio"
         />
       </div>
-    </section>
+    </HomeSection>
   );
 }

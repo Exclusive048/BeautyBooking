@@ -58,6 +58,7 @@ const DEFAULT_FEATURES: PlanFeatures = {
   clientNotes: false,
   clientImport: false,
   highlightCard: false,
+  aiCabinetAnalysis: false,
   // ── Limits (seed values; plan overrides relax them) ───────────────────────
   maxTeamMasters: 2,
   maxPortfolioPhotosSolo: 15,
