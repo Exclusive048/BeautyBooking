@@ -14,7 +14,6 @@
     "src/lib/client-cabinet/favorites.service.ts": 1,
     "src/lib/deletion/delete-account.ts": 1,
     "src/lib/feed/portfolio.service.ts": 7,
-    "src/lib/legal/consent.ts": 1,
     "src/lib/master/portfolio-mutations.ts": 1,
     "src/lib/master/portfolio-view.service.ts": 1,
     "src/lib/master/profile.service.ts": 3,

@@ -30,6 +30,7 @@ export const GUEST_CLASS_PROFILE_SELECT = {
   telegramId: true,
   vkLink: { select: { id: true } },
   yandexLink: { select: { id: true } },
+  // include-ok: счётчик, а не выборка строк.
   _count: { select: { refreshSessions: true } },
 } satisfies Prisma.UserProfileSelect;
 
