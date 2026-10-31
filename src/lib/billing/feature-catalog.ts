@@ -214,6 +214,15 @@ export const FEATURE_CATALOG = {
     uiOrder: 160,
     status: "active",
   },
+  aiCabinetAnalysis: {
+    kind: "boolean",
+    title: "ИИ-разбор кабинета",
+    description: "ИИ смотрит профиль, услуги, расписание и записи за 90 дней и советует, что поправить.",
+    group: "Аналитика",
+    appliesTo: "BOTH",
+    uiOrder: 165,
+    status: "active",
+  },
   maxTeamMasters: {
     kind: "limit",
     title: "Сколько мастеров в команде",

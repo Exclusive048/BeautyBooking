@@ -58,6 +58,7 @@ export { home } from "./text/home";
 export { catalog } from "./text/catalog";
 export { cabinetMaster } from "./text/cabinet-master";
 export { master } from "./text/master";
+export { cabinetHome } from "./text/cabinet-home";
 export { adminPanel } from "./text/admin-panel";
 export { admin } from "./text/admin";
 export { media } from "./text/media";

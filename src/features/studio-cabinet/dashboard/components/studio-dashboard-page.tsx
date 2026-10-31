@@ -1,13 +1,23 @@
+import type { ComponentProps } from "react";
 import { AppSetupCard } from "@/features/cabinet/components/app-setup-card";
+import { CabinetHomeLower } from "@/features/cabinet/home/cabinet-home-lower";
 import { SetupGuideCard } from "@/features/cabinet/setup-guide/setup-guide-card";
 import { FreeWindowsPanel } from "@/features/schedule-nav/components/free-windows-panel";
 import type { StudioScheduleData } from "@/features/studio-cabinet/schedule/server/types";
+import type { CabinetHomeInsights } from "@/lib/cabinet-insights/home";
 import type { SetupGuideDto } from "@/lib/onboarding/setup-guide-shared";
 import * as UI_TEXT from "@/lib/ui/text";
 import { StudioAttentionSection } from "./studio-attention-section";
+import { StudioQuickActions } from "./studio-quick-actions";
 import { StudioTodayBanner } from "./studio-today-banner";
 import { StudioUpcomingSection } from "./studio-upcoming-section";
 import type { StudioHomeData } from "../server/dashboard-data.service";
+
+/** Нижняя часть главной — только владельцу и администратору студии. */
+export type StudioHomeLower = {
+  insights: CabinetHomeInsights;
+  quickActions: Omit<ComponentProps<typeof StudioQuickActions>, "timezone">;
+};
 
 type Props = {
   data: StudioHomeData;
@@ -22,6 +32,8 @@ type Props = {
   setupGuide?: SetupGuideDto | null;
   /** Конец действующего пробного периода (ISO); `null` — пробного нет. */
   trialEndsAt?: string | null;
+  /** AI-CABINET-ANALYSIS: быстрые действия, ИИ-разбор, советы, новое; `null` — мастеру студии. */
+  lower?: StudioHomeLower | null;
 };
 
 /** Дней окошек на мастера в списке главной (неделя — в календаре). */
@@ -30,7 +42,9 @@ const FREE_WINDOW_DAYS_PER_MASTER = 2;
 /**
  * Главная кабинета студии (DASHBOARD-REORDER, запрос владельца 2026-10-31):
  * сегодня (компактно) → «Требуют внимания» и ближайшие записи → «Первые
- * шаги» → свободные окошки мастеров → установка приложения. Показатели за
+ * шаги» → свободные окошки мастеров → установка приложения → быстрые
+ * действия и ИИ-разбор, советы и «Новое в МастерРядом» (AI-CABINET-ANALYSIS,
+ * владельцу и администратору). Показатели за
  * 30 дней, топ мастеров, загрузка, популярные услуги и выручка по мастерам —
  * в аналитике.
  */
@@ -42,6 +56,7 @@ export function StudioDashboardPage({
   zoneIso,
   setupGuide = null,
   trialEndsAt = null,
+  lower = null,
 }: Props) {
   return (
     <div className="space-y-4 lg:space-y-6">
@@ -70,6 +85,16 @@ export function StudioDashboardPage({
 
       {/* PWA-ONBOARDING-01: установка приложения + уведомления (скрывается сама). */}
       <AppSetupCard />
+
+      {lower ? (
+        <CabinetHomeLower
+          scope="studio"
+          quickActions={<StudioQuickActions {...lower.quickActions} timezone={data.timeZone} />}
+          insights={lower.insights}
+          billingHref="/cabinet/studio/billing"
+          timeZone={data.timeZone}
+        />
+      ) : null}
     </div>
   );
 }

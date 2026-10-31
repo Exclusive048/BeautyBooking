@@ -1553,27 +1553,6 @@ export const cabinetMaster = {
       unansweredReviews: "Отзывы без ответа",
       scheduleEnding: (date: string) => `Расписание настроено до ${date}`,
     },
-    quickActions: {
-      title: "Быстрые действия",
-      subtitle: "В одно касание",
-      addBooking: "Добавить запись",
-      addBookingSub: "Вручную в расписание",
-      blockTime: "Закрыть время",
-      blockTimeSub: "Перерыв или выходной",
-      sharePublic: "Поделиться профилем",
-      sharePublicSub: "Ссылка для соцсетей",
-      // UX-PASS-01: копирование ссылки было молчаливым — итог теперь тостом.
-      shareCopied: "Ссылка на профиль скопирована",
-      shareCopyFailed: "Не удалось скопировать ссылку. Попробуйте ещё раз.",
-      invitePeople: "Пригласить клиента",
-      invitePeopleSub: "По телефону или ссылке",
-      addPortfolio: "Добавить в портфолио",
-      addPortfolioSub: "Свежая работа",
-    },
-    announcements: {
-      title: "Анонсы и советы",
-      from: "от МастерРядом",
-    },
     manualBooking: {
       title: "Новая запись",
       chooseService: "Выберите услугу",

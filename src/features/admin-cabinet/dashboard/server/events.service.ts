@@ -19,6 +19,9 @@ import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 import { formatBookingWhenLabel } from "@/lib/notifications/format-booking-when";
 import { decodeCursor, encodeCursor } from "@/lib/pagination/cursor";
 import { moneyRUBFromKopeks } from "@/lib/format";
+import { GUEST_CLASS_PROFILE_SELECT, isGuestClassProfileRow } from "@/lib/legal/guest-class-where";
+import { formatRussianPhoneInput } from "@/lib/phone/input-format";
+import { normalizeRussianPhone } from "@/lib/phone/russia";
 import * as UI_TEXT from "@/lib/ui/text";
 import {
   ADMIN_EVENT_TYPES,
@@ -262,7 +265,11 @@ const BOOKING_SELECT = {
   source: true,
   clientNameSnapshot: true,
   clientName: true,
-  clientUser: { select: USER_SELECT },
+  clientPhone: true,
+  clientPhoneSnapshot: true,
+  // Признак гостевого профиля и подтверждение номера — для строки «какие
+  // контакты ушли мастеру» (тот же расчёт, что `isGuestClassProfile`).
+  clientUser: { select: { ...USER_SELECT, ...GUEST_CLASS_PROFILE_SELECT, phoneVerifiedAt: true } },
   provider: { select: { ...PROVIDER_SELECT, timezone: true } },
   masterProvider: { select: { name: true } },
   service: { select: { name: true, price: true } },
@@ -297,6 +304,33 @@ function bookingFacts(booking: BookingRow): { lines: string[]; priceKopeks: numb
   return { lines, priceKopeks: priceKopeks && priceKopeks > 0 ? priceKopeks : null };
 }
 
+/** Канонический вид номера («+79991234567») либо null у пустого и нечитаемого. */
+function canonicalPhone(raw: string | null | undefined): string | null {
+  const trimmed = raw?.trim();
+  if (!trimmed) return null;
+  return normalizeRussianPhone(trimmed) ?? trimmed;
+}
+
+/**
+ * Какие контакты получил мастер вместе с записью: телефон — тот же, что видит
+ * кабинет (снимок записи, иначе телефон записи — `clientPhoneOf` в
+ * `master/booking-items.service.ts`), почта мастеру не показывается нигде. И
+ * кто записался: гость без аккаунта (пассивный профиль гостевой записи),
+ * аккаунт — с номером, подтверждённым кодом или через VK / Яндекс (инв. #46),
+ * либо ручная запись без клиента-аккаунта.
+ */
+function bookingContactLines(booking: BookingRow): string[] {
+  const phone = canonicalPhone(booking.clientPhoneSnapshot) ?? canonicalPhone(booking.clientPhone);
+  // Нечитаемый как российский номер показывается как записан — маска его исказила бы.
+  const shown = phone && normalizeRussianPhone(phone) ? formatRussianPhoneInput(phone) : phone;
+  const phoneLine = shown ? D.contactPhone(shown) : D.contactNoPhone;
+  const user = booking.clientUser;
+  if (!user) return [phoneLine, D.clientKind.none];
+  if (isGuestClassProfileRow(user)) return [phoneLine, D.clientKind.guest];
+  const verifiedSame = Boolean(user.phoneVerifiedAt) && phone !== null && canonicalPhone(user.phone) === phone;
+  return [phoneLine, verifiedSame ? D.clientKind.accountVerified : D.clientKind.account];
+}
+
 function bookingEvent(booking: BookingRow): Ranked {
   const client = bookingClient(booking);
   const provider = providerPerson(booking.provider);
@@ -309,6 +343,7 @@ function bookingEvent(booking: BookingRow): Ranked {
     subject: manual ? client : provider,
     details: [
       ...facts.lines,
+      ...bookingContactLines(booking),
       manual ? null : D.source[booking.source],
       D.statusNow(D.bookingStatus[booking.status]),
     ],

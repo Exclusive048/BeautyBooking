@@ -9234,6 +9234,68 @@ export const openApiSpec = {
         },
       },
     },
+    "/api/cabinet/ai-analysis": {
+      post: {
+        operationId: "cabinetAiAnalysisRun",
+        summary: "Run the AI analysis of the caller's master or studio cabinet (PREMIUM)",
+        description:
+          "AI-CABINET-ANALYSIS: модель смотрит профиль, услуги, пакеты, портфолио, расписание, правила записи и записи " +
+          "за 90 дней и даёт итог, сильные стороны и советы. `scope=master` — личный профиль мастера; `scope=studio` — " +
+          "студия, только владелец или администратор (тариф — владельца). Без функции `aiCabinetAnalysis` в тарифе — 403 " +
+          "`FEATURE_GATE` (`details.requiredPlan`). Три запуска в сутки на кабинет — 429 `RATE_LIMITED` с текстом; запуск " +
+          "без результата лимит не тратит. `href` совета — только раздел кабинета либо `null`. Последний разбор хранится " +
+          "неделю и показывается на главной кабинета.",
+        tags: ["master", "studio"],
+        security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["scope"],
+                properties: { scope: { type: "string", enum: ["master", "studio"] } },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": okResponse({
+            type: "object",
+            required: ["analysis"],
+            properties: {
+              analysis: {
+                type: "object",
+                required: ["summary", "strengths", "improvements", "generatedAt"],
+                properties: {
+                  summary: { type: "string" },
+                  strengths: { type: "array", items: { type: "string" } },
+                  improvements: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      required: ["title", "text", "href"],
+                      properties: {
+                        title: { type: "string" },
+                        text: { type: "string" },
+                        href: { type: "string", nullable: true },
+                      },
+                    },
+                  },
+                  generatedAt: { type: "string", format: "date-time" },
+                },
+              },
+            },
+          }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN | FEATURE_GATE"),
+          "404": errorResponse("STUDIO_NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED | AI_DAILY_LIMIT_REACHED"),
+          "503": errorResponse("SYSTEM_FEATURE_DISABLED | RATE_LIMIT_UNAVAILABLE | SERVICE_UNAVAILABLE"),
+        },
+      },
+    },
     "/api/master/services": {
       put: {
         summary: "Bulk update master services from cabinet",

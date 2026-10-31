@@ -46,6 +46,7 @@ describe("BETA-PROMO-DEC · тексты акции согласованы с е
     ["pricing.launchPromo.trialDescriptionMaster", UI_TEXT.pricing.launchPromo.trialDescriptionMaster],
     ["pricing.launchPromo.trialDescriptionStudio", UI_TEXT.pricing.launchPromo.trialDescriptionStudio],
     ["betaPromo.titleAccent", UI_TEXT.betaPromo.titleAccent],
+    ["cabinetHome.announcements.items.betaPromo.title", UI_TEXT.cabinetHome.announcements.items.betaPromo.title],
   ])("последний день акции — в %s", (_key, text) => {
     expect(text).toContain(LAST_DAY);
   });
