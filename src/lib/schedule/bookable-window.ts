@@ -112,6 +112,8 @@ export async function listBookableSlots(input: {
    * записи не передаётся.
    */
   operatorMaxWindow?: Pick<ProviderPolicy, "maxBookingDaysAhead">;
+  /** BOOKING-DATE-CALENDAR: всё окно одной страницей (см. `listAvailabilitySlotsPaginated`). */
+  wholeRange?: boolean;
 }): Promise<BookableSlotsResult> {
   const { provider, serviceId, durationMinutes, fromKey, toKeyExclusive, limit, now } = input;
 
@@ -124,6 +126,7 @@ export async function listBookableSlots(input: {
     // MANUAL-SLOTS-ALL: отбор «без дыр» — и у клиента, и у оператора; без
     // него — только «все свободные времена» ручной записи.
     packing: !input.allStarts,
+    wholeRange: input.wholeRange,
   });
   if (!result.ok) {
     return { ok: false, status: result.status, code: result.code, message: result.message };

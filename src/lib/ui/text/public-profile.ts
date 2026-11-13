@@ -221,11 +221,7 @@ export const publicProfile = {
   },
   bookingWidget: {
     headerEyebrow: "Запись · от",
-    dateLabel: "Дата",
     timeLabel: "Время",
-    prevWeek: "Предыдущая неделя",
-    nextWeek: "Следующая неделя",
-    daysLoadFailed: "Не удалось загрузить дни. Попробуйте ещё раз.",
     // QA-122 (FIX-10): clear, accurate empty state for a 0-slot day. The old
     // "мастер занят" implied the master is busy; for an exhausted today the
     // window has simply passed. `emptyDayToday` is shown when the selected day
@@ -278,20 +274,5 @@ export const publicProfile = {
     conflictBody:
       "Кто-то записался первым на это время. Выберите другое — обычно есть много вариантов.",
     conflictRetry: "Выбрать другое время",
-    weekdaysShort: ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"] as string[],
-    monthsGenitive: [
-      "января",
-      "февраля",
-      "марта",
-      "апреля",
-      "мая",
-      "июня",
-      "июля",
-      "августа",
-      "сентября",
-      "октября",
-      "ноября",
-      "декабря",
-    ] as string[],
   },
 } as const;

@@ -2,14 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Chip } from "@/components/ui/chip";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
+import { BookingDateCalendar } from "@/features/booking/components/booking-date-calendar";
 import {
   SlotPickerOptimized,
   groupSlotsByTimeOfDay,
   type SlotItem,
 } from "@/features/booking/components/slot-picker/slot-picker";
-import { addDaysToDateKey, diffDateKeys } from "@/lib/schedule/dateKey";
+import { bookableDaysUrl, useBookableDays } from "@/features/booking/lib/use-bookable-days";
+import { cn } from "@/lib/cn";
+import { firstFreeDate } from "@/lib/schedule/bookable-days-shared";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
@@ -17,15 +19,7 @@ import * as UI_TEXT from "@/lib/ui/text";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 
 const T = UI_TEXT.schedule.operatorSlots;
-
-/**
- * Сколько дней вперёд предлагает полоса дат (сервер всё равно режет горизонтом
- * публикации). Прежний `datetime-local` ограничений не имел, поэтому полоса
- * длинная и, если переносимая запись дальше, дотягивается до её дня
- * (`OPERATOR_MAX_DAYS` — предохранитель от записи «через десять лет»).
- */
-const OPERATOR_DAYS = 90;
-const OPERATOR_MAX_DAYS = 366;
+const C = UI_TEXT.bookingCalendar;
 
 export type OperatorSlot = {
   startAtUtc: string;
@@ -49,6 +43,13 @@ type Props = {
    */
   prefillIso?: string | null;
   /**
+   * День салона `YYYY-MM-DD`, который сейчас открыт в календаре кабинета
+   * («Добавить запись» над днём 17-го). Открывает этот день, если он в окне
+   * записи, — даже без окошек: оператор видит, почему записать нельзя.
+   * Слабее `prefillIso` и явного выбора; вне окна — первый свободный день.
+   */
+  initialDateKey?: string | null;
+  /**
    * Перенос: окно этой записи не считается занятым (RESCHEDULE-SELF-SLOT).
    * Передавать только для исполнителя этой записи — для другого мастера
    * сервер отвечает 404.
@@ -64,18 +65,20 @@ type Props = {
   /** Подсказка, пока нет мастера/услуги. */
   missingHint?: string;
   disabled?: boolean;
+  /**
+   * `split` — календарь и окошки рядом с `md` (широкие окна студии);
+   * `stack` — друг под другом (узкое окно ручной записи мастера).
+   */
+  layout?: "stack" | "split";
 };
-
-// Дата-ключ салона → «пн, 8 июл.» (UI_FMT.dateKey: UTC-tech, без сдвига суток).
-function formatDateKeyLabel(dateKey: string): string {
-  return UI_FMT.dateKey(dateKey, "weekdayDayMonthShort");
-}
 
 /**
  * MANUAL-BOOKING-SLOTS-01 — выбор окошка для РУЧНОЙ записи (кабинет мастера и
  * кабинет студии). Раньше там стоял `datetime-local`: мастер вбивал любое время
- * руками и узнавал о занятости только отказом сервера. Теперь — та же полоса
- * дат и те же свободные окошки, что у клиента и в окне переноса
+ * руками и узнавал о занятости только отказом сервера. Теперь — календарь
+ * дат (BOOKING-DATE-CALENDAR: дни с окошками отмечены, в выходной и в
+ * полностью занятый день сказано, почему окошек нет) и те же свободные
+ * окошки, что у клиента и в окне переноса
  * (`/api/masters/{id}/availability`), но с `?manual=1`: для своей стороны
  * кабинета сервер не применяет «запись не ранее чем за N часов» — это правило
  * для клиентов, а ручные пути его и не проверяют.
@@ -94,10 +97,12 @@ export function OperatorSlotPicker({
   value,
   onChange,
   prefillIso = null,
+  initialDateKey = null,
   excludeBookingId = null,
   moveBookingId = null,
   missingHint = T.chooseFirst,
   disabled = false,
+  layout = "stack",
 }: Props) {
   // «Сегодня» — после монтирования: SSR и клиент не обязаны совпадать по часам.
   const [todayKey, setTodayKey] = useState<string | null>(null);
@@ -112,28 +117,52 @@ export function OperatorSlotPicker({
     return Number.isNaN(date.getTime()) ? null : toLocalDateKey(date, timeZone);
   }, [prefillIso, timeZone]);
 
-  const dateKeys = useMemo(() => {
-    if (!todayKey) return [];
-    // День предвыбора (переносимая запись) обязан попасть в полосу, иначе
-    // предвыбор молча откатывался на «сегодня».
-    const toPrefill = prefillDateKey ? diffDateKeys(todayKey, prefillDateKey) + 1 : 0;
-    const length = Math.min(Math.max(OPERATOR_DAYS, toPrefill), OPERATOR_MAX_DAYS);
-    return Array.from({ length }, (_, i) => addDaysToDateKey(todayKey, i));
-  }, [todayKey, prefillDateKey]);
-
   // rule 17 — окошки в поясе САЛОНА; администратор из другого пояса видит метку
   // «(Город, GMT+N)», как клиент в сетке записи (`booking-flow/.../time-grid.tsx`).
   const viewerTz = useViewerTimeZoneContext();
 
+  // BOOKING-DATE-CALENDAR: дни окна записи со статусом (есть окошки / всё
+  // занято / выходной) — тем же окном оператора, что и окошки (`?manual=1`).
+  const days = useBookableDays({
+    urls:
+      providerId && serviceId && todayKey
+        ? [
+            bookableDaysUrl(`/api/masters/${encodeURIComponent(providerId)}/availability`, {
+              serviceId,
+              from: todayKey,
+              manual: "1",
+              excludeBookingId,
+              moveBookingId,
+            }),
+          ]
+        : null,
+    withAuth: true,
+    fallbackError: C.loadFailed,
+  });
+
   // Выбранный день выводится, а не синхронизируется эффектом: явный выбор
-  // пользователя, иначе день ячейки расписания, иначе сегодня.
+  // пользователя, иначе день ячейки расписания (или переносимой записи),
+  // иначе открытый в календаре кабинета день (если он в окне записи), иначе
+  // первый день со свободным временем. Пока сводка грузится — дня нет
+  // (окошки не грузятся дважды); не загрузилась — сегодня.
   const [pickedDate, setSelectedDate] = useState<string>("");
+  const viewedDate =
+    initialDateKey &&
+    days.summary &&
+    initialDateKey >= days.summary.firstDate &&
+    initialDateKey <= days.summary.lastDate
+      ? initialDateKey
+      : null;
   const selectedDate =
-    pickedDate && dateKeys.includes(pickedDate)
-      ? pickedDate
-      : prefillDateKey && dateKeys.includes(prefillDateKey)
-        ? prefillDateKey
-        : (dateKeys[0] ?? "");
+    pickedDate ||
+    prefillDateKey ||
+    (days.summary
+      ? (viewedDate ?? firstFreeDate(days.summary) ?? days.summary.firstDate)
+      : days.error
+        ? (todayKey ?? "")
+        : "");
+  const selectedDayStatus =
+    days.summary?.days.find((day) => day.date === selectedDate)?.status ?? null;
 
   // Результат загрузки помечен ключом запроса: «идёт загрузка», ошибка и сами
   // окошки ВЫВОДЯТСЯ из того, совпадает ли ключ с текущим, — без синхронных
@@ -300,28 +329,55 @@ export function OperatorSlotPicker({
       ? formatZoneLabel({ iso: refInstant, timeZone })
       : "";
 
+  const waitingForDay = ready && !selectedDate;
+  // Почему в выбранный день нет окошек: выходной или всё занято (сводка дней —
+  // тот же движок). Иначе — прежние тексты «нет окошек без промежутков».
+  const emptyText =
+    otherSlots.length > 0
+      ? T.emptyPacked
+      : selectedDayStatus === "off"
+        ? C.dayOff
+        : selectedDayStatus === "busy"
+          ? C.dayBusy
+          : T.empty;
+
+  if (!ready) {
+    return (
+      <div data-testid="operator-slot-picker">
+        <p className="rounded-xl border border-border-subtle bg-bg-input/40 p-3 text-sm text-text-sec">
+          {missingHint}
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-3" data-testid="operator-slot-picker">
+    <div
+      className={cn(
+        "space-y-4",
+        layout === "split" && "md:grid md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] md:items-start md:gap-6 md:space-y-0",
+      )}
+      data-testid="operator-slot-picker"
+    >
       <div>
         <p className="mb-2 eyebrow text-2xs">{T.dateLabel}</p>
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {dateKeys.map((dateKey) => (
-            <Chip
-              key={dateKey}
-              onClick={() => {
-                if (dateKey === selectedDate) return;
-                setSelectedDate(dateKey);
-                onChange(null);
-              }}
-              variant={dateKey === selectedDate ? "active" : "default"}
-              className="whitespace-nowrap"
-              disabled={disabled}
-              aria-pressed={dateKey === selectedDate}
-            >
-              {formatDateKeyLabel(dateKey)}
-            </Chip>
-          ))}
-        </div>
+        <BookingDateCalendar
+          summary={days.summary}
+          loading={days.loading}
+          error={days.error}
+          onRetry={days.retry}
+          value={selectedDate || null}
+          todayKey={todayKey}
+          selectable="window"
+          disabled={disabled}
+          label={T.dateLabel}
+          testId="operator-slot-picker-calendar"
+          onSelect={(dateKey) => {
+            if (dateKey === selectedDate) return;
+            setSelectedDate(dateKey);
+            onChange(null);
+          }}
+        />
       </div>
 
       <div>
@@ -329,11 +385,7 @@ export function OperatorSlotPicker({
           {T.timeLabel}
           {zoneLabel ? <span className="ml-1 normal-case tracking-normal">{zoneLabel}</span> : null}
         </p>
-        {!ready ? (
-          <p className="rounded-xl border border-border-subtle bg-bg-input/40 p-3 text-sm text-text-sec">
-            {missingHint}
-          </p>
-        ) : loading ? (
+        {loading || waitingForDay ? (
           <p className="rounded-xl border border-border-subtle bg-bg-input/40 p-3 text-sm text-text-sec">
             {T.loading}
           </p>
@@ -344,7 +396,7 @@ export function OperatorSlotPicker({
         ) : groups.length === 0 ? (
           <div className="space-y-2">
             <p className="rounded-xl border border-border-subtle bg-bg-input/40 p-3 text-sm text-text-sec">
-              {otherSlots.length > 0 ? T.emptyPacked : T.empty}
+              {emptyText}
             </p>
             {allStartsToggle}
           </div>

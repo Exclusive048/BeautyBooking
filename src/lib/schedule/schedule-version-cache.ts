@@ -38,8 +38,10 @@ const SCHEDULE_VERSION_TTL_SECONDS = 120;
  * 2 — у дня со своими часами только его перерывы (без обеда из графика).
  * 3 — начала «впритык» к занятому времени (SLOTS-FLUSH-STARTS).
  * 4 — клиентские окошки без дыр, которые нечем заполнить (SLOTS-GAP-PACKING).
+ * 5 — услуга не пропадает из свободного промежутка, где помещается
+ *     (SLOTS-GAP-PACKING-SOFT).
  */
-export const SCHEDULE_COMPUTE_GENERATION = 4;
+export const SCHEDULE_COMPUTE_GENERATION = 5;
 
 export type ScheduleVersionValue = {
   value: string;

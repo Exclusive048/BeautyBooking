@@ -43,7 +43,8 @@ type BuildSlotsInput = {
    * SLOTS-GAP-PACKING (2026-10-30, решение владельца): длительности услуг,
    * которые профиль продаёт, — чем ещё можно заполнить свободный промежуток.
    * Задано — день не предлагает начала, которые оставляют в нём дыру, не
-   * заполнимую никакой комбинацией этих услуг (`isPackingStart`), а к
+   * заполнимую никакой комбинацией этих услуг (`measurePackingStart` +
+   * `acceptPackingStarts`), а к
    * кандидатам добавляются начала «подряд» этой услуги. Не задано — кандидаты
    * без отбора: пробы «свободно сегодня», фильтра «когда» и ближайшего окошка
    * профиля.
@@ -194,14 +195,15 @@ function buildPackingTable(durations: number[], bufferMin: number, capacity: num
 }
 
 /**
- * SLOTS-GAP-PACKING (2026-10-30, решение владельца) — не оставляет ли начало
- * дыру, которую потом нечем заполнить. Свободный отрезок, где стоит начало,
- * ограничен занятым (запись с паузой, перерыв, блокировка) или краем рабочего
- * отрезка. Начало годится, если:
- *   1. ДО него не остаётся минут, которые не заполнить услугами профиля, —
- *      неизбежный остаток отрезка уходит к его концу, а не дырой к записи;
- *   2. до и после него вместе пропадает не больше минут, чем пропадает в этом
- *      отрезке при лучшей раскладке без него.
+ * SLOTS-GAP-PACKING (2026-10-30, решение владельца) — сколько минут пропадёт,
+ * если поставить начало сюда. Свободный отрезок, где стоит начало, ограничен
+ * занятым (запись с паузой, перерыв, блокировка) или краем рабочего отрезка.
+ * `null` — начало оставляет ДО себя минуты, которые не заполнить услугами
+ * профиля: неизбежный остаток отрезка уходит к его концу, а не дырой к записи.
+ * Иначе — потери начала (`cost`: минуты после него, которые нечем занять), где
+ * лучшая раскладка отрезка без него теряет `allowance`, и ключ отрезка: решает
+ * `acceptPackingStarts`, сравнив начала одного отрезка между собой.
+ *
  * Пример: запись 6:10–6:30, услуги по 20 минут — 6:45 не предлагается (6:30–6:45
  * не заполнить), 6:50 предлагается. Простое «не оставлять промежуток короче
  * самой короткой услуги» хуже прежнего: оно не даёт поставить 20 минут в
@@ -214,7 +216,7 @@ function buildPackingTable(durations: number[], bufferMin: number, capacity: num
  * Вес услуги — длительность плюс пауза; ёмкость отрезка без начала — его длина
  * плюс пауза (паузы стоят только МЕЖДУ записями).
  */
-function isPackingStart(input: {
+function measurePackingStart(input: {
   start: number;
   durationMin: number;
   bufferMin: number;
@@ -223,7 +225,7 @@ function isPackingStart(input: {
   earliest: number;
   busy: BlockInterval[];
   best: Int32Array;
-}): boolean {
+}): PackingMeasure | null {
   const waste = (capacity: number): number => {
     if (capacity <= 0) return 0;
     const clamped = Math.min(capacity, input.best.length - 1);
@@ -237,14 +239,57 @@ function isPackingStart(input: {
     if (item.start >= input.start + input.durationMin && item.start < next) next = item.start;
   }
   const after = next - (input.start + input.durationMin);
+  const segment = `${prev}:${next}`;
 
   if (input.earliest > prev) {
-    return waste(after) <= waste(next - input.start + input.bufferMin);
+    return { segment, cost: waste(after), allowance: waste(next - input.start + input.bufferMin) };
   }
 
-  const before = input.start - prev;
-  if (waste(before) > 0) return false;
-  return waste(before) + waste(after) <= waste(next - prev + input.bufferMin);
+  if (waste(input.start - prev) > 0) return null;
+  return { segment, cost: waste(after), allowance: waste(next - prev + input.bufferMin) };
+}
+
+type PackingMeasure = {
+  /** Свободный отрезок начала — `«prev»:«next»` в минутах дня. */
+  segment: string;
+  /** Сколько минут отрезка пропадёт, если поставить начало сюда. */
+  cost: number;
+  /** Сколько пропадает в отрезке при лучшей раскладке без этого начала. */
+  allowance: number;
+};
+
+/**
+ * SLOTS-GAP-PACKING — какие начала предложить. Начало годится, если теряет не
+ * больше, чем лучшая раскладка отрезка без него (`allowance`), ЛИБО не больше,
+ * чем лучшее начало этой же услуги в том же отрезке.
+ *
+ * Вторая половина — SLOTS-GAP-PACKING-SOFT (2026-11-13, решение владельца):
+ * услуга, которая помещается в свободный отрезок, из него не пропадает.
+ * Прежде правило сравнивало начало только с идеальной раскладкой из ДРУГИХ
+ * услуг: утро 10:00–13:00 мастера с паузой 15 минут ровно занимают «Комплекс»
+ * на 180 минут или «брови + брови + маникюр», а любое начало услуги на 90
+ * минут оставляет 15 минут, которые нечем занять, — и утром её было не
+ * записать вовсе. «В расписании свободно, а окошек нет». Теперь у такой услуги
+ * остаются её наименее затратные начала (10:00), а начала, теряющие больше
+ * необходимого, по-прежнему не предлагаются: 6:45 после записи 6:10–6:30 при
+ * услугах по 20 минут теряет 15 минут там, где 6:50 не теряет ничего.
+ *
+ * Сравниваются только начала, которые движок отбирает (`measures`): переданные
+ * сервером (курсор пакета, проверяемое время) в минимум не входят, иначе
+ * выдача дня зависела бы от того, что проверяют.
+ */
+function acceptPackingStarts(measures: Array<PackingMeasure | null>): boolean[] {
+  const bestCost = new Map<string, number>();
+  for (const measure of measures) {
+    if (!measure) continue;
+    const known = bestCost.get(measure.segment);
+    if (known === undefined || measure.cost < known) bestCost.set(measure.segment, measure.cost);
+  }
+  return measures.map((measure) => {
+    if (!measure) return false;
+    const ownBest = bestCost.get(measure.segment) ?? measure.cost;
+    return measure.cost <= Math.max(measure.allowance, ownBest);
+  });
 }
 
 export function buildSlotsForDay(input: BuildSlotsInput): AvailabilitySlot[] {
@@ -388,6 +433,9 @@ export function buildSlotsForDay(input: BuildSlotsInput): AvailabilitySlot[] {
           ]),
         ).sort((a, b) => a - b);
 
+    // SLOTS-GAP-PACKING-SOFT: начала сначала собираются, потом отбираются —
+    // решение о начале зависит от лучшего начала той же услуги в его отрезке.
+    const free: Array<{ t: number; startUtc: Date; endUtc: Date; measure: PackingMeasure | null | "exempt" }> = [];
     let bookingCursor = 0;
     for (const t of candidates) {
       const blocked = blockIntervals.some((b) => t < b.end && t + input.serviceDurationMin > b.start);
@@ -423,29 +471,37 @@ export function buildSlotsForDay(input: BuildSlotsInput): AvailabilitySlot[] {
           });
       if (hasConflict) continue;
 
-      if (
-        packingTable &&
-        !exemptStarts.has(t) &&
-        !isPackingStart({
-          start: t,
-          durationMin: input.serviceDurationMin,
-          bufferMin: input.bufferMin,
-          windowStart,
-          windowEnd,
-          earliest,
-          busy: busyIntervals,
-          best: packingTable,
-        })
-      ) {
-        continue;
-      }
-
-      slots.push({
-        startAtUtc: startUtc,
-        endAtUtc: endUtc,
-        label: `${input.dateKey} ${minutesToTime(t)}`,
+      free.push({
+        t,
+        startUtc,
+        endUtc,
+        measure:
+          !packingTable || exemptStarts.has(t)
+            ? "exempt"
+            : measurePackingStart({
+                start: t,
+                durationMin: input.serviceDurationMin,
+                bufferMin: input.bufferMin,
+                windowStart,
+                windowEnd,
+                earliest,
+                busy: busyIntervals,
+                best: packingTable,
+              }),
       });
     }
+
+    const accepted = acceptPackingStarts(
+      free.map((item) => (item.measure === "exempt" ? null : item.measure)),
+    );
+    free.forEach((item, index) => {
+      if (item.measure !== "exempt" && !accepted[index]) return;
+      slots.push({
+        startAtUtc: item.startUtc,
+        endAtUtc: item.endUtc,
+        label: `${input.dateKey} ${minutesToTime(item.t)}`,
+      });
+    });
   }
 
   return slots;

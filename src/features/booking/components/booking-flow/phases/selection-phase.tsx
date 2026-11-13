@@ -4,7 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import * as UI_TEXT from "@/lib/ui/text";
 import { ServiceHeader } from "@/features/booking/components/booking-flow/components/service-header";
-import { DateGrid } from "@/features/booking/components/booking-flow/components/date-grid";
+import { ProviderDateCalendar } from "@/features/booking/components/booking-flow/components/provider-date-calendar";
 import { TimeGrid } from "@/features/booking/components/booking-flow/components/time-grid";
 import { SummaryBlock } from "@/features/booking/components/booking-flow/components/summary-block";
 import { Footnote } from "@/features/booking/components/booking-flow/components/footnote";
@@ -73,9 +73,10 @@ export function SelectionPhase({
         ) : null}
       </div>
 
-      <DateGrid
+      <ProviderDateCalendar
         providerId={providerId}
         providerTimezone={providerTimezone}
+        serviceId={serviceId}
         selectedDateKey={selectedDateKey}
         onSelect={onSelectDate}
       />

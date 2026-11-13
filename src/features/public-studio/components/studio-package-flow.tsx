@@ -16,10 +16,13 @@ import {
   fetchBookingMe,
   fetchMasterAvailability,
   todayKey,
-  buildDayOptions,
   type SlotItem,
   type StudioMaster,
 } from "@/features/booking/lib/studio-booking";
+import { BookingDateCalendar } from "@/features/booking/components/booking-date-calendar";
+import { bookableDaysUrl, useBookableDays } from "@/features/booking/lib/use-bookable-days";
+import { firstFreeDate } from "@/lib/schedule/bookable-days-shared";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
 import type { StudioBundleView } from "@/lib/providers/public-packages";
 import {
   studioNextComponentEarliestStart,
@@ -68,16 +71,17 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
   // вернуть тот же пакет, а не «это время занято».
   const idempotencyKeyRef = useRef<string>(newIdempotencyKey());
   const viewerTz = useViewerTimeZoneContext();
-  // LOGIC-26: дни визарда — в tz студии, а не посетителя (`studioTimezone`
-  // здесь уже есть пропом; прежний `buildDays` его просто не использовал).
-  const days = useMemo(() => buildDayOptions(14, studioTimezone), [studioTimezone]);
+  // LOGIC-26: дни визарда — в tz студии, а не посетителя.
+  const today = useMemo(() => todayKey(studioTimezone), [studioTimezone]);
 
   const [phase, setPhase] = useState<Phase>("build");
   const [placements, setPlacements] = useState<Record<string, Placement>>({});
 
-  // Active-component picker state.
+  // Active-component picker state. BOOKING-DATE-CALENDAR: день пуст, пока
+  // календарь не выбрал первый свободный (или день окончания предыдущей
+  // услуги) — до этого окошки не грузятся.
   const [selectedMasterId, setSelectedMasterId] = useState("");
-  const [selectedDay, setSelectedDay] = useState(days[0]?.key ?? todayKey(studioTimezone));
+  const [selectedDay, setSelectedDay] = useState("");
   const [slots, setSlots] = useState<SlotItem[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsError, setSlotsError] = useState<string | null>(null);
@@ -185,18 +189,43 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
     return masters.filter((m) => (m.serviceIds ?? []).includes(activeComponent.serviceId));
   }, [activeComponent, masters]);
 
+  // BOOKING-DATE-CALENDAR: дни выбранного мастера для активной услуги —
+  // календарь вместо полосы из 14 дней. Раньше дня окончания предыдущей
+  // услуги эту не поставить; сам этот день выбирается всегда: время «сразу
+  // после» неё сводка дня не видит (`?after=` знает только сетка окошек).
+  const cursorDayKey = cursorMs ? toLocalDateKey(new Date(cursorMs), studioTimezone) : null;
+  const bookableDays = useBookableDays({
+    urls:
+      open && phase === "build" && activeComponent && selectedMasterId
+        ? [
+            bookableDaysUrl(`/api/masters/${encodeURIComponent(selectedMasterId)}/availability`, {
+              serviceId: activeComponent.serviceId,
+              from: today,
+            }),
+          ]
+        : null,
+    fallbackError: UI_TEXT.bookingCalendar.loadFailed,
+  });
+  // День не выбран — первый свободный (или день окончания предыдущей услуги).
+  // По условию в рендере, не в эффекте: окошки сразу грузятся на нужный день.
+  const autoDay =
+    selectedMasterId && !selectedDay
+      ? (cursorDayKey ?? firstFreeDate(bookableDays.summary, undefined))
+      : null;
+  if (autoDay) setSelectedDay(autoDay);
+
   // Reset everything when the modal closes.
   useEffect(() => {
     if (!open) {
       setPhase("build");
       setPlacements({});
       setSelectedMasterId("");
-      setSelectedDay(days[0]?.key ?? todayKey(studioTimezone));
+      setSelectedDay("");
       setProposal(null);
       setError(null);
       setComment("");
     }
-  }, [open, days, studioTimezone]);
+  }, [open]);
 
   // Session prefill.
   useEffect(() => {
@@ -263,10 +292,10 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
         },
       }));
       setSelectedMasterId("");
-      setSelectedDay(days[0]?.key ?? todayKey(studioTimezone));
+      setSelectedDay("");
       setError(null);
     },
-    [activeComponent, selectedMasterId, masterName, days, studioTimezone],
+    [activeComponent, selectedMasterId, masterName],
   );
 
   // Re-pick a placed component → cascade-clear it + every later one (their
@@ -282,10 +311,10 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
         return next;
       });
       setSelectedMasterId("");
-      setSelectedDay(days[0]?.key ?? todayKey(studioTimezone));
+      setSelectedDay("");
       setError(null);
     },
-    [components, days, studioTimezone],
+    [components],
   );
 
   const buildSelections = useCallback(
@@ -485,7 +514,12 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
                         {assignedMasters.map((master) => (
                           <Button variant="wrapper" aria-pressed={selectedMasterId === master.id}
                             key={master.id}
-                            onClick={() => setSelectedMasterId(master.id)}
+                            onClick={() => {
+                              // Другой мастер — свои дни: календарь снова
+                              // выбирает первый свободный.
+                              if (master.id !== selectedMasterId) setSelectedDay("");
+                              setSelectedMasterId(master.id);
+                            }}
                             className={`rounded-full border px-3 py-1.5 text-xs transition ${
                               selectedMasterId === master.id
                                 ? "border-primary bg-primary/10 text-accent-text"
@@ -499,22 +533,21 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
 
                       {selectedMasterId ? (
                         <>
-                          <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
-                            {days.map((d) => (
-                              <Button variant="wrapper" aria-pressed={selectedDay === d.key}
-                                key={d.key}
-                                onClick={() => setSelectedDay(d.key)}
-                                className={`shrink-0 rounded-xl border px-3 py-2 text-xs transition ${
-                                  selectedDay === d.key
-                                    ? "border-primary bg-primary/10 text-accent-text"
-                                    : "border-border-subtle text-text-sec hover:border-primary/60"
-                                }`}
-                              >
-                                {d.label}
-                              </Button>
-                            ))}
-                          </div>
-                          {slotsLoading ? (
+                          <BookingDateCalendar
+                            summary={bookableDays.summary}
+                            loading={bookableDays.loading}
+                            error={bookableDays.error}
+                            onRetry={bookableDays.retry}
+                            value={selectedDay || null}
+                            onSelect={setSelectedDay}
+                            todayKey={today}
+                            selectable="free"
+                            minDateKey={cursorDayKey}
+                            forceSelectableDate={cursorDayKey}
+                            className="mb-3"
+                            testId="studio-package-date-calendar"
+                          />
+                          {!selectedDay ? null : slotsLoading ? (
                             <div className="py-5 text-center text-sm text-text-sec">{T.slotsLoading}</div>
                           ) : slotsError ? (
                             <div className="py-5 text-center text-sm text-danger-text">{slotsError}</div>

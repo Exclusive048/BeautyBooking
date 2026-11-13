@@ -4,8 +4,9 @@ import { requireProviderOwner } from "@/lib/auth/ownership";
 import { prisma } from "@/lib/prisma";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 import { resolveServiceDuration } from "@/lib/schedule/resolveDuration";
-import { addDaysToDateKey, isDateKey } from "@/lib/schedule/dateKey";
+import { addDaysToDateKey, compareDateKeys, isDateKey } from "@/lib/schedule/dateKey";
 import { listBookableSlots } from "@/lib/schedule/bookable-window";
+import { listBookableDays } from "@/lib/schedule/bookable-days";
 import { resolveRescheduleExclusion } from "@/lib/schedule/reschedule-exclusion";
 import { resolveFlushAfterParam } from "@/lib/schedule/flush-after";
 import { resolveStudioMoveSlots } from "@/lib/studio/move-plan";
@@ -149,9 +150,15 @@ export async function GET(
     // существующие записи (`bookable-window.ts`).
     const now = new Date();
     const isPublicListing = operatorProvider === null && !exclusion && !studioMove;
-    const effectiveToKeyExclusive = isPublicListing
+    const clampedToKeyExclusive = isPublicListing
       ? addDaysToDateKey(clampVisibleSlotsHorizon(toKey || null, provider, now, provider.timezone), 1)
       : toKeyExclusive;
+    // SLOTS-RANGE-CLAMP: день за горизонтом видимости — пустая выдача, а не
+    // 400 «Некорректный диапазон» (конец окна раньше запрошенного начала).
+    const effectiveToKeyExclusive =
+      clampedToKeyExclusive && compareDateKeys(clampedToKeyExclusive, fromKey) < 0
+        ? fromKey
+        : clampedToKeyExclusive;
 
     // EXP-025: same primitive as `/slots` → min-ahead + schedule filter
     // applied identically. A slot returned here is one `assertBookingWindow`
@@ -197,6 +204,27 @@ export async function GET(
     // оставляющее промежуток, который не заполнит ни одна услуга, — приходят
     // отдельным списком `otherSlots` для ссылки «Показать все свободные
     // времена»: клиент по телефону может попросить именно такое время.
+    // BOOKING-DATE-CALENDAR: `?days=1` — сводка окна записи по дням для
+    // календаря выбора даты (`bookable-days.ts`). Оператору день свободен, если
+    // в нём есть хоть одно свободное начало — в том числе вне отбора «без дыр».
+    if (url.searchParams.get("days") === "1") {
+      const summary = await listBookableDays({
+        provider,
+        serviceId,
+        durationMinutes: windowMinutes,
+        fromKey,
+        toKeyExclusive: effectiveToKeyExclusive,
+        now,
+        excludeBookingId: slotsInput.excludeBookingId,
+        operatorWindow: slotsInput.operatorWindow,
+        allStarts: operatorProvider !== null,
+        windowPolicy: slotsInput.windowPolicy,
+        operatorMaxWindow: slotsInput.operatorMaxWindow,
+      });
+      if (!summary.ok) return fail(summary.message, summary.status, summary.code);
+      return ok(summary.data);
+    }
+
     const [bookable, allStarts] = await Promise.all([
       listBookableSlots(slotsInput),
       operatorProvider !== null ? listBookableSlots({ ...slotsInput, allStarts: true }) : null,

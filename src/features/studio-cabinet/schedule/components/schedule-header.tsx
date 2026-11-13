@@ -185,6 +185,9 @@ export function ScheduleHeader({
         services={services}
         masterId={null}
         startAtUtc={null}
+        // Просматриваемый день; сегодня — без подсказки: пикер сам откроет
+        // первый день со свободным временем.
+        initialDateKey={dateKey !== todayKey ? dateKey : null}
         timezone={timezone}
         open={createOpen}
         onClose={() => setCreateOpen(false)}

@@ -1,10 +1,8 @@
 import * as UI_TEXT from "@/lib/ui/text";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import type { ConsentFlags } from "@/lib/legal/consent-flags";
-import { addDaysToDateKey } from "@/lib/schedule/dateKey";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { ApiClientError, fetchJson, serverMessageOr } from "@/lib/http/client";
-import { UI_FMT } from "@/lib/ui/fmt";
 
 export type StudioMaster = {
   id: string;
@@ -38,11 +36,6 @@ export type StudioMaster = {
   // treated as 0 (the pre-fix behavior — never stricter than the validator
   // for different-master pairs).
   bufferMin?: number;
-  /**
-   * 29.09 доработки · 03: сколько дней вперёд у мастера видны окошки
-   * (`publicBookingHorizonDays`). Нет — ограничивает только студия.
-   */
-  bookingHorizonDays?: number;
 };
 
 /**
@@ -123,8 +116,9 @@ export type MastersResult =
  * и часть сегодняшних слотов была невидима. Данные это не портило (лечится
  * навигацией), но первый экран показывал не то.
  *
- * `toLocalDateKey`/`addDaysToDateKey` — те же хелперы, которыми пользуется
- * движок расписания; собственной арифметики дат здесь быть не должно.
+ * `toLocalDateKey` — тот же хелпер, которым пользуется движок расписания;
+ * собственной арифметики дат здесь быть не должно. Дни для выбора даты
+ * приходят сводкой сервера (`?days=1`, BOOKING-DATE-CALENDAR).
  */
 export function todayKey(timeZone: string) {
   return toLocalDateKey(new Date(), timeZone);
@@ -135,31 +129,6 @@ function isValidDateKey(dateKey: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return false;
   const [y, m, d] = dateKey.split("-").map(Number);
   return Boolean(y) && m >= 1 && m <= 12 && d >= 1 && d <= 31;
-}
-
-export function buildDateBounds(
-  base: Date,
-  timeZone: string,
-  daysAhead: number
-) {
-  const min = toLocalDateKey(base, timeZone);
-  return { min, max: addDaysToDateKey(min, daysAhead) };
-}
-
-/** Список ближайших дней в tz салона: ключ (salon-local) + подпись для чипа. */
-export function buildDayOptions(
-  count: number,
-  timeZone: string
-): { key: string; label: string }[] {
-  const first = todayKey(timeZone);
-  const out: { key: string; label: string }[] = [];
-  for (let i = 0; i < count; i += 1) {
-    const key = addDaysToDateKey(first, i);
-    // Подпись — по самому ключу (UTC-tech): не съезжает на соседние сутки
-    // ни при каком смещении зоны.
-    out.push({ key, label: UI_FMT.dateKey(key, "weekdayDayMonthShort") });
-  }
-  return out;
 }
 
 const TS = UI_TEXT.publicStudio;

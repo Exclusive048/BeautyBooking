@@ -415,7 +415,7 @@ const ACTIONABLE_REFUSAL_SURFACES = [
   "src/features/billing/components/billing-page.tsx",
   "src/features/billing/components/public-settings-client.tsx",
   "src/features/booking/components/booking-flow/booking-flow-stepper.tsx",
-  "src/features/booking/components/booking-flow/components/date-grid.tsx",
+  "src/features/booking/lib/use-bookable-days.ts",
   "src/features/booking/components/booking-flow/components/time-grid.tsx",
   "src/features/booking/components/operator-slot-picker.tsx",
   "src/features/booking/guest-manage/guest-manage-page.tsx",

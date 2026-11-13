@@ -3,11 +3,12 @@ import { toAppError } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
 import { resolveServiceDuration } from "@/lib/schedule/resolveDuration";
-import { addDaysToDateKey, isDateKey } from "@/lib/schedule/dateKey";
+import { addDaysToDateKey, compareDateKeys, isDateKey } from "@/lib/schedule/dateKey";
 import { resolveDynamicHotSlotPricing } from "@/lib/hot-slots/runtime";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
-import { clampVisibleSlotsHorizon } from "@/lib/bookings/policy-enforcement";
+import { clampVisibleSlotsHorizon, stricterBookingWindow } from "@/lib/bookings/policy-enforcement";
 import { listBookableSlots } from "@/lib/schedule/bookable-window";
+import { listBookableDays } from "@/lib/schedule/bookable-days";
 import { resolveRescheduleExclusion } from "@/lib/schedule/reschedule-exclusion";
 import { resolveFlushAfterParam } from "@/lib/schedule/flush-after";
 import { isActiveMasterOfPublishedStudio } from "@/lib/studio/active-studio-master";
@@ -81,6 +82,7 @@ export async function GET(
       // BOOKING-WIDGET-A: policy fields are needed for the visible-window
       // clamp + min-hours filter below. Keep selection narrow.
       minBookingHoursAhead: true,
+      maxBookingDaysAhead: true,
       visibleSlotDays: true,
     } as const;
     // STUDIO-MASTER-PROFILES (этап 4): у профиля мастера в студии публичной
@@ -121,7 +123,11 @@ export async function GET(
 
     const service = await prisma.service.findUnique({
       where: { id: serviceId },
-      select: { id: true, price: true },
+      select: {
+        id: true,
+        price: true,
+        provider: { select: { minBookingHoursAhead: true, maxBookingDaysAhead: true } },
+      },
     });
     if (!service) return fail("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
 
@@ -133,9 +139,22 @@ export async function GET(
     // instead — see bookable-window.ts).
     const nowForPolicy = new Date();
     const clampedToKey = clampVisibleSlotsHorizon(toKey || null, provider, nowForPolicy, provider.timezone);
-    const effectiveToKeyExclusive = clampedToKey
+    const clampedToKeyExclusive = clampedToKey
       ? addDaysToDateKey(clampedToKey, 1)
       : toKey || undefined;
+    // SLOTS-RANGE-CLAMP: день за горизонтом видимости — пустая выдача, а не
+    // 400 «Проверьте выбранный период» (конец окна раньше начала).
+    const effectiveToKeyExclusive =
+      clampedToKeyExclusive && compareDateKeys(clampedToKeyExclusive, fromKey) < 0
+        ? fromKey
+        : clampedToKeyExclusive;
+    // SLOTS-MAX-AHEAD: окно записи — то, что проверит запись и перенос:
+    // строже из владельца услуги и мастера (`stricterBookingWindow`). Раньше
+    // `/slots` «Максимум вперёд» не применял вовсе и показывал окошки, на
+    // которые запись отвечала `BOOKING_TOO_FAR`.
+    const windowPolicy = service.provider
+      ? stricterBookingWindow(service.provider, provider)
+      : { minBookingHoursAhead: provider.minBookingHoursAhead, maxBookingDaysAhead: provider.maxBookingDaysAhead };
 
     // RESCHEDULE-SELF-SLOT: окно переносимой брони не занято — только для
     // сторон этой брони (см. reschedule-exclusion.ts); аноним без сессии — 401.
@@ -146,6 +165,24 @@ export async function GET(
       url.searchParams.get("excludeBookingId"),
     );
     const flushAfter = resolveFlushAfterParam(url.searchParams.get("after"));
+    const durationMinutes = exclusion && exclusion.durationMin > 0 ? exclusion.durationMin : duration.data;
+
+    // BOOKING-DATE-CALENDAR: `?days=1` — сводка окна записи по дням для
+    // календаря выбора даты виджета мастера (`bookable-days.ts`).
+    if (url.searchParams.get("days") === "1") {
+      const summary = await listBookableDays({
+        provider,
+        serviceId,
+        durationMinutes,
+        fromKey,
+        toKeyExclusive: effectiveToKeyExclusive,
+        now: nowForPolicy,
+        excludeBookingId: exclusion?.bookingId,
+        windowPolicy,
+      });
+      if (!summary.ok) return fail(mapSlotsError(summary.code), summary.status, summary.code);
+      return ok(summary.data);
+    }
 
     // EXP-025/026: the shared bookable-window primitive applies the
     // `minBookingHoursAhead` cutoff + effective weekly/override schedule
@@ -156,7 +193,7 @@ export async function GET(
       listBookableSlots({
         provider,
         serviceId,
-        durationMinutes: exclusion && exclusion.durationMin > 0 ? exclusion.durationMin : duration.data,
+        durationMinutes,
         fromKey,
         toKeyExclusive: effectiveToKeyExclusive,
         limit,
@@ -165,6 +202,7 @@ export async function GET(
         // SLOTS-FLUSH-STARTS: визард пакета показывает время сразу после
         // предыдущей услуги (`?after=`).
         extraStartsUtc: flushAfter ? [flushAfter] : undefined,
+        windowPolicy,
       }),
       prisma.discountRule.findUnique({
         where: { providerId: provider.id },

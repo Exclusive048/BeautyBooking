@@ -9,10 +9,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * покраснел «публичный запрос — не дальше 7 дней». Обрезка всегда (без
  * `isPublicListing`): покраснел «перенос своей записи — не обрезается».
  * Возвращено — зелёный.
+ *
+ * @probe 2026-11-13 — без прижатия конца к началу (SLOTS-RANGE-CLAMP):
+ * покраснел «день за «Сколько окошек вперёд» — пустая выдача». `allStarts`
+ * сводки оператора всегда `false`: покраснел «?days=1&manual=1 своей стороны».
  */
 
 const state = vi.hoisted(() => ({ sessionOk: false, ownerOk: false }));
 const listBookableSlots = vi.hoisted(() => vi.fn());
+const listBookableDays = vi.hoisted(() => vi.fn());
 const bookingFindUnique = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/providers/resolve-provider", () => ({
@@ -55,6 +60,15 @@ vi.mock("@/lib/schedule/bookable-window", () => ({
     return Promise.resolve({ ok: true as const, slots: [], meta: {} });
   },
 }));
+vi.mock("@/lib/schedule/bookable-days", () => ({
+  listBookableDays: (...args: unknown[]) => {
+    listBookableDays(...args);
+    return Promise.resolve({
+      ok: true as const,
+      data: { timezone: "Asia/Yekaterinburg", firstDate: "2026-09-30", lastDate: "2026-10-06", days: [] },
+    });
+  },
+}));
 vi.mock("@/lib/logging/logger", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/logging/logger")>()),
   logInfo: vi.fn(),
@@ -81,6 +95,7 @@ beforeEach(() => {
   state.sessionOk = false;
   state.ownerOk = false;
   listBookableSlots.mockClear();
+  listBookableDays.mockClear();
   bookingFindUnique.mockReset();
   bookingFindUnique.mockResolvedValue({
     id: "bk1",
@@ -113,5 +128,49 @@ describe("/availability — «Сколько окошек вперёд» мас�
     const input = await call("&excludeBookingId=bk1&to=2026-10-20");
     expect(input.excludeBookingId).toBe("bk1");
     expect(input.toKeyExclusive).toBe("2026-10-21");
+  });
+});
+
+describe("/availability — окно за горизонтом и сводка дней", () => {
+  async function get(query: string) {
+    const res = await GET(new Request(`http://localhost/api/masters/prov1/availability?serviceId=svc1${query}`), {
+      params: Promise.resolve({ id: "prov1" }),
+    });
+    return res;
+  }
+
+  it("день за «Сколько окошек вперёд» — пустая выдача, а не 400 (SLOTS-RANGE-CLAMP)", async () => {
+    const res = await get("&from=2026-10-10&limit=1");
+    expect(res.status).toBe(200);
+    const input = listBookableSlots.mock.calls.at(-1)?.[0] as { fromKey: string; toKeyExclusive?: string };
+    expect(input.fromKey).toBe("2026-10-10");
+    expect(input.toKeyExclusive).toBe("2026-10-10");
+  });
+
+  it("?days=1 — сводка тем же окном, что окошки клиента (BOOKING-DATE-CALENDAR)", async () => {
+    const res = await get("&from=2026-09-30&days=1");
+    expect(res.status).toBe(200);
+    expect(listBookableSlots).not.toHaveBeenCalled();
+    const input = listBookableDays.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(input).toMatchObject({
+      fromKey: "2026-09-30",
+      toKeyExclusive: "2026-10-07",
+      operatorWindow: false,
+      allStarts: false,
+      windowPolicy: { minBookingHoursAhead: 0, maxBookingDaysAhead: 30 },
+    });
+    const body = (await res.json()) as { data: { lastDate: string } };
+    expect(body.data.lastDate).toBe("2026-10-06");
+  });
+
+  it("?days=1&manual=1 своей стороны — окно оператора и все свободные начала", async () => {
+    state.sessionOk = true;
+    state.ownerOk = true;
+    const res = await get("&from=2026-09-30&days=1&manual=1");
+    expect(res.status).toBe(200);
+    const input = listBookableDays.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(input).toMatchObject({ operatorWindow: true, allStarts: true });
+    // «Сколько окошек вперёд» — про клиента: оператора не обрезает.
+    expect(input.toKeyExclusive).toBeUndefined();
   });
 });

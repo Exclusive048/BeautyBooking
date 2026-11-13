@@ -56,10 +56,6 @@ export const bookingWidget = {
     // UX-PASS-01: окошки не загрузились — перезапрос без смены даты.
     retry: "Повторить",
     back: "Назад",
-    today: "Сегодня",
-    tomorrow: "Завтра",
-    daysOfWeek: ["вс", "пн", "вт", "ср", "чт", "пт", "сб"],
-    months: ["янв", "фев", "мар", "апр", "мая", "июня", "июля", "авг", "сен", "окт", "ноя", "дек"],
     // FIX-BATCH-C Defect 1 (QA-107/FIX-22): slot times are shown in the SALON's
     // timezone; this note + «(город, GMT+N)» label clarifies that for a cross-tz client.
     salonTimeNote: "Время салона",

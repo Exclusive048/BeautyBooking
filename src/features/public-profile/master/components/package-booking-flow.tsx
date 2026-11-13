@@ -12,7 +12,7 @@ import {
   hasRequiredConsents,
   type ConsentFlags,
 } from "@/lib/legal/consent-flags";
-import { DateGrid } from "@/features/booking/components/booking-flow/components/date-grid";
+import { ProviderDateCalendar } from "@/features/booking/components/booking-flow/components/provider-date-calendar";
 import { TimeGrid } from "@/features/booking/components/booking-flow/components/time-grid";
 import type { BookingFlowSlot } from "@/features/booking/components/booking-flow/types";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
@@ -76,11 +76,12 @@ type SessionUser = { displayName: string | null; phone: string | null };
  * horizon.
  *
  * Two deliberate reuses:
- *   - `DateGrid`/`TimeGrid` — the SAME primitives the single-service widget
- *     uses. They're data-driven (`/booking-days` working days + the 60-day
- *     scan, paginated by week) so the horizon is now the normal booking horizon
- *     rather than a package-only literal, and `TimeGrid` carries the salon-tz
- *     «(город, GMT+N)» label the old package dialog omitted.
+ *   - `ProviderDateCalendar`/`TimeGrid` — the SAME primitives the
+ *     single-service widget uses. They're data-driven (BOOKING-DATE-CALENDAR:
+ *     a month calendar over the whole booking window, days with free time for
+ *     THIS component's service marked) so the horizon is the normal booking
+ *     horizon rather than a package-only literal, and `TimeGrid` carries the
+ *     salon-tz «(город, GMT+N)» label the old package dialog omitted.
  *   - the studio wizard's SEQUENTIAL CURSOR (`studio-package-flow.tsx`):
  *     component N+1 may only start at/after component N's end, and re-picking a
  *     component cascade-clears the tail that depended on it. The backend
@@ -441,12 +442,14 @@ export function PackageBookingFlow({
                   </div>
 
                   <div data-testid="package-date-grid">
-                    <DateGrid
+                    <ProviderDateCalendar
                       providerId={providerId}
                       providerTimezone={providerTimezone}
+                      serviceId={component.serviceId}
                       selectedDateKey={selectedDay}
                       onSelect={setSelectedDay}
                       minDateKey={cursorDayKey}
+                      forceSelectableDate={cursorDayKey}
                     />
                   </div>
 
