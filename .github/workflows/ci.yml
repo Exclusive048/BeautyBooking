@@ -144,13 +144,23 @@ jobs:
       - name: 4/18 prisma generate
         run: npm run prisma:generate
 
-      # Fail-soft by design (как и smoke): скрипт фетчит /api/openapi с живого
-      # сервера и без него печатает «skipped (server not reachable)» + exit 0.
-      # Шаг оставлен исполняемым, потому что так же он ведёт себя и в локальной
-      # батарее без dev-сервера; реальную сверку спеки с деревом роутов делает
-      # шаг 13/18 (check:openapi-routes), он от сервера не зависит.
+      # OPENAPI-FRESH (2026-11-14): openapi/openapi.json собирается прямо из
+      # src/lib/openapi/spec.ts, без живого сервера (раньше скрипт фетчил
+      # /api/openapi и без сервера молча выходил 0 — в CI так было всегда, и
+      # закоммиченный файл отставал от спеки). Сверку спеки с деревом роутов
+      # делает шаг 13/18 (check:openapi-routes).
       - name: 5/18 openapi generate
         run: npm run openapi:generate
+
+      # Не шаг npm run check: локально тот же генератор просто перезаписывает
+      # файл, и изменение видно в git status. Здесь — сверка с закоммиченным.
+      # Проба: правка spec.ts без перегенерации → exit 1.
+      - name: openapi.json совпадает со спекой
+        run: |
+          if ! git diff --exit-code --stat -- openapi/openapi.json; then
+            echo "::error file=openapi/openapi.json::Файл устарел: запустите npm run openapi:generate и закоммитьте openapi/openapi.json."
+            exit 1
+          fi
 
       - name: 6/18 encoding check
         run: npm run check:encoding
