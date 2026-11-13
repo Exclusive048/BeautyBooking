@@ -3,7 +3,7 @@ import { AppError } from "@/lib/api/errors";
 import {
   assertAcceptsNewClient,
   assertBookingWindow,
-  clampVisibleSlotsHorizon,
+  clampToBookingWindow,
   earliestBookableUtc,
   isWithinBookableWindow,
   latestBookableUtc,
@@ -109,42 +109,61 @@ describe("policy-enforcement / assertAcceptsNewClient", () => {
   });
 });
 
-describe("policy-enforcement / clampVisibleSlotsHorizon", () => {
-  it("uses the policy horizon when no requested toKey is given", () => {
-    // policy 7 days, NOW = 2026-05-20 → horizon = 2026-05-26
-    expect(clampVisibleSlotsHorizon(null, { visibleSlotDays: 7 }, NOW, "UTC")).toBe("2026-05-26");
+/**
+ * BOOKING-WINDOW-MERGE (2026-11-14): выдача окошек обрезается по последнему
+ * дню окна записи — дате последнего момента, на который запись ещё открыта
+ * (`latestBookableUtc`), в поясе салона. Тот же день считают календарь выбора
+ * даты (`bookable-days.ts`) и проверка записи (`assertBookingWindow`).
+ *
+ * @probe 2026-11-14 — дата ключа взята в UTC, а не в поясе салона: покраснел
+ * «Екатеринбург ранним утром» (2026-05-27 вместо 2026-05-28). Без потолка
+ * горизонта расписания (`now + n суток` вместо `latestBookableUtc`): покраснел
+ * «не дальше горизонта расписания».
+ */
+describe("policy-enforcement / clampToBookingWindow", () => {
+  it("без запрошенного конца — последний день окна записи", () => {
+    // NOW = 2026-05-20 10:00Z, окно 7 суток → запись открыта до 2026-05-27 10:00.
+    expect(clampToBookingWindow(null, { maxBookingDaysAhead: 7 }, NOW, "UTC")).toBe("2026-05-27");
   });
-  it("uses the requested toKey when it's shorter than the horizon", () => {
-    expect(clampVisibleSlotsHorizon("2026-05-22", { visibleSlotDays: 30 }, NOW, "UTC")).toBe("2026-05-22");
+  it("запрошенный конец раньше окна — остаётся", () => {
+    expect(clampToBookingWindow("2026-05-22", { maxBookingDaysAhead: 30 }, NOW, "UTC")).toBe("2026-05-22");
   });
-  it("clamps a requested toKey beyond the horizon", () => {
-    expect(clampVisibleSlotsHorizon("2026-12-31", { visibleSlotDays: 7 }, NOW, "UTC")).toBe("2026-05-26");
+  it("запрошенный конец за окном — обрезается", () => {
+    expect(clampToBookingWindow("2026-12-31", { maxBookingDaysAhead: 7 }, NOW, "UTC")).toBe("2026-05-27");
   });
-  it("clamps zero/negative visibleSlotDays to 1", () => {
-    expect(clampVisibleSlotsHorizon(null, { visibleSlotDays: 0 }, NOW, "UTC")).toBe("2026-05-20");
+  it("окно не короче суток", () => {
+    expect(clampToBookingWindow(null, { maxBookingDaysAhead: 0 }, NOW, "UTC")).toBe("2026-05-21");
+  });
+  it("не дальше горизонта расписания", () => {
+    // 2026-05-20 + 92 суток = 2026-08-20.
+    expect(SCHEDULE_HORIZON_DAYS).toBe(92);
+    expect(clampToBookingWindow(null, { maxBookingDaysAhead: 365 }, NOW, "UTC")).toBe("2026-08-20");
+  });
+  it("последний день — тот, на который ещё принимается запись", () => {
+    const policy = { minBookingHoursAhead: 0, maxBookingDaysAhead: 7 };
+    const lastKey = clampToBookingWindow(null, policy, NOW, "UTC");
+    const lastMinute = new Date(latestBookableUtc(policy, NOW).getTime() - 60_000);
+    expect(isWithinBookableWindow(lastMinute, policy, NOW)).toBe(true);
+    expect(lastMinute.toISOString().slice(0, 10)).toBe(lastKey);
   });
 
-  // HARDENING-10 #16 — horizon date-key derived in the PROVIDER timezone.
-  // NOW_EVENING is late-evening UTC → early-morning local for east-of-UTC zones,
-  // the exact window where a UTC-derived key dropped the last visible local day.
-  const NOW_EVENING = new Date("2026-05-20T20:00:00Z"); // = 2026-05-21T01:00 in +5
+  // HARDENING-10 #16 — день считается в поясе САЛОНА. Поздний вечер по UTC —
+  // раннее утро следующего дня восточнее UTC.
+  const NOW_EVENING = new Date("2026-05-20T20:00:00Z"); // = 2026-05-21T01:00 в +5
 
-  it("east-of-UTC provider (Yekaterinburg, GMT+5) keeps its last visible day at early-morning local hours", () => {
-    // horizon instant = NOW_EVENING + 6d = 2026-05-26T20:00Z = 2026-05-27T01:00 local(+5)
-    expect(
-      clampVisibleSlotsHorizon(null, { visibleSlotDays: 7 }, NOW_EVENING, "Asia/Yekaterinburg"),
-    ).toBe("2026-05-27");
-    // Contrast: the old UTC derivation would have dropped it to 2026-05-26.
-    expect(
-      clampVisibleSlotsHorizon(null, { visibleSlotDays: 7 }, NOW_EVENING, "UTC"),
-    ).toBe("2026-05-26");
+  it("Екатеринбург ранним утром (GMT+5) — день по салону, не по UTC", () => {
+    // 2026-05-27T20:00Z = 2026-05-28T01:00 по салону.
+    expect(clampToBookingWindow(null, { maxBookingDaysAhead: 7 }, NOW_EVENING, "Asia/Yekaterinburg")).toBe(
+      "2026-05-28",
+    );
+    expect(clampToBookingWindow(null, { maxBookingDaysAhead: 7 }, NOW_EVENING, "UTC")).toBe("2026-05-27");
   });
 
-  it("Moscow control (GMT+3) at the same instant is unchanged", () => {
-    // 2026-05-26T20:00Z = 2026-05-26T23:00 local(+3) → same date-key as UTC here
-    expect(
-      clampVisibleSlotsHorizon(null, { visibleSlotDays: 7 }, NOW_EVENING, "Europe/Moscow"),
-    ).toBe("2026-05-26");
+  it("Москва (GMT+3) в тот же момент — тот же день, что UTC", () => {
+    // 2026-05-27T20:00Z = 2026-05-27T23:00 по салону.
+    expect(clampToBookingWindow(null, { maxBookingDaysAhead: 7 }, NOW_EVENING, "Europe/Moscow")).toBe(
+      "2026-05-27",
+    );
   });
 });
 
@@ -180,23 +199,15 @@ describe("stricterBookingWindow", () => {
 });
 
 /**
- * 29.09 доработки · 03 — полоса дат виджета студии: окно записи, у мастера —
- * ещё «Сколько окошек вперёд», не дальше горизонта расписания.
- *
- * @probe 2026-09-29 — `visibleSlotDays` не учитывается (лимиты без него):
- * покраснел «у мастера — и «Сколько окошек вперёд»» (получено 30 вместо 7).
- * Возвращено — зелёный.
+ * 29.09 доработки · 03 → BOOKING-WINDOW-MERGE — на сколько дней вперёд открыта
+ * запись: окно записи, не дальше горизонта расписания (отдельного «Сколько
+ * окошек вперёд» больше нет).
  */
 describe("publicBookingHorizonDays", () => {
   it("окно записи, не дальше горизонта расписания", () => {
     expect(publicBookingHorizonDays({ maxBookingDaysAhead: 14 })).toBe(14);
     expect(publicBookingHorizonDays({ maxBookingDaysAhead: 90 })).toBe(90);
     expect(publicBookingHorizonDays({ maxBookingDaysAhead: 365 })).toBe(SCHEDULE_HORIZON_DAYS);
-  });
-
-  it("у мастера — и «Сколько окошек вперёд»", () => {
-    expect(publicBookingHorizonDays({ maxBookingDaysAhead: 30, visibleSlotDays: 7 })).toBe(7);
-    expect(publicBookingHorizonDays({ maxBookingDaysAhead: 14, visibleSlotDays: 60 })).toBe(14);
   });
 
   it("не меньше одного дня", () => {

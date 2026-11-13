@@ -12,12 +12,14 @@ import {
   applyScheduleSnapshotTx,
   applyStudioProfileRules,
   buildScheduleSnapshot,
+  mergeLegacyVisibleDays,
   normalizeBookingRules,
   normalizeExceptionInput,
   normalizeHotSlots,
   normalizeSlotStepMin,
   normalizeVisibility,
   normalizeWeekScheduleInput,
+  readLegacyVisibleDays,
   SCHEDULE_SNAPSHOT_TX_OPTIONS,
   serializeScheduleState,
   type BookingRulesDto,
@@ -121,10 +123,17 @@ function buildNormalizedState(input: {
 }
 
 function readSettingsPatch(snapshot: ScheduleEditorSnapshot, body: PatchBody): SettingsPatch {
-  const bookingRules =
+  const sentRules =
     body.bookingRules !== undefined
       ? normalizeBookingRules(body.bookingRules, snapshot.bookingRules)
       : undefined;
+  // BOOKING-WINDOW-MERGE: «Сколько окошек вперёд» старых сборок приложения
+  // (`visibility.visibleSlotDays`) — это теперь окно записи.
+  const bookingRules = mergeLegacyVisibleDays(
+    normalizeBookingRules(snapshot.bookingRules, snapshot.bookingRules),
+    sentRules,
+    readLegacyVisibleDays(body.visibility),
+  );
   const visibility =
     body.visibility !== undefined ? normalizeVisibility(body.visibility, snapshot.visibility) : undefined;
   let hotSlots: HotSlotsDto | null | undefined;
@@ -152,9 +161,9 @@ function settingsChanged(snapshot: ScheduleEditorSnapshot, patch: SettingsPatch)
 /**
  * STUDIO-PROFILE-PERSONAL-RULES (решение владельца 2026-10-30, уточняет
  * STUDIO-PROFILE-RULES-TAB-STATE): личные правила профиля В СТУДИИ — шаг
- * окошек, паузу, окно записи, автоподтверждение, дни видимости окошек и приём
- * новых клиентов — мастер меняет сам, сразу и без заявки (`studio-profile-
- * rules.ts`). Заявка по-прежнему согласует только рабочее время — неделю и
+ * окошек, паузу, окно записи (оно же — сколько дней видны окошки),
+ * автоподтверждение и приём новых клиентов — мастер меняет сам, сразу и без
+ * заявки (`studio-profile-rules.ts`). Заявка по-прежнему согласует только рабочее время — неделю и
  * дни календаря. Отказ остаётся лишь на общее для студии: отмену записи,
  * горящие окошки и точность времени в каталоге — у профиля в студии они ни на
  * что не влияют, и «Сохранено» за них было бы молчаливым откатом.
@@ -298,6 +307,12 @@ async function buildResponse(input: {
 
   return {
     ...snapshot,
+    // BOOKING-WINDOW-MERGE: зеркало окна записи для старых сборок приложения,
+    // читающих `visibility.visibleSlotDays` (веб его не читает).
+    visibility: {
+      ...snapshot.visibility,
+      visibleSlotDays: normalizeBookingRules(snapshot.bookingRules, snapshot.bookingRules).maxDaysAhead,
+    },
     approval,
   };
 }

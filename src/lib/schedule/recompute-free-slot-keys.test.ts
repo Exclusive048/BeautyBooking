@@ -43,7 +43,6 @@ function master(freeSlotKeys: string[]) {
     slotStepMin: null,
     minBookingHoursAhead: null,
     maxBookingDaysAhead: 30,
-    visibleSlotDays: 30,
     bufferBetweenBookingsMin: null,
     freeSlotKeys,
   };

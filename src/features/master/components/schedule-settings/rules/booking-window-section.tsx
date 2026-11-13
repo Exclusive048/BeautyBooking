@@ -3,6 +3,7 @@
 import { SLOT_STEP_OPTIONS, type BookingRulesDto, type SlotStepMin } from "@/lib/schedule/editor-shared";
 import * as UI_TEXT from "@/lib/ui/text";
 import { ChipGroup } from "@/components/ui/chip-group";
+import { formatDays } from "@/lib/utils/pluralize-days";
 import { SettingRow } from "../components/setting-row";
 
 const T = UI_TEXT.cabinetMaster.scheduleSettings.rules.bookingWindow;
@@ -20,12 +21,21 @@ const MIN_OPTIONS = [
   { value: 24, label: T.minOptions["24"] },
 ];
 
-const MAX_OPTIONS = [
-  { value: 14, label: T.maxOptions["14"] },
-  { value: 30, label: T.maxOptions["30"] },
-  { value: 60, label: T.maxOptions["60"] },
-  { value: 90, label: T.maxOptions["90"] },
-];
+const MAX_PRESETS = [7, 14, 30, 60, 90];
+
+/**
+ * BOOKING-WINDOW-MERGE: варианты «Запись открыта вперёд». Значение вне
+ * набора (перенесённое из прежнего «Сколько окошек вперёд» — например, 3 дня
+ * — или заданное администратором студии) показывается своей кнопкой, иначе
+ * ни одна кнопка не была бы выбрана. Единица — у последней кнопки.
+ */
+function maxDaysOptions(current: number): { value: number; label: string }[] {
+  const values = [...new Set([...MAX_PRESETS, current])].sort((a, b) => a - b);
+  return values.map((value, index) => ({
+    value,
+    label: index === values.length - 1 ? formatDays(value) : String(value),
+  }));
+}
 
 type Props = {
   rules: BookingRulesDto;
@@ -37,7 +47,8 @@ type Props = {
 /**
  * "Когда можно записаться" — pair of chip groups for the booking window.
  * Min hours ahead = how soon a client can grab a slot. Max days ahead =
- * how far in advance the schedule is open. Шаг окошек — как часто они
+ * how far in advance the schedule is open — and, since BOOKING-WINDOW-MERGE,
+ * how far ahead clients see free slots. Шаг окошек — как часто они
  * начинаются; жил во вкладке «Часы», переехал сюда вместе с её удалением
  * (SCHEDULE-HOURS-TAB-REMOVAL, 2026-10-01): это поле `Provider`, а не недели.
  */
@@ -64,7 +75,7 @@ export function BookingWindowSection({ rules, onChange, slotStepMin, onSlotStepC
             <ChipGroup
               value={rules.maxDaysAhead}
               onChange={(value) => onChange({ ...rules, maxDaysAhead: value })}
-              options={MAX_OPTIONS}
+              options={maxDaysOptions(rules.maxDaysAhead)}
             />
           }
         />

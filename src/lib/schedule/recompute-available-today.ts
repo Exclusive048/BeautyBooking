@@ -85,7 +85,6 @@ export async function recomputeAvailableToday(
       bufferBetweenBookingsMin: true,
       // CATALOG-DATE-TIME-FILTER: поля снимка свободного времени.
       maxBookingDaysAhead: true,
-      visibleSlotDays: true,
       freeSlotKeys: true,
     },
   });
@@ -182,7 +181,6 @@ async function recomputeOneProvider(
       bufferBetweenBookingsMin: true,
       // CATALOG-DATE-TIME-FILTER: поля снимка свободного времени.
       maxBookingDaysAhead: true,
-      visibleSlotDays: true,
       freeSlotKeys: true,
     },
   });

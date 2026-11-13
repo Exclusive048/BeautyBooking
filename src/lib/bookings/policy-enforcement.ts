@@ -8,7 +8,7 @@ import { SCHEDULE_HORIZON_DAYS } from "@/lib/schedule/publish-horizon";
  * Pre-launch backlog gap closure: the 6 booking-rules fields on
  * `Provider` (minBookingHoursAhead / maxBookingDaysAhead /
  * acceptNewClients / cancellationDeadlineHours / lateCancelAction /
- * remindersEnabled / visibleSlotDays) were settable in cabinets but
+ * remindersEnabled) were settable in cabinets but
  * **not validated** at booking time. Slot endpoints surfaced
  * impossible-to-book times, and `createBooking` accepted bookings
  * outside the configured windows.
@@ -18,7 +18,7 @@ import { SCHEDULE_HORIZON_DAYS } from "@/lib/schedule/publish-horizon";
  *
  *   1. Slot generation (`/api/public/providers/[id]/slots`) — filters
  *      out slots before `now + minBookingHoursAhead` and clamps the
- *      visible window to `visibleSlotDays`.
+ *      window to `maxBookingDaysAhead` (`clampToBookingWindow`).
  *   2. `resolveBookingCore` (called inside `createBooking`) — defends
  *      against direct API calls bypassing the slot UI.
  *   3. Future widget UIs (`/u/[username]/booking`) — can re-use the
@@ -52,7 +52,6 @@ export type ProviderPolicy = {
   minBookingHoursAhead: number;
   maxBookingDaysAhead: number;
   acceptNewClients: boolean;
-  visibleSlotDays: number;
 };
 
 const MS_PER_HOUR = 60 * 60 * 1000;
@@ -201,45 +200,36 @@ export function assertAcceptsNewClient(
 }
 
 /**
- * Clamps a window to `visibleSlotDays` from `now`. Returns the inclusive
- * `toDateKey` (YYYY-MM-DD) the slot endpoint should not exceed. Used by the
- * public slots route to respect the provider's catalog visibility horizon.
+ * BOOKING-WINDOW-MERGE (решение владельца 2026-11-14) — последний день САЛОНА
+ * (включительно, `YYYY-MM-DD`), на который открыта запись: дата момента
+ * `latestBookableUtc`. Публичная выдача окошек не заглядывает дальше — окошки
+ * видны ровно настолько, насколько открыта запись. Прежняя отдельная настройка
+ * «Сколько окошек вперёд» (`visibleSlotDays`) слита с окном записи: окошки,
+ * которые она прятала, запись всё равно принимала, и наоборот.
  *
- * HARDENING-10 #16 — the horizon date-key is derived in the **provider's**
- * timezone (`toLocalDateKey(horizon, timeZone)`), consistent with the rest of
- * the booking date logic. Deriving it in UTC dropped the last visible local day
- * for east-of-UTC providers during early-morning local hours (the horizon
- * instant's UTC date-key lagged its local date-key by one). The horizon options
- * and the clamp are unchanged — only the date-key derivation is provider-local.
+ * Тот же последний день у сводки календаря (`bookable-days.ts`). Ключ даты — в
+ * поясе провайдера (HARDENING-10 #16: в UTC восточнее Гринвича рано утром
+ * терялся последний день).
  */
-export function clampVisibleSlotsHorizon(
+export function clampToBookingWindow(
   requestedToKey: string | null | undefined,
-  policy: Pick<ProviderPolicy, "visibleSlotDays">,
+  policy: Pick<ProviderPolicy, "maxBookingDaysAhead">,
   now: Date,
   timeZone: string,
 ): string {
-  const days = Math.max(1, policy.visibleSlotDays);
-  const horizon = new Date(now.getTime() + (days - 1) * MS_PER_DAY);
-  const horizonKey = toLocalDateKey(horizon, timeZone);
-  if (!requestedToKey) return horizonKey;
-  return requestedToKey < horizonKey ? requestedToKey : horizonKey;
+  const lastKey = toLocalDateKey(latestBookableUtc(policy, now), timeZone);
+  if (!requestedToKey) return lastKey;
+  return requestedToKey < lastKey ? requestedToKey : lastKey;
 }
 
 /**
- * 29.09 доработки · 03 — сколько дней вперёд публичный виджет записи
- * показывает в полосе дат: «максимум вперёд» (окно записи), у мастера — ещё
- * «Сколько окошек вперёд» (`visibleSlotDays`), и не дальше горизонта расписания.
- * Одно правило для профиля студии и мастеров в её виджете — раньше полоса
- * виджета студии была зашита на 30 дней и расходилась с окном в обе стороны.
- * У студии `visibleSlotDays` не передаётся: такой настройки у неё нет.
+ * 29.09 доработки · 03 — на сколько дней вперёд открыта запись для публичного
+ * виджета: окно записи, не дальше горизонта расписания. Одно правило для
+ * профиля студии и мастеров в её виджете. С BOOKING-WINDOW-MERGE отдельного
+ * «Сколько окошек вперёд» у мастера нет — окно одно.
  */
-export function publicBookingHorizonDays(policy: {
-  maxBookingDaysAhead: number;
-  visibleSlotDays?: number | null;
-}): number {
-  const limits = [policy.maxBookingDaysAhead, SCHEDULE_HORIZON_DAYS];
-  if (typeof policy.visibleSlotDays === "number") limits.push(policy.visibleSlotDays);
-  return Math.max(1, Math.min(...limits));
+export function publicBookingHorizonDays(policy: { maxBookingDaysAhead: number }): number {
+  return Math.max(1, Math.min(policy.maxBookingDaysAhead, SCHEDULE_HORIZON_DAYS));
 }
 
 /**

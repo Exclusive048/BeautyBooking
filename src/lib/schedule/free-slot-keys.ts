@@ -35,8 +35,8 @@ export { FREE_SLOT_HORIZON_DAYS, freeSlotHourKey };
  * Окошко — та же 30-минутная проба, что у «Свободно сегодня»: снимок отвечает
  * «есть ли время на типичную услугу», а не на конкретную (услуга в каталоге
  * необязательна). Горизонт — 30 дней, суженный окном записи провайдера
- * (`maxBookingDaysAhead`) и горизонтом видимости (`visibleSlotDays`); окошки
- * раньше «минимум за N часов» не считаются.
+ * (`maxBookingDaysAhead`: оно же решает, на сколько дней видны окошки,
+ * BOOKING-WINDOW-MERGE); окошки раньше «минимум за N часов» не считаются.
  */
 
 export type FreeSlotProbeProvider = {
@@ -45,7 +45,6 @@ export type FreeSlotProbeProvider = {
   slotStepMin: number | null;
   minBookingHoursAhead: number | null;
   maxBookingDaysAhead: number | null;
-  visibleSlotDays: number | null;
   bufferBetweenBookingsMin: number | null;
 };
 
@@ -76,11 +75,7 @@ export async function providerFreeSlotStarts(
   const todayKey = toLocalDateKey(now, timeZone);
   const horizonDays = Math.max(
     1,
-    Math.min(
-      FREE_SLOT_HORIZON_DAYS,
-      window.maxBookingDaysAhead ?? FREE_SLOT_HORIZON_DAYS,
-      provider.visibleSlotDays ?? FREE_SLOT_HORIZON_DAYS,
-    ),
+    Math.min(FREE_SLOT_HORIZON_DAYS, window.maxBookingDaysAhead ?? FREE_SLOT_HORIZON_DAYS),
   );
   const toKeyExclusive = addDaysToDateKey(todayKey, horizonDays);
   const rangeStart = localDayRangeUtc(todayKey, timeZone).startUtc;
@@ -141,7 +136,6 @@ const PROBE_SELECT = {
   slotStepMin: true,
   minBookingHoursAhead: true,
   maxBookingDaysAhead: true,
-  visibleSlotDays: true,
   bufferBetweenBookingsMin: true,
 } as const;
 

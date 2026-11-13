@@ -27,7 +27,6 @@ type ProviderProfileSource = Pick<
   | "socialMax"
   | "cancellationDeadlineHours"
   | "maxBookingDaysAhead"
-  | "visibleSlotDays"
   | "geoLat"
   | "geoLng"
 > & { services: ProviderServiceSource[] };
@@ -141,10 +140,7 @@ export function mapProviderProfile(provider: ProviderProfileSource): ProviderPro
     socialTelegram: provider.socialTelegram ?? null,
     socialMax: provider.socialMax ?? null,
     cancellationDeadlineHours: provider.cancellationDeadlineHours ?? null,
-    bookingHorizonDays: publicBookingHorizonDays({
-      maxBookingDaysAhead: provider.maxBookingDaysAhead,
-      visibleSlotDays: provider.type === "STUDIO" ? null : provider.visibleSlotDays,
-    }),
+    bookingHorizonDays: publicBookingHorizonDays({ maxBookingDaysAhead: provider.maxBookingDaysAhead }),
     hotSlotsEnabled: false,
     geoLat: provider.geoLat,
     geoLng: provider.geoLng,

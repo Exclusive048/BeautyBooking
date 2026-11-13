@@ -97,9 +97,9 @@ export type ProviderProfileDto = {
   socialMax: string | null;
   cancellationDeadlineHours: number | null;
   /**
-   * Сколько дней вперёд виджет записи показывает в полосе дат
-   * (`publicBookingHorizonDays`: окно записи, у мастера — и «Сколько окошек
-   * вперёд», не дальше горизонта расписания). 29.09 доработки · 03.
+   * На сколько дней вперёд открыта запись (`publicBookingHorizonDays`: окно
+   * записи, не дальше горизонта расписания). 29.09 доработки · 03;
+   * BOOKING-WINDOW-MERGE — отдельного «Сколько окошек вперёд» больше нет.
    */
   bookingHorizonDays: number;
   hotSlotsEnabled: boolean;

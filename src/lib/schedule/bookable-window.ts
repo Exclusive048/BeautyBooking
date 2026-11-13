@@ -26,11 +26,10 @@ import {
  * drifted), both endpoints now call this one helper for the
  * window/schedule filtering. A slot this helper returns is a slot the
  * booking-window guard will accept. The only thing `/slots` adds on top
- * is its catalog-visibility horizon clamp (`visibleSlotDays`) + hot-slot
- * pricing decoration — those stay route-local because `/availability`
- * (authenticated reschedule) is bounded by `maxBookingDaysAhead`, not the
- * public catalog-visibility horizon, so force-clamping it would wrongly
- * block rescheduling beyond `visibleSlotDays`.
+ * is hot-slot pricing decoration. Both routes narrow the requested range to
+ * the last day of the booking window (`clampToBookingWindow`) for the public
+ * listing — BOOKING-WINDOW-MERGE (2026-11-14) folded the separate
+ * catalog-visibility horizon (`visibleSlotDays`) into `maxBookingDaysAhead`.
  *
  * The proven slot ENGINE (`listAvailabilitySlotsPaginated` →
  * `buildSlotsForDay`) is untouched — this helper only filters its output.

@@ -11045,7 +11045,9 @@ export const openApiSpec = {
           "`?studioId&masterId` — владелец/администратор студии правит расписание мастера студии, сразу " +
           "(`approval.mode = STUDIO_ADMIN`). MOBILE-POLISH: в режиме `STUDIO_ADMIN` `approval.pendingRequestId` / " +
           "`requestStatus: \"PENDING\"` — открытая заявка мастера (только показ; решение — " +
-          "`POST /api/studio/schedule/requests/{id}/approve|reject`), иначе `null`; `rejectedComment` — всегда `null`.",
+          "`POST /api/studio/schedule/requests/{id}/approve|reject`), иначе `null`; `rejectedComment` — всегда `null`. " +
+          "BOOKING-WINDOW-MERGE: `visibility.visibleSlotDays` устарело — это зеркало `bookingRules.maxDaysAhead` " +
+          "(окно записи решает и то, на сколько дней вперёд видны окошки); новым клиентам его не читать.",
         tags: ["mobile", "schedule"],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }],
         parameters: SCHEDULE_ACTOR_PARAMETERS,
@@ -11067,7 +11069,9 @@ export const openApiSpec = {
           "`visibility.isPublished` не применяется; `hotSlots` — по тарифу вызывающего (403 `FEATURE_GATE`). " +
           "Мастер в режиме `STUDIO_MASTER` (профиль в студии `?profile=`) меняет сам, сразу и без заявки, " +
           "личные правила: `slotStepMin`, `bufferBetweenBookingsMin`, `bookingRules.{minHoursAhead,maxDaysAhead," +
-          "autoConfirm}`, `visibility.{visibleSlotDays,acceptNewClients}` (`approval.lastAction` = `APPLIED`). " +
+          "autoConfirm}`, `visibility.acceptNewClients` (`approval.lastAction` = `APPLIED`). " +
+          "BOOKING-WINDOW-MERGE: устаревшее `visibility.visibleSlotDays` принимается и пишется в " +
+          "`bookingRules.maxDaysAhead` (значение, равное текущему окну, — не правка; при изменённых обоих — меньшее). " +
           "Общее для студии — `bookingRules.{freeCancelHours,lateCancelAction}`, `visibility.slotPrecision` — и " +
           "`hotSlots` задаёт студия: изменение — 403 `FORBIDDEN`, неизменённые значения проходят " +
           "(STUDIO-PROFILE-PERSONAL-RULES).",

@@ -3,15 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { NumberInput } from "@/components/ui/number-input";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import {
-  BOOKING_RULE_LIMITS,
-  type ScheduleEditorSnapshot,
-  type SlotPrecision,
-  type VisibilityDto,
-} from "@/lib/schedule/editor-shared";
+import type { ScheduleEditorSnapshot, SlotPrecision, VisibilityDto } from "@/lib/schedule/editor-shared";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 
@@ -43,7 +37,8 @@ const SLOT_PRECISION_OPTIONS: ReadonlyArray<{ value: SlotPrecision; labelKey: ke
  * STUDIO-PAUSE-SPLIT-01; сервер это поле от администратора игнорирует):
  *   - `slotPrecision` — what the public sees («exact time» / «today
  *     has free slots» / «date only»)
- *   - `visibleSlotDays` — booking horizon visible to clients
+ *   (на сколько дней видны окошки, решает «Запись открыта вперёд» во
+ *   вкладке правил — BOOKING-WINDOW-MERGE)
  *   - `acceptNewClients` — gate booking widget for first-time visitors
  *     (BOOKING-WIDGET-A enforces this in `resolveBookingCore`)
  */
@@ -69,7 +64,15 @@ export function VisibilityTab({ studioId, masterId, initialSnapshot }: Props) {
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ visibility: draft }),
+          // BOOKING-WINDOW-MERGE: явный набор полей, без устаревшего
+          // `visibleSlotDays`.
+          body: JSON.stringify({
+            visibility: {
+              isPublished: draft.isPublished,
+              slotPrecision: draft.slotPrecision,
+              acceptNewClients: draft.acceptNewClients,
+            },
+          }),
         },
       );
       setSavedAt(Date.now());
@@ -102,18 +105,6 @@ export function VisibilityTab({ studioId, masterId, initialSnapshot }: Props) {
               </option>
             ))}
           </Select>
-        </Row>
-
-        <Row title={T.visibleSlotDaysTitle} hint={T.visibleSlotDaysHint}>
-          <NumberInput
-            min={BOOKING_RULE_LIMITS.visibleSlotDays.min}
-            max={BOOKING_RULE_LIMITS.visibleSlotDays.max}
-            fallback={BOOKING_RULE_LIMITS.visibleSlotDays.fallback}
-            value={draft.visibleSlotDays}
-            onValueChange={(next) => update({ visibleSlotDays: next })}
-            aria-label={T.visibleSlotDaysTitle}
-            className="w-24"
-          />
         </Row>
 
         <Row title={T.acceptNewClientsTitle} hint={T.acceptNewClientsHint}>

@@ -222,7 +222,6 @@ export async function buildScheduleSnapshot(providerId: string): Promise<Schedul
       maxBookingDaysAhead: true,
       lateCancelAction: true,
       slotPrecision: true,
-      visibleSlotDays: true,
       acceptNewClients: true,
       isPublished: true,
       bufferBetweenBookingsMin: true,
@@ -274,7 +273,6 @@ export async function buildScheduleSnapshot(providerId: string): Promise<Schedul
   const visibility: VisibilityDto = {
     isPublished: provider.isPublished,
     slotPrecision,
-    visibleSlotDays: provider.visibleSlotDays,
     acceptNewClients: provider.acceptNewClients,
   };
 
@@ -343,7 +341,6 @@ async function applyProviderAndDiscountRule(
   if (input.visibility) {
     providerData.isPublished = input.visibility.isPublished;
     providerData.slotPrecision = input.visibility.slotPrecision;
-    providerData.visibleSlotDays = input.visibility.visibleSlotDays;
     providerData.acceptNewClients = input.visibility.acceptNewClients;
   }
 
@@ -539,7 +536,6 @@ export async function applyStudioProfileRules(
   if (rules.minHoursAhead !== undefined) data.minBookingHoursAhead = rules.minHoursAhead;
   if (rules.maxDaysAhead !== undefined) data.maxBookingDaysAhead = rules.maxDaysAhead;
   if (rules.autoConfirm !== undefined) data.autoConfirmBookings = rules.autoConfirm;
-  if (rules.visibleSlotDays !== undefined) data.visibleSlotDays = rules.visibleSlotDays;
   if (rules.acceptNewClients !== undefined) data.acceptNewClients = rules.acceptNewClients;
   if (Object.keys(data).length === 0) return;
 

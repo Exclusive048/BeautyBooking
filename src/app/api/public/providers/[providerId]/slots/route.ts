@@ -6,7 +6,7 @@ import { resolveServiceDuration } from "@/lib/schedule/resolveDuration";
 import { addDaysToDateKey, compareDateKeys, isDateKey } from "@/lib/schedule/dateKey";
 import { resolveDynamicHotSlotPricing } from "@/lib/hot-slots/runtime";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
-import { clampVisibleSlotsHorizon, stricterBookingWindow } from "@/lib/bookings/policy-enforcement";
+import { clampToBookingWindow, stricterBookingWindow } from "@/lib/bookings/policy-enforcement";
 import { listBookableSlots } from "@/lib/schedule/bookable-window";
 import { listBookableDays } from "@/lib/schedule/bookable-days";
 import { resolveRescheduleExclusion } from "@/lib/schedule/reschedule-exclusion";
@@ -79,11 +79,10 @@ export async function GET(
       id: true,
       type: true,
       timezone: true,
-      // BOOKING-WIDGET-A: policy fields are needed for the visible-window
+      // BOOKING-WIDGET-A: policy fields are needed for the booking-window
       // clamp + min-hours filter below. Keep selection narrow.
       minBookingHoursAhead: true,
       maxBookingDaysAhead: true,
-      visibleSlotDays: true,
     } as const;
     // STUDIO-MASTER-PROFILES (этап 4): у профиля мастера в студии публичной
     // страницы нет, а окошки ему нужны — перенос студийной записи клиентом
@@ -131,23 +130,6 @@ export async function GET(
     });
     if (!service) return fail("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
 
-    // BOOKING-WIDGET-A: clamp the requested horizon to
-    // `Provider.visibleSlotDays`. The cabinet-side schedule editor stores
-    // this value as the "catalog visibility" knob — this clamp is
-    // public-discovery-specific and stays route-local (the authenticated
-    // `/availability` reschedule surface is bounded by `maxBookingDaysAhead`
-    // instead — see bookable-window.ts).
-    const nowForPolicy = new Date();
-    const clampedToKey = clampVisibleSlotsHorizon(toKey || null, provider, nowForPolicy, provider.timezone);
-    const clampedToKeyExclusive = clampedToKey
-      ? addDaysToDateKey(clampedToKey, 1)
-      : toKey || undefined;
-    // SLOTS-RANGE-CLAMP: день за горизонтом видимости — пустая выдача, а не
-    // 400 «Проверьте выбранный период» (конец окна раньше начала).
-    const effectiveToKeyExclusive =
-      clampedToKeyExclusive && compareDateKeys(clampedToKeyExclusive, fromKey) < 0
-        ? fromKey
-        : clampedToKeyExclusive;
     // SLOTS-MAX-AHEAD: окно записи — то, что проверит запись и перенос:
     // строже из владельца услуги и мастера (`stricterBookingWindow`). Раньше
     // `/slots` «Максимум вперёд» не применял вовсе и показывал окошки, на
@@ -155,6 +137,18 @@ export async function GET(
     const windowPolicy = service.provider
       ? stricterBookingWindow(service.provider, provider)
       : { minBookingHoursAhead: provider.minBookingHoursAhead, maxBookingDaysAhead: provider.maxBookingDaysAhead };
+    // BOOKING-WINDOW-MERGE: окошки видны ровно настолько, насколько открыта
+    // запись — запрошенный период обрезается по последнему дню окна записи
+    // (прежде — по отдельному «Сколько окошек вперёд»).
+    const nowForPolicy = new Date();
+    const clampedToKeyExclusive = addDaysToDateKey(
+      clampToBookingWindow(toKey || null, windowPolicy, nowForPolicy, provider.timezone),
+      1,
+    );
+    // SLOTS-RANGE-CLAMP: день за окном записи — пустая выдача, а не 400
+    // «Проверьте выбранный период» (конец окна раньше начала).
+    const effectiveToKeyExclusive =
+      compareDateKeys(clampedToKeyExclusive, fromKey) < 0 ? fromKey : clampedToKeyExclusive;
 
     // RESCHEDULE-SELF-SLOT: окно переносимой брони не занято — только для
     // сторон этой брони (см. reschedule-exclusion.ts); аноним без сессии — 401.

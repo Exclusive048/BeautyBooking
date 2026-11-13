@@ -108,8 +108,16 @@ export type BookingRulesDto = {
 export type VisibilityDto = {
   isPublished: boolean;
   slotPrecision: SlotPrecision;
-  visibleSlotDays: number;
   acceptNewClients: boolean;
+  /**
+   * @deprecated BOOKING-WINDOW-MERGE (решение владельца 2026-11-14): отдельной
+   * настройки «Сколько окошек вперёд» больше нет — окошки видны и запись
+   * открыта ровно на `bookingRules.maxDaysAhead`. Поле живёт только в ответе
+   * `/api/cabinet/master/schedule` зеркалом `maxDaysAhead` для старых сборок
+   * приложения и принимается в PATCH (`mergeLegacyVisibleDays`). Веб его не
+   * читает и не отправляет. Удаление — `VISIBLE-SLOT-DAYS-DROP` в BACKLOG.
+   */
+  visibleSlotDays?: number;
 };
 
 export type HotSlotsDto = {
@@ -189,9 +197,10 @@ export const WEEK_TEMPLATE_OPTIONS: WeekTemplateDto[] = [
 export const BOOKING_RULE_LIMITS = {
   minHoursAhead: { min: 0, max: 168, fallback: 2 },
   // SCHEDULE-PATTERNS-01: запись открыта максимум на горизонт расписания (3 месяца).
-  maxDaysAhead: { min: 1, max: SCHEDULE_HORIZON_DAYS, fallback: 90 },
+  // BOOKING-WINDOW-MERGE: одна настройка «Запись открыта вперёд» — и окошки,
+  // и запись; по умолчанию 30 дней, как прежнее «Сколько окошек вперёд».
+  maxDaysAhead: { min: 1, max: SCHEDULE_HORIZON_DAYS, fallback: 30 },
   freeCancelHours: { min: 0, max: 168, fallback: 24 },
-  visibleSlotDays: { min: 1, max: 90, fallback: 30 },
   bufferMin: { min: 0, max: 30, fallback: 0 },
 } as const;
 
@@ -283,13 +292,46 @@ export function normalizeVisibility(
     typeof precisionRaw === "string" && SLOT_PRECISIONS.includes(precisionRaw as SlotPrecision)
       ? (precisionRaw as SlotPrecision)
       : defaults.slotPrecision;
-  const visibleSlotDays = clampToRange(
-    record.visibleSlotDays,
-    BOOKING_RULE_LIMITS.visibleSlotDays,
-    defaults.visibleSlotDays
-  );
+  // BOOKING-WINDOW-MERGE: устаревшее `visibleSlotDays` сюда не попадает —
+  // его разбирает `readLegacyVisibleDays` и вливает в окно записи.
+  return { isPublished, slotPrecision, acceptNewClients };
+}
 
-  return { isPublished, slotPrecision, visibleSlotDays, acceptNewClients };
+/**
+ * BOOKING-WINDOW-MERGE — устаревшее `visibility.visibleSlotDays` из тела PATCH
+ * (старые сборки приложения). `undefined` — поле не прислано или не число.
+ * Прижимается к пределам окна записи, а не к прежним 1…90.
+ */
+export function readLegacyVisibleDays(visibility: unknown): number | undefined {
+  if (!visibility || typeof visibility !== "object") return undefined;
+  const raw = (visibility as Record<string, unknown>).visibleSlotDays;
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return undefined;
+  return clampToRange(raw, BOOKING_RULE_LIMITS.maxDaysAhead, BOOKING_RULE_LIMITS.maxDaysAhead.fallback);
+}
+
+/**
+ * BOOKING-WINDOW-MERGE — вливает устаревшее «Сколько окошек вперёд» в окно
+ * записи. Старое приложение шлёт снимок целиком, где поле — зеркало
+ * `maxDaysAhead` из прошлого ответа; поэтому:
+ *   - значение совпало с текущим окном — ничего не меняли, правок нет;
+ *   - изменено только оно — это и есть новое окно записи;
+ *   - изменены оба — строже из двух (прежде клиент видел меньшее из них).
+ * Возвращает правила для записи либо `undefined`, если правок окна нет.
+ */
+export function mergeLegacyVisibleDays(
+  current: BookingRulesDto,
+  bookingRules: BookingRulesDto | undefined,
+  legacyVisibleDays: number | undefined
+): BookingRulesDto | undefined {
+  if (legacyVisibleDays === undefined || legacyVisibleDays === current.maxDaysAhead) {
+    return bookingRules;
+  }
+  const next = bookingRules ?? current;
+  const maxDaysAhead =
+    next.maxDaysAhead !== current.maxDaysAhead
+      ? Math.min(next.maxDaysAhead, legacyVisibleDays)
+      : legacyVisibleDays;
+  return { ...next, maxDaysAhead };
 }
 
 export function normalizeHotSlots(value: unknown): HotSlotsDto | null {

@@ -40,7 +40,16 @@ export function VisibilityTab({ initialSnapshot, onSnapshotPatch }: Props) {
         const saved = await fetchJsonWithAuth<ScheduleEditorSnapshot>(endpoint, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ visibility: value }),
+          // BOOKING-WINDOW-MERGE: явный набор полей — ответ сервера несёт
+          // устаревшее зеркало `visibleSlotDays` для старого приложения, и
+          // отправленное назад оно меняло бы окно записи.
+          body: JSON.stringify({
+            visibility: {
+              isPublished: value.isPublished,
+              slotPrecision: value.slotPrecision,
+              acceptNewClients: value.acceptNewClients,
+            },
+          }),
         });
         onSnapshotPatch({ visibility: saved.visibility });
       } catch (error) {

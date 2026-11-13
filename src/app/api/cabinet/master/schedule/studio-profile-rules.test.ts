@@ -6,8 +6,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * (`STUDIO_MASTER`):
  *
  *   - ЛИЧНЫЕ правила профиля в студии — шаг окошек, пауза, «минимум за» /
- *     «максимум вперёд», автоподтверждение, дни видимости окошек, приём новых
- *     клиентов — применяются сразу, без заявки (`applyStudioProfileRules`);
+ *     «запись открыта вперёд», автоподтверждение, приём новых клиентов —
+ *     применяются сразу, без заявки (`applyStudioProfileRules`);
+ *   - BOOKING-WINDOW-MERGE: устаревшее `visibility.visibleSlotDays` старого
+ *     приложения — это окно записи; совпавшее с ним зеркало правкой не
+ *     считается, а в ответе зеркало есть;
  *   - общие для студии — бесплатная и поздняя отмена, горящие окошки,
  *     точность времени в каталоге — отказываются 403 `FORBIDDEN`, и личная
  *     половина той же правки при этом НЕ пишется;
@@ -28,6 +31,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * @probe  2026-10-30: `applyStudioProfileRules` добавлен ещё и ДО заявки →
  *         красный «заявка отказала — личные правила не записаны» (плюс пять
  *         «… применяются сразу» — запись в пробе шла дважды).
+ * @probe  2026-11-14: в `buildResponse` убрано зеркало `visibleSlotDays` →
+ *         красный «ответ несёт зеркало окна записи»; `readLegacyVisibleDays`
+ *         не вызван в `readSettingsPatch` → красный «устаревшее … — это окно
+ *         записи».
  * @probe  2026-10-30: `freeCancelHours` отнесён к личным полям → красный
  *         «изменение бесплатной отмены — 403».
  */
@@ -105,7 +112,6 @@ const SNAPSHOT = {
   visibility: {
     isPublished: true,
     slotPrecision: "exact",
-    visibleSlotDays: 14,
     acceptNewClients: true,
   },
   hotSlots: null,
@@ -177,11 +183,33 @@ describe("PATCH /api/cabinet/master/schedule — личные правила п�
     await expectApplied({ slotStepMin: 60 }, { slotStepMin: 60 });
   });
 
-  it("дни видимости окошек и приём новых клиентов применяются сразу", async () => {
+  it("приём новых клиентов применяется сразу", async () => {
     await expectApplied(
-      { visibility: { ...SNAPSHOT.visibility, visibleSlotDays: 30, acceptNewClients: false } },
-      { visibleSlotDays: 30, acceptNewClients: false },
+      { visibility: { ...SNAPSHOT.visibility, acceptNewClients: false } },
+      { acceptNewClients: false },
     );
+  });
+
+  it("устаревшее «Сколько окошек вперёд» старого приложения — это окно записи", async () => {
+    await expectApplied(
+      { visibility: { ...SNAPSHOT.visibility, visibleSlotDays: 14, acceptNewClients: false } },
+      { maxDaysAhead: 14, acceptNewClients: false },
+    );
+  });
+
+  it("зеркало окна записи, присланное назад как есть, — не правка", async () => {
+    const result = await patch({
+      bookingRules: SNAPSHOT.bookingRules,
+      visibility: { ...SNAPSHOT.visibility, visibleSlotDays: SNAPSHOT.bookingRules.maxDaysAhead },
+    });
+    expect(result.status).toBe(200);
+    expect(result.body.data.approval.lastAction).toBe("NO_CHANGES");
+    expect(applyStudioProfileRules).not.toHaveBeenCalled();
+  });
+
+  it("ответ несёт зеркало окна записи для старого приложения", async () => {
+    const result = await patch({ slotStepMin: 60 });
+    expect(result.body.data.visibility.visibleSlotDays).toBe(SNAPSHOT.bookingRules.maxDaysAhead);
   });
 
   it("личная видимость страницы с профиля в студии не пишется и изменением не считается", async () => {

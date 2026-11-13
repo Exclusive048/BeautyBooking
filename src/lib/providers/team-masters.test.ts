@@ -43,7 +43,6 @@ function teamRow(over: Record<string, unknown>) {
     ratingCount: 12,
     bufferBetweenBookingsMin: 10,
     maxBookingDaysAhead: 60,
-    visibleSlotDays: 14,
     masterServices: [{ serviceId: "svc-1" }],
     owner: { masterProfile: { provider: { id: "m-personal", publicUsername: "marina", isPublished: true } } },
     ...over,
@@ -84,7 +83,8 @@ describe("listPublicTeamMasters", () => {
       serviceIds: ["svc-1"],
       bufferMin: 10,
     });
-    expect(open.bookingHorizonDays).toBeGreaterThan(0);
+    // BOOKING-WINDOW-MERGE: горизонт — окно записи профиля в студии.
+    expect(open.bookingHorizonDays).toBe(60);
 
     providerFindMany.mockResolvedValueOnce([
       teamRow({ owner: { masterProfile: { provider: { id: "m-personal", publicUsername: "marina", isPublished: false } } } }),

@@ -7,7 +7,9 @@ import type { ScheduleEditorSnapshot } from "@/lib/schedule/editor-shared";
  * STUDIO-PROFILE-PERSONAL-RULES — на расписании профиля в студии (`?profile=`)
  * те же четыре вкладки, но только с ЛИЧНЫМИ правилами мастера: «Правила» без
  * отмены записи и горящих окошек, «Видимость» без видимости страницы и
- * точности времени (роут их изменение отказывает), над вкладкой — пояснение,
+ * точности времени (роут их изменение отказывает) — с BOOKING-WINDOW-MERGE
+ * секции «Как клиенты видят окошки» там нет вовсе: дни видимости слиты с
+ * окном записи во вкладке «Правила». Над вкладкой — пояснение,
  * что окно записи действует строже из правил мастера и студии. Личное
  * расписание — как прежде, всё на месте.
  *
@@ -20,6 +22,9 @@ import type { ScheduleEditorSnapshot } from "@/lib/schedule/editor-shared";
  * @probe  2026-10-30: `showPrecision={!studioProfile}` → `showPrecision` →
  *         красный «профиль в студии, «Видимость»: …» (строка «Точность
  *         времени» вернулась).
+ * @probe  2026-11-14: в `SlotVisibilitySection` снят ранний `return null` →
+ *         красный «профиль в студии, «Видимость»: …» (пустая секция с
+ *         заголовком «Как клиенты видят окошки» на экране).
  * @probe  2026-10-30: условие пояснения `active !== "calendar"` снято →
  *         красный «профиль в студии: календарь без пояснения».
  */
@@ -61,7 +66,6 @@ const SNAPSHOT = {
   visibility: {
     isPublished: true,
     slotPrecision: "exact",
-    visibleSlotDays: 14,
     acceptNewClients: true,
   },
   hotSlots: null,
@@ -113,11 +117,11 @@ describe("настройки расписания — профиль в студ
     expect(html).toContain(T.studioProfileRulesNote);
   });
 
-  it("профиль в студии, «Видимость»: дни и новые клиенты — без страницы и точности времени", () => {
+  it("профиль в студии, «Видимость»: новые клиенты — без страницы, точности времени и пустой секции", () => {
     search.value = "tab=visibility";
     const html = render("profile-in-studio");
-    expect(html).toContain(SLOT.daysTitle);
     expect(html).toContain("NEW_CLIENTS_SECTION");
+    expect(html).not.toContain(SLOT.title);
     expect(html).not.toContain(SLOT.precisionTitle);
     expect(html).not.toContain(SLOT.publishedTitle);
     expect(html).toContain(T.studioProfileRulesNote);
@@ -143,6 +147,6 @@ describe("настройки расписания — личное распис�
     search.value = "tab=visibility";
     const html = render(null);
     expect(html).toContain(SLOT.precisionTitle);
-    expect(html).toContain(SLOT.daysTitle);
+    expect(html).toContain(SLOT.publishedTitle);
   });
 });

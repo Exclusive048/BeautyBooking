@@ -1,9 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * 29.09 доработки · 03 — публичные окошки `/api/masters/{id}/availability`
- * (виджет записи в студию) не дальше «Сколько окошек вперёд» мастера; перенос
- * существующей записи эта настройка не ограничивает.
+ * 29.09 доработки · 03 → BOOKING-WINDOW-MERGE — публичные окошки
+ * `/api/masters/{id}/availability` (виджет записи в студию) не дальше
+ * последнего дня окна записи (строже из владельца услуги и мастера; отдельного
+ * «Сколько окошек вперёд» больше нет). Перенос существующей записи эта
+ * обрезка не трогает — его окно применяет `bookable-window.ts`.
+ *
+ * @probe 2026-11-14 — обрезка по окну мастера, а не по строгому из двух
+ * (`clampToBookingWindow(…, provider, …)`): покраснел «публичный запрос — не
+ * дальше окна записи» (граница уехала на 2026-10-31).
  *
  * @probe 2026-09-29 — обрезка убрана (`toKeyExclusive` всегда из запроса):
  * покраснел «публичный запрос — не дальше 7 дней». Обрезка всегда (без
@@ -27,7 +33,6 @@ vi.mock("@/lib/providers/resolve-provider", () => ({
       timezone: "Asia/Yekaterinburg",
       minBookingHoursAhead: 0,
       maxBookingDaysAhead: 30,
-      visibleSlotDays: 7,
     }),
 }));
 vi.mock("@/lib/auth/access", () => ({
@@ -45,7 +50,8 @@ vi.mock("@/lib/auth/ownership", () => ({
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     booking: { findUnique: (...args: unknown[]) => bookingFindUnique(...args) },
-    service: { findUnique: vi.fn(async () => ({ provider: { minBookingHoursAhead: 0, maxBookingDaysAhead: 30 } })) },
+    // Окно владельца услуги строже окна мастера — выдача обязана резаться по нему.
+    service: { findUnique: vi.fn(async () => ({ provider: { minBookingHoursAhead: 0, maxBookingDaysAhead: 7 } })) },
     studio: { findUnique: vi.fn(async () => null) },
     provider: { findUnique: vi.fn(async () => ({ studioId: null })) },
     masterService: { findMany: vi.fn(async () => []) },
@@ -113,10 +119,11 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("/availability — «Сколько окошек вперёд» мастера", () => {
-  it("публичный запрос — не дальше 7 дней по салону", async () => {
-    // 30.09 — первый день, седьмой — 06.10, исключающая граница — 07.10.
-    expect((await call("")).toKeyExclusive).toBe("2026-10-07");
+describe("/availability — окно записи мастера", () => {
+  it("публичный запрос — не дальше окна записи (7 дней) по салону", async () => {
+    // Сейчас 30.09 01:30 по салону; запись открыта до 07.10 01:30 — последний
+    // день 07.10 (тот же, что у календаря и проверки записи), граница — 08.10.
+    expect((await call("")).toKeyExclusive).toBe("2026-10-08");
   });
 
   it("запрошенный конец раньше горизонта — остаётся", async () => {
@@ -139,7 +146,7 @@ describe("/availability — окно за горизонтом и сводка �
     return res;
   }
 
-  it("день за «Сколько окошек вперёд» — пустая выдача, а не 400 (SLOTS-RANGE-CLAMP)", async () => {
+  it("день за окном записи — пустая выдача, а не 400 (SLOTS-RANGE-CLAMP)", async () => {
     const res = await get("&from=2026-10-10&limit=1");
     expect(res.status).toBe(200);
     const input = listBookableSlots.mock.calls.at(-1)?.[0] as { fromKey: string; toKeyExclusive?: string };
@@ -154,10 +161,10 @@ describe("/availability — окно за горизонтом и сводка �
     const input = listBookableDays.mock.calls.at(-1)?.[0] as Record<string, unknown>;
     expect(input).toMatchObject({
       fromKey: "2026-09-30",
-      toKeyExclusive: "2026-10-07",
+      toKeyExclusive: "2026-10-08",
       operatorWindow: false,
       allStarts: false,
-      windowPolicy: { minBookingHoursAhead: 0, maxBookingDaysAhead: 30 },
+      windowPolicy: { minBookingHoursAhead: 0, maxBookingDaysAhead: 7 },
     });
     const body = (await res.json()) as { data: { lastDate: string } };
     expect(body.data.lastDate).toBe("2026-10-06");
@@ -170,7 +177,7 @@ describe("/availability — окно за горизонтом и сводка �
     expect(res.status).toBe(200);
     const input = listBookableDays.mock.calls.at(-1)?.[0] as Record<string, unknown>;
     expect(input).toMatchObject({ operatorWindow: true, allStarts: true });
-    // «Сколько окошек вперёд» — про клиента: оператора не обрезает.
+    // Обрезка выдачи — про клиента: окно оператора применяет `bookable-window.ts`.
     expect(input.toKeyExclusive).toBeUndefined();
   });
 });
