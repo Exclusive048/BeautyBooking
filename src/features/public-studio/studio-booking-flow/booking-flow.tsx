@@ -27,7 +27,8 @@ import {
   type ServiceBookingConfig,
 } from "@/features/booking/lib/booking-config";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
-import { SCHEDULE_HORIZON_DAYS } from "@/lib/schedule/publish-horizon";
+import { bookableDaysUrl, useBookableDays } from "@/features/booking/lib/use-bookable-days";
+import { firstFreeDate } from "@/lib/schedule/bookable-days-shared";
 import { UI_FMT } from "@/lib/ui/fmt";
 import * as UI_TEXT from "@/lib/ui/text";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
@@ -99,6 +100,9 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
   // дней живёт за шагом «когда», а виджет до конца загрузки в состоянии
   // `loading`.
   const [selectedDate, setSelectedDate] = useState(() => todayKey(viewerTimeZone));
+  // BOOKING-DATE-CALENDAR: день выбран человеком в календаре — до этого
+  // выбирается первый со свободным временем.
+  const [datePickedByUser, setDatePickedByUser] = useState(false);
   const [serviceId, setServiceId] = useState(initialServiceId ?? "");
   const [masterId, setMasterId] = useState(initialMasterId ?? "");
   const [slotLabel, setSlotLabel] = useState("");
@@ -187,21 +191,6 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
     return "";
   }, [anyMasterSlots, masterId, slotLabel]);
 
-  // 29.09 доработки · 03: полоса дат — окно записи студии и мастера. Для
-  // выбранного мастера — меньшее из двух; для «Любой мастер» — студия и
-  // самый дальний горизонт среди мастеров услуги (окошко уйдёт тому, у кого
-  // оно есть). У мастера без поля ограничивает только студия.
-  const horizonDays = useMemo(() => {
-    const studioDays = studio?.bookingHorizonDays ?? SCHEDULE_HORIZON_DAYS;
-    const masterDays = (master: StudioMaster) => master.bookingHorizonDays ?? studioDays;
-    if (masterId && masterId !== ANY_MASTER_ID) {
-      const selected = masters.find((master) => master.id === masterId);
-      return selected ? Math.min(studioDays, masterDays(selected)) : studioDays;
-    }
-    if (availableMasters.length === 0) return studioDays;
-    return Math.min(studioDays, Math.max(...availableMasters.map(masterDays)));
-  }, [availableMasters, masterId, masters, studio]);
-
   const slots = useMemo(() => {
     if (anyMasterSlots) return anyMasterSlots.map((entry) => entry.slot);
     return resolvedMasterId ? availabilityByMaster[resolvedMasterId]?.slots ?? [] : [];
@@ -232,6 +221,43 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
     zonesDifferForViewer({ iso: selectedSlot.startAtUtc, salonTimeZone: salonTz, viewerTimeZone })
       ? formatZoneLabel({ iso: selectedSlot.startAtUtc, timeZone: salonTz })
       : "";
+
+  // BOOKING-DATE-CALENDAR: дни календаря шага «Когда» — сводка окна записи
+  // выбранного мастера; у «Любой мастер» — всех мастеров услуги (день
+  // свободен, если свободен хоть у одного: окошко уйдёт тому, у кого оно
+  // есть). Окно — то же, что у окошек (строже из студии и мастера, «Сколько
+  // окошек вперёд» мастера), поэтому прежний расчёт горизонта полосы дат
+  // (29.09 доработки · 03) больше не нужен.
+  const salonTodayKey = useMemo(() => todayKey(salonTz), [salonTz]);
+  const daySummaryUrls = useMemo(() => {
+    if (!studio || !serviceId) return null;
+    const ids =
+      masterId === ANY_MASTER_ID ? assignedMasters.map((master) => master.id) : masterId ? [masterId] : [];
+    return ids.map((id) =>
+      bookableDaysUrl(`/api/masters/${encodeURIComponent(id)}/availability`, {
+        serviceId,
+        from: salonTodayKey,
+      }),
+    );
+  }, [assignedMasters, masterId, salonTodayKey, serviceId, studio]);
+  const bookableDays = useBookableDays({
+    urls: daySummaryUrls,
+    fallbackError: UI_TEXT.bookingCalendar.loadFailed,
+  });
+
+  // Пока человек сам не выбрал день — первый со свободным временем. Выбранный
+  // им день, на котором у другого мастера свободного времени нет, тоже
+  // заменяется: иначе после смены мастера шаг открывался бы пустым днём.
+  // Состояние меняется в рендере по условию (не в эффекте): запрос окошек
+  // сразу уходит на нужную дату.
+  const selectedDayFree =
+    bookableDays.summary?.days.some((day) => day.date === selectedDate && day.status === "free") ?? false;
+  const autoDate =
+    bookableDays.summary && (!datePickedByUser || !selectedDayFree) ? firstFreeDate(bookableDays.summary) : null;
+  if (autoDate && autoDate !== selectedDate) {
+    setSelectedDate(autoDate);
+    setSlotLabel("");
+  }
 
   // Мастер из ссылки — по id либо по адресу страницы. Раньше адрес без id
   // не читался вовсе (сценарий «к мастеру» без его услуг и шапки).
@@ -902,12 +928,17 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
           {step === "when" ? (
             <WhenStep
               slots={slots}
-              loading={loadingSlots}
+              // Пока не известно, какой день откроется, окошки «сегодня» не
+              // показываются — день сменится, как только придёт календарь.
+              loading={loadingSlots || (!datePickedByUser && bookableDays.loading)}
               selectedDate={selectedDate}
               onDateChange={(date) => {
+                setDatePickedByUser(true);
                 setSelectedDate(date);
                 setSlotLabel("");
               }}
+              todayKey={salonTodayKey}
+              days={bookableDays}
               selectedSlotLabel={slotLabel}
               onSlotChange={(label) => {
                 setSlotLabel(label);
@@ -922,7 +953,6 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
               viewerTimeZone={viewerTimeZone}
               selectedMasterName={selectedMasterName ?? ""}
               isAnyMaster={masterId === ANY_MASTER_ID}
-              horizonDays={horizonDays}
               onBack={() => goBack("when")}
             />
           ) : null}

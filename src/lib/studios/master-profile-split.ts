@@ -399,7 +399,6 @@ const PERSONAL_PROFILE_COPY_SELECT = {
   maxBookingDaysAhead: true,
   lateCancelAction: true,
   slotPrecision: true,
-  visibleSlotDays: true,
   acceptNewClients: true,
   slotStepMin: true,
 } satisfies Prisma.ProviderSelect;

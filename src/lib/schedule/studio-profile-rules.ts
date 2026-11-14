@@ -19,11 +19,12 @@ import {
  * Личные — значения, которые при записи через студию читаются со строки
  * профиля в студии, то есть принадлежат этому мастеру:
  *   - шаг окошек и пауза между записями — генерация окошек его профиля;
- *   - «минимум за» / «максимум вперёд» и «принимать новых клиентов» —
+ *   - «минимум за» / «запись открыта вперёд» и «принимать новых клиентов» —
  *     действует строже из студии и мастера (`stricterBookingWindow`,
- *     `stricterAcceptNewClients`), то есть мастер может только сузить;
- *   - автоподтверждение — флаг исполнителя (`booking-core.ts`);
- *   - сколько дней вперёд видны окошки — `clampVisibleSlotsHorizon` профиля.
+ *     `stricterAcceptNewClients`), то есть мастер может только сузить; окно
+ *     записи заодно решает, на сколько дней вперёд видны окошки
+ *     (BOOKING-WINDOW-MERGE);
+ *   - автоподтверждение — флаг исполнителя (`booking-core.ts`).
  * Их мастер меняет сам, без заявки: заявка согласует рабочее время.
  *
  * Общие для студии — то, что запись берёт с ПОВЕРХНОСТИ (студии), а у профиля
@@ -43,7 +44,6 @@ export type StudioProfilePersonalRules = {
   minHoursAhead?: number;
   maxDaysAhead?: number;
   autoConfirm?: boolean;
-  visibleSlotDays?: number;
   acceptNewClients?: boolean;
 };
 
@@ -99,7 +99,6 @@ export function splitStudioProfileRulesEdit(current: CurrentRules, next: NextRul
   if (next.visibility) {
     const was = normalizeVisibility(current.visibility, current.visibility);
     const now = normalizeVisibility(next.visibility, was);
-    if (now.visibleSlotDays !== was.visibleSlotDays) personal.visibleSlotDays = now.visibleSlotDays;
     if (now.acceptNewClients !== was.acceptNewClients) personal.acceptNewClients = now.acceptNewClients;
     if (now.slotPrecision !== was.slotPrecision) lockedChanged = true;
   }

@@ -4,9 +4,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   BOOKING_RULE_LIMITS,
+  mergeLegacyVisibleDays,
   normalizeBookingRules,
   normalizeBufferMin,
   normalizeVisibility,
+  readLegacyVisibleDays,
   type BookingRulesDto,
   type VisibilityDto,
 } from "./editor-shared";
@@ -18,6 +20,16 @@ import {
  * набором кнопок кабинета мастера: «13 часов» молча заменялись прежним
  * значением, буфер вне списка — нулём. Здесь пиннится диапазон вместо набора
  * и то, что «значение по умолчанию» пустого поля совпадает с дефолтом колонки.
+ *
+ * BOOKING-WINDOW-MERGE (2026-11-14): «Сколько окошек вперёд» слито с окном
+ * записи. Устаревшее `visibility.visibleSlotDays` из старого приложения
+ * вливается в `maxDaysAhead`: совпало с текущим окном — правки нет; изменено
+ * только оно — новое окно; изменены оба — строже из двух.
+ *
+ * @probe 2026-11-14 — в `mergeLegacyVisibleDays` при обеих правках взят
+ * `Math.max`: покраснел «изменены оба — строже из двух». Без проверки
+ * «совпало с текущим окном»: покраснел «зеркало из прошлого ответа — не правка».
+ * `readLegacyVisibleDays` без прижатия: покраснел «прижимает к пределам окна».
  */
 
 const RULES: BookingRulesDto = {
@@ -31,7 +43,6 @@ const RULES: BookingRulesDto = {
 const VISIBILITY: VisibilityDto = {
   isPublished: true,
   slotPrecision: "exact",
-  visibleSlotDays: 30,
   acceptNewClients: true,
 };
 
@@ -71,13 +82,49 @@ describe("normalizeBookingRules — диапазон, а не набор кно�
   });
 });
 
-describe("normalizeVisibility / normalizeBufferMin", () => {
-  it("видимые дни — любое целое в диапазоне", () => {
-    expect(normalizeVisibility({ ...VISIBILITY, visibleSlotDays: 45 }, VISIBILITY).visibleSlotDays).toBe(45);
-    expect(normalizeVisibility({ ...VISIBILITY, visibleSlotDays: 400 }, VISIBILITY).visibleSlotDays).toBe(
-      BOOKING_RULE_LIMITS.visibleSlotDays.max,
-    );
+describe("BOOKING-WINDOW-MERGE — устаревшее «Сколько окошек вперёд»", () => {
+  it("normalizeVisibility поле не пропускает", () => {
+    const out = normalizeVisibility({ ...VISIBILITY, visibleSlotDays: 45 }, VISIBILITY);
+    expect(out).toEqual(VISIBILITY);
+    expect("visibleSlotDays" in out).toBe(false);
   });
+
+  it("readLegacyVisibleDays: нет поля или нечисло — undefined", () => {
+    expect(readLegacyVisibleDays(undefined)).toBeUndefined();
+    expect(readLegacyVisibleDays({ isPublished: true })).toBeUndefined();
+    expect(readLegacyVisibleDays({ visibleSlotDays: "30" })).toBeUndefined();
+    expect(readLegacyVisibleDays({ visibleSlotDays: Number.NaN })).toBeUndefined();
+  });
+
+  it("readLegacyVisibleDays прижимает к пределам окна записи", () => {
+    expect(readLegacyVisibleDays({ visibleSlotDays: 45 })).toBe(45);
+    expect(readLegacyVisibleDays({ visibleSlotDays: 400 })).toBe(BOOKING_RULE_LIMITS.maxDaysAhead.max);
+    expect(readLegacyVisibleDays({ visibleSlotDays: 0 })).toBe(BOOKING_RULE_LIMITS.maxDaysAhead.min);
+  });
+
+  it("зеркало из прошлого ответа — не правка", () => {
+    expect(mergeLegacyVisibleDays(RULES, undefined, RULES.maxDaysAhead)).toBeUndefined();
+    const edited = { ...RULES, minHoursAhead: 6 };
+    expect(mergeLegacyVisibleDays(RULES, edited, RULES.maxDaysAhead)).toBe(edited);
+    expect(mergeLegacyVisibleDays(RULES, edited, undefined)).toBe(edited);
+  });
+
+  it("изменено только поле видимости — это новое окно записи", () => {
+    expect(mergeLegacyVisibleDays(RULES, undefined, 14)).toEqual({ ...RULES, maxDaysAhead: 14 });
+    expect(mergeLegacyVisibleDays(RULES, { ...RULES, minHoursAhead: 6 }, 14)).toEqual({
+      ...RULES,
+      minHoursAhead: 6,
+      maxDaysAhead: 14,
+    });
+  });
+
+  it("изменены оба — строже из двух", () => {
+    expect(mergeLegacyVisibleDays(RULES, { ...RULES, maxDaysAhead: 60 }, 14)?.maxDaysAhead).toBe(14);
+    expect(mergeLegacyVisibleDays(RULES, { ...RULES, maxDaysAhead: 10 }, 14)?.maxDaysAhead).toBe(10);
+  });
+});
+
+describe("normalizeBufferMin", () => {
 
   it("буфер: любое целое 0..30, выше — потолок CHECK-констрейнта, а не ноль", () => {
     expect(normalizeBufferMin(25)).toBe(25);
@@ -98,7 +145,6 @@ describe("fallback пустого поля = дефолт колонки в сх
   it.each([
     ["minBookingHoursAhead", BOOKING_RULE_LIMITS.minHoursAhead.fallback],
     ["maxBookingDaysAhead", BOOKING_RULE_LIMITS.maxDaysAhead.fallback],
-    ["visibleSlotDays", BOOKING_RULE_LIMITS.visibleSlotDays.fallback],
     ["bufferBetweenBookingsMin", BOOKING_RULE_LIMITS.bufferMin.fallback],
   ])("%s", (column, fallback) => {
     expect(fallback).toBe(defaultOf(column));

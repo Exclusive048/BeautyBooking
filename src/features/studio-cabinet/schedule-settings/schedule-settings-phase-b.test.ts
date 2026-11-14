@@ -9,8 +9,9 @@ import { describe, expect, it } from "vitest";
  *   - Exceptions: validation rules (date in past / end-before-start /
  *     duplicate date) + visibility filter (past hidden).
  *   - Breaks: buffer minutes clamp.
- *   - Visibility: slot-precision allowed values + visibleSlotDays
- *     clamp.
+ *   - Visibility: slot-precision allowed values. («Сколько окошек вперёд»
+ *     слито с окном записи — BOOKING-WINDOW-MERGE; его пределы пиннит
+ *     `lib/schedule/editor-shared-limits.test.ts`.)
  *
  * Same pure-predicate pattern as the Phase A foundation tests and the
  * MASTER-DASHBOARD-FIX-A action-state tests.
@@ -207,13 +208,6 @@ function isAllowedSlotPrecision(value: unknown): value is SlotPrecision {
   );
 }
 
-function clampVisibleSlotDays(input: unknown): number {
-  const n = Number(input);
-  if (!Number.isFinite(n) || n < 1) return 1;
-  if (n > 90) return 90;
-  return Math.floor(n);
-}
-
 describe("STUDIO-SCHEDULE-SETTINGS-A Phase B — Visibility validation", () => {
   it("accepts all 3 allowed slot-precision values", () => {
     expect(isAllowedSlotPrecision("exact")).toBe(true);
@@ -225,23 +219,5 @@ describe("STUDIO-SCHEDULE-SETTINGS-A Phase B — Visibility validation", () => {
     expect(isAllowedSlotPrecision("approximate")).toBe(false);
     expect(isAllowedSlotPrecision("")).toBe(false);
     expect(isAllowedSlotPrecision(null)).toBe(false);
-  });
-
-  it("clamps visibleSlotDays to [1, 90]", () => {
-    expect(clampVisibleSlotDays(0)).toBe(1);
-    expect(clampVisibleSlotDays(-5)).toBe(1);
-    expect(clampVisibleSlotDays(91)).toBe(90);
-    expect(clampVisibleSlotDays(1000)).toBe(90);
-  });
-
-  it("accepts in-range visibleSlotDays verbatim", () => {
-    expect(clampVisibleSlotDays(1)).toBe(1);
-    expect(clampVisibleSlotDays(30)).toBe(30);
-    expect(clampVisibleSlotDays(90)).toBe(90);
-  });
-
-  it("non-numeric visibleSlotDays defaults to 1", () => {
-    expect(clampVisibleSlotDays("abc")).toBe(1);
-    expect(clampVisibleSlotDays(NaN)).toBe(1);
   });
 });

@@ -4,13 +4,14 @@ import { requireProviderOwner } from "@/lib/auth/ownership";
 import { prisma } from "@/lib/prisma";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 import { resolveServiceDuration } from "@/lib/schedule/resolveDuration";
-import { addDaysToDateKey, isDateKey } from "@/lib/schedule/dateKey";
+import { addDaysToDateKey, compareDateKeys, isDateKey } from "@/lib/schedule/dateKey";
 import { listBookableSlots } from "@/lib/schedule/bookable-window";
+import { listBookableDays } from "@/lib/schedule/bookable-days";
 import { resolveRescheduleExclusion } from "@/lib/schedule/reschedule-exclusion";
 import { resolveFlushAfterParam } from "@/lib/schedule/flush-after";
 import { resolveStudioMoveSlots } from "@/lib/studio/move-plan";
 import { toAppError } from "@/lib/api/errors";
-import { clampVisibleSlotsHorizon, stricterBookingWindow } from "@/lib/bookings/policy-enforcement";
+import { clampToBookingWindow, stricterBookingWindow } from "@/lib/bookings/policy-enforcement";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { isActiveMasterOfPublishedStudio } from "@/lib/studio/active-studio-master";
 
@@ -22,7 +23,6 @@ const PROVIDER_SELECT = {
   timezone: true,
   minBookingHoursAhead: true,
   maxBookingDaysAhead: true,
-  visibleSlotDays: true,
   studioId: true,
 } as const;
 
@@ -72,7 +72,6 @@ async function loadStudioActiveMaster(providerKey: string) {
     timezone: master.timezone,
     minBookingHoursAhead: master.minBookingHoursAhead,
     maxBookingDaysAhead: master.maxBookingDaysAhead,
-    visibleSlotDays: master.visibleSlotDays,
     studioId: master.studioId,
   };
 }
@@ -142,17 +141,6 @@ export async function GET(
       studioMove?.durationMin ??
       (exclusion && exclusion.durationMin > 0 ? exclusion.durationMin : duration.data);
 
-    // 29.09 доработки · 03: публичный запрос (виджет записи в студию) видит
-    // окошки не дальше «Сколько окошек вперёд» мастера — тот же примитив, что у
-    // `/slots`. Перенос (`excludeBookingId` / `moveBookingId`) и операторское
-    // окно не обрезаются: настройка про то, что видит клиент, а не про уже
-    // существующие записи (`bookable-window.ts`).
-    const now = new Date();
-    const isPublicListing = operatorProvider === null && !exclusion && !studioMove;
-    const effectiveToKeyExclusive = isPublicListing
-      ? addDaysToDateKey(clampVisibleSlotsHorizon(toKey || null, provider, now, provider.timezone), 1)
-      : toKeyExclusive;
-
     // EXP-025: same primitive as `/slots` → min-ahead + schedule filter
     // applied identically. A slot returned here is one `assertBookingWindow`
     // will accept at submit.
@@ -164,6 +152,27 @@ export async function GET(
         provider: { select: { minBookingHoursAhead: true, maxBookingDaysAhead: true } },
       },
     });
+    // BOOKING-WINDOW-STRICTER: более строгое из окон владельца услуги и мастера.
+    const windowPolicy = serviceOwner?.provider
+      ? stricterBookingWindow(serviceOwner.provider, provider)
+      : undefined;
+
+    // 29.09 доработки · 03 → BOOKING-WINDOW-MERGE: публичный запрос (виджет
+    // записи в студию) видит окошки не дальше последнего дня окна записи — тот
+    // же примитив, что у `/slots`. Перенос (`excludeBookingId` /
+    // `moveBookingId`) и операторское окно здесь не обрезаются: их окно
+    // применяет `bookable-window.ts`.
+    const now = new Date();
+    const isPublicListing = operatorProvider === null && !exclusion && !studioMove;
+    const clampedToKeyExclusive = isPublicListing
+      ? addDaysToDateKey(clampToBookingWindow(toKey || null, windowPolicy ?? provider, now, provider.timezone), 1)
+      : toKeyExclusive;
+    // SLOTS-RANGE-CLAMP: день за окном записи — пустая выдача, а не 400
+    // «Некорректный диапазон» (конец окна раньше запрошенного начала).
+    const effectiveToKeyExclusive =
+      clampedToKeyExclusive && compareDateKeys(clampedToKeyExclusive, fromKey) < 0
+        ? fromKey
+        : clampedToKeyExclusive;
 
     // SLOTS-FLUSH-STARTS: визард пакета студии показывает время сразу после
     // предыдущей услуги (`?after=`).
@@ -180,16 +189,10 @@ export async function GET(
       excludeBookingId: studioMove ? studioMove.excludeBookingId : exclusion?.bookingId,
       extraStartsUtc: flushAfter ? [flushAfter] : undefined,
       operatorWindow: operatorProvider !== null,
-      // BOOKING-WINDOW-STRICTER: более строгое из окон владельца услуги и мастера.
-      windowPolicy: serviceOwner?.provider
-        ? stricterBookingWindow(serviceOwner.provider, provider)
-        : undefined,
+      windowPolicy,
       // 29.09 доработки · 07: оператор на профиле мастера В СТУДИИ — это админ
-      // студии, для него действует «максимум вперёд» (строже из двух).
-      operatorMaxWindow:
-        operatorProvider !== null && provider.studioId && serviceOwner?.provider
-          ? stricterBookingWindow(serviceOwner.provider, provider)
-          : undefined,
+      // студии, для него действует окно записи (строже из двух).
+      operatorMaxWindow: operatorProvider !== null && provider.studioId ? windowPolicy : undefined,
     };
 
     // MANUAL-SLOTS-ALL (2026-10-30, решение владельца): ручная запись видит те
@@ -197,6 +200,27 @@ export async function GET(
     // оставляющее промежуток, который не заполнит ни одна услуга, — приходят
     // отдельным списком `otherSlots` для ссылки «Показать все свободные
     // времена»: клиент по телефону может попросить именно такое время.
+    // BOOKING-DATE-CALENDAR: `?days=1` — сводка окна записи по дням для
+    // календаря выбора даты (`bookable-days.ts`). Оператору день свободен, если
+    // в нём есть хоть одно свободное начало — в том числе вне отбора «без дыр».
+    if (url.searchParams.get("days") === "1") {
+      const summary = await listBookableDays({
+        provider,
+        serviceId,
+        durationMinutes: windowMinutes,
+        fromKey,
+        toKeyExclusive: effectiveToKeyExclusive,
+        now,
+        excludeBookingId: slotsInput.excludeBookingId,
+        operatorWindow: slotsInput.operatorWindow,
+        allStarts: operatorProvider !== null,
+        windowPolicy: slotsInput.windowPolicy,
+        operatorMaxWindow: slotsInput.operatorMaxWindow,
+      });
+      if (!summary.ok) return fail(summary.message, summary.status, summary.code);
+      return ok(summary.data);
+    }
+
     const [bookable, allStarts] = await Promise.all([
       listBookableSlots(slotsInput),
       operatorProvider !== null ? listBookableSlots({ ...slotsInput, allStarts: true }) : null,

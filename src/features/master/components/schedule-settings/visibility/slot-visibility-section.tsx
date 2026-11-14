@@ -19,13 +19,6 @@ const PRECISION_OPTIONS: { value: SlotPrecision; label: string }[] = [
   { value: "date_only", label: T.precisionOptions.date_only },
 ];
 
-const DAY_OPTIONS = [
-  { value: 3, label: T.daysOptions["3"] },
-  { value: 7, label: T.daysOptions["7"] },
-  { value: 14, label: T.daysOptions["14"] },
-  { value: 30, label: T.daysOptions["30"] },
-];
-
 type Props = {
   visibility: VisibilityDto;
   onChange: (next: VisibilityDto) => void;
@@ -42,9 +35,11 @@ type Props = {
 };
 
 /**
- * "Как клиенты видят окошки" — public catalog inclusion + slot precision +
- * visible horizon. `isPublished = false` removes the provider from the
- * catalog (existing public-catalog behaviour).
+ * "Как клиенты видят окошки" — public catalog inclusion + slot precision.
+ * `isPublished = false` removes the provider from the catalog (existing
+ * public-catalog behaviour). На сколько дней видны окошки, решает «Запись
+ * открыта вперёд» в правилах записи (BOOKING-WINDOW-MERGE). У профиля в
+ * студии обе строки скрыты — секции нет.
  */
 export function SlotVisibilitySection({
   visibility,
@@ -52,6 +47,7 @@ export function SlotVisibilitySection({
   showPublished = true,
   showPrecision = true,
 }: Props) {
+  if (!showPublished && !showPrecision) return null;
   return (
     <section className="rounded-2xl border border-border-subtle bg-bg-card p-5">
       <h2 className="mb-4 font-display text-lg text-text-main">{T.title}</h2>
@@ -85,17 +81,6 @@ export function SlotVisibilitySection({
             }
           />
         ) : null}
-        <SettingRow
-          title={T.daysTitle}
-          subtitle={T.daysSubtitle}
-          control={
-            <ChipGroup
-              value={visibility.visibleSlotDays}
-              onChange={(value) => onChange({ ...visibility, visibleSlotDays: value })}
-              options={DAY_OPTIONS}
-            />
-          }
-        />
       </div>
     </section>
   );

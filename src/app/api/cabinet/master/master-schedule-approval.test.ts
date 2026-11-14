@@ -16,7 +16,12 @@ const prisma = vi.hoisted(() => ({
 
 vi.mock("@/lib/auth/session", () => ({ getSessionUser }));
 vi.mock("@/lib/schedule/schedule-actor", () => ({ resolveScheduleActor }));
-vi.mock("@/lib/schedule/editor", () => ({ buildScheduleSnapshot }));
+// Частичный мок: ответ GET достраивает зеркало окна записи настоящим
+// `normalizeBookingRules` (BOOKING-WINDOW-MERGE).
+vi.mock("@/lib/schedule/editor", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/schedule/editor")>()),
+  buildScheduleSnapshot,
+}));
 vi.mock("@/lib/prisma", () => ({ prisma }));
 vi.mock("@/lib/schedule/slotsCache", () => ({ invalidateSlotsForMaster: vi.fn() }));
 vi.mock("@/lib/notifications/studio-notifications", () => ({ notifyMasterScheduleUpdatedByStudio: vi.fn() }));
@@ -29,7 +34,12 @@ vi.mock("@/lib/billing/get-current-plan", () => ({ getCurrentPlan: vi.fn() }));
 
 import { GET } from "@/app/api/cabinet/master/schedule/route";
 
-const SNAPSHOT = { weekSchedule: [], exceptions: [] };
+const SNAPSHOT = {
+  weekSchedule: [],
+  exceptions: [],
+  bookingRules: { minHoursAhead: 2, maxDaysAhead: 30, autoConfirm: true, freeCancelHours: 24, lateCancelAction: "none" },
+  visibility: { isPublished: true, slotPrecision: "exact", acceptNewClients: true },
+};
 
 async function load() {
   const response = await GET(

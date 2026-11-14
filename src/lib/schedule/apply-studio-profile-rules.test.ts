@@ -41,7 +41,6 @@ describe("applyStudioProfileRules", () => {
       minHoursAhead: 5,
       maxDaysAhead: 60,
       autoConfirm: false,
-      visibleSlotDays: 30,
       acceptNewClients: false,
     });
     expect(update).toHaveBeenCalledWith({
@@ -52,7 +51,6 @@ describe("applyStudioProfileRules", () => {
         minBookingHoursAhead: 5,
         maxBookingDaysAhead: 60,
         autoConfirmBookings: false,
-        visibleSlotDays: 30,
         acceptNewClients: false,
       },
       select: { id: true },

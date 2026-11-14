@@ -3211,6 +3211,56 @@
           }
         }
       },
+      "BookableDaysData": {
+        "type": "object",
+        "required": [
+          "timezone",
+          "firstDate",
+          "lastDate",
+          "days"
+        ],
+        "description": "?days=1 (BOOKING-DATE-CALENDAR): the booking window by salon-local date.",
+        "properties": {
+          "timezone": {
+            "type": "string",
+            "description": "Salon IANA zone the dates are in."
+          },
+          "firstDate": {
+            "type": "string",
+            "format": "date",
+            "description": "First date of the booking window (inclusive)."
+          },
+          "lastDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Last date of the booking window (inclusive)."
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "date",
+                "status"
+              ],
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "free",
+                    "busy",
+                    "off"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
       "HotSlotRule": {
         "type": "object",
         "required": [
@@ -5263,6 +5313,10 @@
               "notificationsUnread": {
                 "type": "integer",
                 "description": "MOBILE-STUDIO-C (ops): уведомления канала студии + ожидающие заявки на график."
+              },
+              "messagesUnread": {
+                "type": "integer",
+                "description": "STUDIO-CHAT: непрочитанные сообщения клиентов в переписке студии."
               }
             }
           }
@@ -17472,6 +17526,18 @@
               "format": "date-time"
             },
             "description": "Package wizard: an extra start (the previous component's end + the master's buffer) that the day's own starts can't know, because that component isn't booked yet. Checked like any other start, only on the salon-local day it falls on; an unparsable value is ignored."
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Day summary instead of slots (`BookableDaysData`): every salon-local date of the booking window from `from` with `free` (at least one start the same request would return), `busy` (working day without free starts) or `off` (day off). Same window rules as the slot list; with ?manual=1 for the provider's own side a day is `free` when any free start exists, including ones outside the gap-free selection."
           }
         ],
         "responses": {
@@ -17488,7 +17554,14 @@
                       "type": "object",
                       "properties": {
                         "data": {
-                          "$ref": "#/components/schemas/AvailabilitySlotsData"
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/AvailabilitySlotsData"
+                            },
+                            {
+                              "$ref": "#/components/schemas/BookableDaysData"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -27720,6 +27793,186 @@
         }
       }
     },
+    "/api/cabinet/ai-analysis": {
+      "post": {
+        "operationId": "cabinetAiAnalysisRun",
+        "summary": "Run the AI analysis of the caller's master or studio cabinet (PREMIUM)",
+        "description": "AI-CABINET-ANALYSIS: модель смотрит профиль, услуги, пакеты, портфолио, расписание, правила записи и записи за 90 дней и даёт итог, сильные стороны и советы. `scope=master` — личный профиль мастера; `scope=studio` — студия, только владелец или администратор (тариф — владельца). Без функции `aiCabinetAnalysis` в тарифе — 403 `FEATURE_GATE` (`details.requiredPlan`). Три запуска в сутки на кабинет — 429 `RATE_LIMITED` с текстом; запуск без результата лимит не тратит. `href` совета — только раздел кабинета либо `null`. Последний разбор хранится неделю и показывается на главной кабинета.",
+        "tags": [
+          "master",
+          "studio"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "scope"
+                ],
+                "properties": {
+                  "scope": {
+                    "type": "string",
+                    "enum": [
+                      "master",
+                      "studio"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiSuccess"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [
+                            "analysis"
+                          ],
+                          "properties": {
+                            "analysis": {
+                              "type": "object",
+                              "required": [
+                                "summary",
+                                "strengths",
+                                "improvements",
+                                "generatedAt"
+                              ],
+                              "properties": {
+                                "summary": {
+                                  "type": "string"
+                                },
+                                "strengths": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "improvements": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "title",
+                                      "text",
+                                      "href"
+                                    ],
+                                    "properties": {
+                                      "title": {
+                                        "type": "string"
+                                      },
+                                      "text": {
+                                        "type": "string"
+                                      },
+                                      "href": {
+                                        "type": "string",
+                                        "nullable": true
+                                      }
+                                    }
+                                  }
+                                },
+                                "generatedAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "required": [
+                        "data"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN | FEATURE_GATE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "STUDIO_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "RATE_LIMITED | AI_DAILY_LIMIT_REACHED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SYSTEM_FEATURE_DISABLED | RATE_LIMIT_UNAVAILABLE | SERVICE_UNAVAILABLE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/master/services": {
       "put": {
         "summary": "Bulk update master services from cabinet",
@@ -28710,7 +28963,6 @@
                                       "id": {
                                         "type": "string",
                                         "enum": [
-                                          "pending-master-approvals",
                                           "bookings-awaiting",
                                           "reviews-unanswered",
                                           "schedule-requests"
@@ -36206,7 +36458,7 @@
       "get": {
         "operationId": "scheduleEditorSnapshot",
         "summary": "Schedule settings snapshot (palette, plan, booking rules, visibility, buffer, slot step) and approval mode",
-        "description": "Без параметров — своё расписание мастера; `?profile=` — профиль мастера в студии (правки — заявкой); `?studioId&masterId` — владелец/администратор студии правит расписание мастера студии, сразу (`approval.mode = STUDIO_ADMIN`). MOBILE-POLISH: в режиме `STUDIO_ADMIN` `approval.pendingRequestId` / `requestStatus: \"PENDING\"` — открытая заявка мастера (только показ; решение — `POST /api/studio/schedule/requests/{id}/approve|reject`), иначе `null`; `rejectedComment` — всегда `null`.",
+        "description": "Без параметров — своё расписание мастера; `?profile=` — профиль мастера в студии (правки — заявкой); `?studioId&masterId` — владелец/администратор студии правит расписание мастера студии, сразу (`approval.mode = STUDIO_ADMIN`). MOBILE-POLISH: в режиме `STUDIO_ADMIN` `approval.pendingRequestId` / `requestStatus: \"PENDING\"` — открытая заявка мастера (только показ; решение — `POST /api/studio/schedule/requests/{id}/approve|reject`), иначе `null`; `rejectedComment` — всегда `null`. BOOKING-WINDOW-MERGE: `visibility.visibleSlotDays` устарело — это зеркало `bookingRules.maxDaysAhead` (окно записи решает и то, на сколько дней вперёд видны окошки); новым клиентам его не читать.",
         "tags": [
           "mobile",
           "schedule"
@@ -36340,7 +36592,7 @@
       "patch": {
         "operationId": "scheduleEditorUpdate",
         "summary": "Update booking rules, visibility, slot step, buffer, hot slots (and legacy week / exceptions)",
-        "description": "Тело не через Zod: значения нормализуются и молча ограничиваются. У администратора студии `visibility.isPublished` не применяется; `hotSlots` — по тарифу вызывающего (403 `FEATURE_GATE`). Мастер в режиме `STUDIO_MASTER` (профиль в студии `?profile=`) меняет сам, сразу и без заявки, личные правила: `slotStepMin`, `bufferBetweenBookingsMin`, `bookingRules.{minHoursAhead,maxDaysAhead,autoConfirm}`, `visibility.{visibleSlotDays,acceptNewClients}` (`approval.lastAction` = `APPLIED`). Общее для студии — `bookingRules.{freeCancelHours,lateCancelAction}`, `visibility.slotPrecision` — и `hotSlots` задаёт студия: изменение — 403 `FORBIDDEN`, неизменённые значения проходят (STUDIO-PROFILE-PERSONAL-RULES).",
+        "description": "Тело не через Zod: значения нормализуются и молча ограничиваются. У администратора студии `visibility.isPublished` не применяется; `hotSlots` — по тарифу вызывающего (403 `FEATURE_GATE`). Мастер в режиме `STUDIO_MASTER` (профиль в студии `?profile=`) меняет сам, сразу и без заявки, личные правила: `slotStepMin`, `bufferBetweenBookingsMin`, `bookingRules.{minHoursAhead,maxDaysAhead,autoConfirm}`, `visibility.acceptNewClients` (`approval.lastAction` = `APPLIED`). BOOKING-WINDOW-MERGE: устаревшее `visibility.visibleSlotDays` принимается и пишется в `bookingRules.maxDaysAhead` (значение, равное текущему окну, — не правка; при изменённых обоих — меньшее). Общее для студии — `bookingRules.{freeCancelHours,lateCancelAction}`, `visibility.slotPrecision` — и `hotSlots` задаёт студия: изменение — 403 `FORBIDDEN`, неизменённые значения проходят (STUDIO-PROFILE-PERSONAL-RULES).",
         "tags": [
           "mobile",
           "schedule"

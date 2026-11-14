@@ -26,11 +26,10 @@ import {
  * drifted), both endpoints now call this one helper for the
  * window/schedule filtering. A slot this helper returns is a slot the
  * booking-window guard will accept. The only thing `/slots` adds on top
- * is its catalog-visibility horizon clamp (`visibleSlotDays`) + hot-slot
- * pricing decoration — those stay route-local because `/availability`
- * (authenticated reschedule) is bounded by `maxBookingDaysAhead`, not the
- * public catalog-visibility horizon, so force-clamping it would wrongly
- * block rescheduling beyond `visibleSlotDays`.
+ * is hot-slot pricing decoration. Both routes narrow the requested range to
+ * the last day of the booking window (`clampToBookingWindow`) for the public
+ * listing — BOOKING-WINDOW-MERGE (2026-11-14) folded the separate
+ * catalog-visibility horizon (`visibleSlotDays`) into `maxBookingDaysAhead`.
  *
  * The proven slot ENGINE (`listAvailabilitySlotsPaginated` →
  * `buildSlotsForDay`) is untouched — this helper only filters its output.
@@ -112,6 +111,8 @@ export async function listBookableSlots(input: {
    * записи не передаётся.
    */
   operatorMaxWindow?: Pick<ProviderPolicy, "maxBookingDaysAhead">;
+  /** BOOKING-DATE-CALENDAR: всё окно одной страницей (см. `listAvailabilitySlotsPaginated`). */
+  wholeRange?: boolean;
 }): Promise<BookableSlotsResult> {
   const { provider, serviceId, durationMinutes, fromKey, toKeyExclusive, limit, now } = input;
 
@@ -124,6 +125,7 @@ export async function listBookableSlots(input: {
     // MANUAL-SLOTS-ALL: отбор «без дыр» — и у клиента, и у оператора; без
     // него — только «все свободные времена» ручной записи.
     packing: !input.allStarts,
+    wholeRange: input.wholeRange,
   });
   if (!result.ok) {
     return { ok: false, status: result.status, code: result.code, message: result.message };

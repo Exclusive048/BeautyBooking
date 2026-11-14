@@ -61,9 +61,14 @@ model Provider {
   // stored but not yet enforced — payment-side fines aren't wired.
   // `slotPrecision` controls how slots are surfaced on the public profile.
   minBookingHoursAhead Int     @default(2)
-  maxBookingDaysAhead  Int     @default(90)
+  // BOOKING-WINDOW-MERGE (2026-11-14): «Запись открыта вперёд» — заодно и
+  // на сколько дней видны окошки; `visibleSlotDays` больше не читается и не
+  // пишется (миграция перенесла меньшее из двух), колонку удалит
+  // VISIBLE-SLOT-DAYS-DROP, когда старые версии приложения уйдут.
+  maxBookingDaysAhead  Int     @default(30)
   lateCancelAction     String  @default("none")
   slotPrecision        String  @default("exact")
+  /// @deprecated BOOKING-WINDOW-MERGE — не читается; см. `maxBookingDaysAhead`.
   visibleSlotDays      Int     @default(30)
   acceptNewClients     Boolean @default(true)
   // Booking grid quantum (15 / 30 / 60 min). Surfaced in Settings → "Часы";

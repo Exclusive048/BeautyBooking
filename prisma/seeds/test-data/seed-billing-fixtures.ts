@@ -105,9 +105,8 @@ async function ensureFixture(
     slotStepMin: 30,
     bufferBetweenBookingsMin: 15,
     minBookingHoursAhead: 2,
-    maxBookingDaysAhead: 60,
+    maxBookingDaysAhead: 30,
     autoConfirmBookings: false,
-    visibleSlotDays: 30,
     acceptNewClients: true,
   };
   const provider = await prisma.provider.upsert({

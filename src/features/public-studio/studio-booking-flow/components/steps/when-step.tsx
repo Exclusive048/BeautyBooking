@@ -1,66 +1,15 @@
 "use client";
 
 import { ArrowLeft, Calendar as CalendarIcon } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
+import { BookingDateCalendar } from "@/features/booking/components/booking-date-calendar";
+import type { SlotItem } from "@/features/booking/lib/studio-booking";
+import type { BookableDaysSummary } from "@/lib/schedule/bookable-days-shared";
+import { getLocalTimeParts } from "@/lib/schedule/timezone";
 import { UI_FMT } from "@/lib/ui/fmt";
 import * as UI_TEXT from "@/lib/ui/text";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
-import type { SlotItem } from "@/features/booking/lib/studio-booking";
-import { buildDateBounds } from "@/features/booking/lib/studio-booking";
-import { SCHEDULE_HORIZON_DAYS } from "@/lib/schedule/publish-horizon";
-import { addDaysToDateKey } from "@/lib/schedule/dateKey";
-import { getLocalTimeParts, toLocalDateKey } from "@/lib/schedule/timezone";
-
-type DayCell = {
-  dateKey: string;
-  label: string;
-  day: number;
-  month: string;
-  isToday: boolean;
-  isTomorrow: boolean;
-  isWeekend: boolean;
-};
-
-const DOW = UI_TEXT.bookingWidget.whenStep.daysOfWeek;
-const MONTH = UI_TEXT.bookingWidget.whenStep.months;
-
-/**
- * LOGIC-26: полоса дней строится в **salon-tz**. Раньше «Сегодня» считалось
- * host-локальными геттерами — у клиента из другой зоны первая ячейка означала
- * его сегодня, а не сегодня салона, и вся полоса была смещена на сутки.
- *
- * Ключ дня выводится из `addDaysToDateKey` (та же арифметика, что у движка), а
- * число/месяц/день недели читаются из самого ключа — он уже salon-local, и
- * промежуточный `Date` в чьей-то зоне тут только добавил бы возможность
- * съехать на соседние сутки.
- */
-function buildStrip(daysAhead: number, timeZone: string): DayCell[] {
-  const out: DayCell[] = [];
-  const first = toLocalDateKey(new Date(), timeZone);
-  for (let i = 0; i < daysAhead; i++) {
-    const dateKey = addDaysToDateKey(first, i);
-    const [year, month, day] = dateKey.split("-").map(Number);
-    // День недели календарной даты от таймзоны не зависит: считаем его на
-    // UTC-полночь этой же даты, а не на инстант в чьей-то зоне.
-    const weekday = new Date(Date.UTC(year!, month! - 1, day!)).getUTCDay();
-    out.push({
-      dateKey,
-      label:
-        i === 0
-          ? UI_TEXT.bookingWidget.whenStep.today
-          : i === 1
-          ? UI_TEXT.bookingWidget.whenStep.tomorrow
-          : DOW[weekday]!.toUpperCase(),
-      day: day!,
-      month: MONTH[month! - 1]!,
-      isToday: i === 0,
-      isTomorrow: i === 1,
-      isWeekend: weekday === 0 || weekday === 6,
-    });
-  }
-  return out;
-}
 
 type Props = {
   slots: SlotItem[];
@@ -73,14 +22,21 @@ type Props = {
   salonTimeZone: string;
   /** Viewer's browser zone — only used to decide whether to show the zone label. */
   viewerTimeZone: string;
+  /** Сегодня в поясе салона — отмечается в календаре. */
+  todayKey: string;
+  /**
+   * BOOKING-DATE-CALENDAR: сводка окна записи по дням для выбранного мастера
+   * (у «Любой мастер» — объединение мастеров услуги). Окно — то же, что у
+   * окошек: строже из студии и мастера, «Сколько окошек вперёд» мастера.
+   */
+  days: {
+    summary: BookableDaysSummary | null;
+    loading: boolean;
+    error: string | null;
+    retry: () => void;
+  };
   selectedMasterName: string;
   isAnyMaster: boolean;
-  /**
-   * Сколько дней вперёд показывать в полосе дат: окно записи студии и
-   * выбранного мастера (`publicBookingHorizonDays`). 29.09 доработки · 03 —
-   * раньше здесь было зашитое 30, а потолок — несвязанное 60.
-   */
-  horizonDays: number;
   onBack: () => void;
   /**
    * UX-PASS-01: окошки не загрузились — показываем причину и «Повторить»,
@@ -90,6 +46,12 @@ type Props = {
   onRetry?: () => void;
 };
 
+/**
+ * Шаг «Когда» виджета записи в студию. BOOKING-DATE-CALENDAR (2026-11-13):
+ * дата — календарём на месяц (дни со свободным временем отмечены, выбрать
+ * можно только их), а не полосой из 90 дней с горизонтальной прокруткой. На
+ * телефоне календарь и время идут друг под другом, с `md` — рядом.
+ */
 export function WhenStep({
   slots,
   loading,
@@ -99,20 +61,14 @@ export function WhenStep({
   onSlotChange,
   salonTimeZone,
   viewerTimeZone,
+  todayKey,
+  days,
   selectedMasterName,
   isAnyMaster,
-  horizonDays,
   onBack,
   error = null,
   onRetry,
 }: Props) {
-  const daysAhead = Math.max(1, Math.min(horizonDays || SCHEDULE_HORIZON_DAYS, SCHEDULE_HORIZON_DAYS));
-  const strip = useMemo(() => buildStrip(daysAhead, salonTimeZone), [daysAhead, salonTimeZone]);
-  const bounds = useMemo(
-    () => buildDateBounds(new Date(), salonTimeZone, daysAhead),
-    [daysAhead, salonTimeZone]
-  );
-
   // Group slots into morning / day / evening by the SALON's local hour (a slot
   // at 13:00 salon-time is "День" in the salon's day, regardless of the viewer's
   // zone) — FIX-BATCH-C Defect 1.
@@ -131,25 +87,16 @@ export function WhenStep({
 
   // Salon-tz «(город, GMT+N)» label — shown when the viewer's zone differs from
   // the salon's, so a cross-tz client reads the salon-local clock correctly.
-  // UX-PASS-01: выбранный день — в поле зрения полосы. При возврате на шаг
-  // (с «Вы», после отказа) полоса открывалась с «Сегодня», и выбранный
-  // 20-й день оставался где-то справа за краем.
-  const stripRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const scroller = stripRef.current;
-    const cell = scroller?.querySelector<HTMLElement>('[aria-pressed="true"]');
-    if (!scroller || !cell) return;
-    const box = scroller.getBoundingClientRect();
-    const rect = cell.getBoundingClientRect();
-    if (rect.left >= box.left && rect.right <= box.right) return;
-    scroller.scrollLeft += rect.left - box.left - (box.width - rect.width) / 2;
-  }, [selectedDate]);
-
   const zoneLabel =
     slots.length > 0 &&
     zonesDifferForViewer({ iso: slots[0]!.startAtUtc, salonTimeZone, viewerTimeZone })
       ? formatZoneLabel({ iso: slots[0]!.startAtUtc, timeZone: salonTimeZone })
       : "";
+
+  // Календарь не прочитался — время выбранного дня всё равно показываем:
+  // ошибка сводки не должна запирать запись.
+  const noFreeDays =
+    days.summary !== null && !days.summary.days.some((day) => day.status === "free");
 
   return (
     <section className="space-y-4">
@@ -173,99 +120,86 @@ export function WhenStep({
         </Button>
       </header>
 
-      <div ref={stripRef} className="-mx-1 overflow-x-auto">
-        <ul className="flex min-w-full snap-x snap-mandatory gap-2 px-1 pb-1">
-          {strip.map((cell) => {
-            const isSelected = cell.dateKey === selectedDate;
-            const inBounds = cell.dateKey >= bounds.min && cell.dateKey <= bounds.max;
-            return (
-              <li key={cell.dateKey} className="snap-start">
-                <Button variant="wrapper"
-                  onClick={() => inBounds && onDateChange(cell.dateKey)}
-                  disabled={!inBounds}
-                  aria-pressed={isSelected}
-                  className={`flex h-[68px] w-16 flex-col items-center justify-center rounded-xl border text-center transition ${
-                    isSelected
-                      ? "border-primary bg-primary text-white"
-                      : "border-border-subtle bg-bg-card text-text hover:border-primary/60"
-                  } ${!inBounds ? "opacity-40" : ""}`}
-                >
-                  <span
-                    className={`eyebrow ${
-                      isSelected ? "text-white/90" : cell.isWeekend ? "text-accent-text" : "text-text-muted"
-                    }`}
-                  >
-                    {cell.label}
-                  </span>
-                  <span className={`font-display text-lg font-semibold ${isSelected ? "text-white" : ""}`}>
-                    {cell.day}
-                  </span>
-                  <span className={`text-3xs ${isSelected ? "text-white/80" : "text-text-muted"}`}>
-                    {cell.month}
-                  </span>
+      <div className="space-y-4 md:grid md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] md:items-start md:gap-6 md:space-y-0">
+        <BookingDateCalendar
+          summary={days.summary}
+          loading={days.loading}
+          error={days.error}
+          onRetry={days.retry}
+          value={selectedDate || null}
+          onSelect={onDateChange}
+          todayKey={todayKey}
+          selectable="free"
+          testId="studio-booking-date-calendar"
+        />
+
+        <div className="min-w-0">
+          {loading ? (
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {Array.from({ length: 9 }).map((_, idx) => (
+                <div key={idx} className="h-9 animate-pulse rounded-lg bg-muted/60" />
+              ))}
+            </div>
+          ) : error && slots.length === 0 ? (
+            <div
+              role="alert"
+              className="space-y-3 rounded-xl border border-danger-border bg-danger-surface p-6 text-center text-sm text-danger-text"
+            >
+              <p>{error}</p>
+              {onRetry ? (
+                <Button type="button" variant="secondary" size="sm" onClick={onRetry}>
+                  {UI_TEXT.bookingWidget.whenStep.retry}
                 </Button>
-              </li>
-            );
-          })}
-        </ul>
+              ) : null}
+            </div>
+          ) : slots.length === 0 ? (
+            // Нет ни одного свободного дня — подсказка уже под календарём,
+            // второй пустой блок рядом ничего не добавил бы.
+            noFreeDays ? null : (
+              <div className="rounded-xl border border-border-subtle bg-muted/40 p-8 text-center text-sm text-text-muted">
+                {UI_TEXT.bookingWidget.whenStep.noSlots}
+              </div>
+            )
+          ) : (
+            <div className="space-y-4">
+              {selectedDate ? (
+                <p className="text-sm font-semibold text-text-main">
+                  {UI_FMT.dateKey(selectedDate, "weekdayDayMonthLong")}
+                </p>
+              ) : null}
+              {zoneLabel ? (
+                <p className="flex items-center gap-1 text-xs font-medium text-accent-text">
+                  <CalendarIcon className="h-3 w-3 shrink-0" aria-hidden />
+                  <span>
+                    {UI_TEXT.bookingWidget.whenStep.salonTimeNote} {zoneLabel}
+                  </span>
+                </p>
+              ) : null}
+              <SlotGroup
+                label={UI_TEXT.bookingWidget.whenStep.morning}
+                slots={grouped.morning}
+                selectedLabel={selectedSlotLabel}
+                onPick={onSlotChange}
+                salonTimeZone={salonTimeZone}
+              />
+              <SlotGroup
+                label={UI_TEXT.bookingWidget.whenStep.day}
+                slots={grouped.day}
+                selectedLabel={selectedSlotLabel}
+                onPick={onSlotChange}
+                salonTimeZone={salonTimeZone}
+              />
+              <SlotGroup
+                label={UI_TEXT.bookingWidget.whenStep.evening}
+                slots={grouped.evening}
+                selectedLabel={selectedSlotLabel}
+                onPick={onSlotChange}
+                salonTimeZone={salonTimeZone}
+              />
+            </div>
+          )}
+        </div>
       </div>
-
-      {loading ? (
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-          {Array.from({ length: 9 }).map((_, idx) => (
-            <div key={idx} className="h-9 animate-pulse rounded-lg bg-muted/60" />
-          ))}
-        </div>
-      ) : error && slots.length === 0 ? (
-        <div
-          role="alert"
-          className="space-y-3 rounded-xl border border-danger-border bg-danger-surface p-6 text-center text-sm text-danger-text"
-        >
-          <p>{error}</p>
-          {onRetry ? (
-            <Button type="button" variant="secondary" size="sm" onClick={onRetry}>
-              {UI_TEXT.bookingWidget.whenStep.retry}
-            </Button>
-          ) : null}
-        </div>
-      ) : slots.length === 0 ? (
-        <div className="rounded-xl border border-border-subtle bg-muted/40 p-8 text-center text-sm text-text-muted">
-          {UI_TEXT.bookingWidget.whenStep.noSlots}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {zoneLabel ? (
-            <p className="flex items-center gap-1 text-xs font-medium text-accent-text">
-              <CalendarIcon className="h-3 w-3 shrink-0" aria-hidden />
-              <span>
-                {UI_TEXT.bookingWidget.whenStep.salonTimeNote} {zoneLabel}
-              </span>
-            </p>
-          ) : null}
-          <SlotGroup
-            label={UI_TEXT.bookingWidget.whenStep.morning}
-            slots={grouped.morning}
-            selectedLabel={selectedSlotLabel}
-            onPick={onSlotChange}
-            salonTimeZone={salonTimeZone}
-          />
-          <SlotGroup
-            label={UI_TEXT.bookingWidget.whenStep.day}
-            slots={grouped.day}
-            selectedLabel={selectedSlotLabel}
-            onPick={onSlotChange}
-            salonTimeZone={salonTimeZone}
-          />
-          <SlotGroup
-            label={UI_TEXT.bookingWidget.whenStep.evening}
-            slots={grouped.evening}
-            selectedLabel={selectedSlotLabel}
-            onPick={onSlotChange}
-            salonTimeZone={salonTimeZone}
-          />
-        </div>
-      )}
-
     </section>
   );
 }

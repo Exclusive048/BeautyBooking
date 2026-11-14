@@ -70,6 +70,7 @@ export { setupGuide } from "./text/setup-guide";
 export { publicStudio } from "./text/public-studio";
 export { guestManage } from "./text/guest-manage";
 export { bookingWidget } from "./text/booking-widget";
+export { bookingCalendar } from "./text/booking-calendar";
 export { pages } from "./text/pages";
 export { chat } from "./text/chat";
 export { errorPages } from "./text/error-pages";

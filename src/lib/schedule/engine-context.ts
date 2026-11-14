@@ -241,7 +241,7 @@ function dateKeyToUtcStart(dateKey: string): Date {
  *   - `slotStepMin` — добавлен в ключ `slots:*` этой же правкой; он был
  *     единственным входом `buildSlotsForDay`, который держался ТОЛЬКО на
  *     `Provider.updatedAt` (`buildSlotsCacheKey`).
- * Остальные поля (`minBookingHoursAhead`, `visibleSlotDays`,
+ * Остальные поля (`minBookingHoursAhead`, `maxBookingDaysAhead`,
  * `acceptNewClients`, …) применяются ПОСЛЕ чтения кэша — они сужают выдачу, а
  * не то, что закэшировано.
  *

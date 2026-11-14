@@ -93,7 +93,6 @@ export async function listPublicTeamMasters(providerKey: string): Promise<Public
       ratingCount: true,
       bufferBetweenBookingsMin: true,
       maxBookingDaysAhead: true,
-      visibleSlotDays: true,
       masterServices: {
         where: { isEnabled: true },
         select: { serviceId: true },
@@ -135,11 +134,8 @@ export async function listPublicTeamMasters(providerKey: string): Promise<Public
       // same-master cursor must match the validator exactly.
       bufferMin: normalizeBufferMinutes(m.bufferBetweenBookingsMin),
       // 29.09 доработки · 03: сколько дней вперёд виджет студии показывает
-      // у этого мастера (его окно записи и «Сколько окошек вперёд»).
-      bookingHorizonDays: publicBookingHorizonDays({
-        maxBookingDaysAhead: m.maxBookingDaysAhead,
-        visibleSlotDays: m.visibleSlotDays,
-      }),
+      // у этого мастера — его окно записи (BOOKING-WINDOW-MERGE).
+      bookingHorizonDays: publicBookingHorizonDays({ maxBookingDaysAhead: m.maxBookingDaysAhead }),
     };
   });
 }

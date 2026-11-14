@@ -37,6 +37,15 @@ concurrency:
 
 jobs:
   quality:
+    # 🔴 Имя ЗАМОРОЖЕНО (CI-REQUIRED-CHECK-NAME, 2026-11-14). Это не подпись, а
+    # идентификатор обязательной проверки в защите ветки main (Settings →
+    # Branches → main → Require status checks): GitHub сопоставляет её по ИМЕНИ
+    # джоба. Переименовали — PR навсегда висит в «Expected — Waiting for status
+    # to be reported», потому что проверку со старым именем больше никто не
+    # запускает (так и случилось, когда в имени исправили «18» на «17»).
+    # «18 шагов» — историческая метка; фактическое число шагов — в нумерации
+    # шагов ниже. Менять имя — только вместе с обязательной проверкой в
+    # настройках репозитория. Пин — scripts/ci-required-checks.test.ts.
     name: npm run check (18 шагов) + npm run test
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -132,85 +141,92 @@ jobs:
 
       # ─── npm run check, шаг в шаг (порядок = package.json) ────────────────────
 
-      - name: 1/18 lint
+      - name: 1/17 lint
         run: npm run lint
 
-      - name: 2/18 typecheck
+      - name: 2/17 typecheck
         run: npm run typecheck
 
-      - name: 3/18 prisma validate
+      - name: 3/17 prisma validate
         run: npm run prisma:validate
 
-      - name: 4/18 prisma generate
+      - name: 4/17 prisma generate
         run: npm run prisma:generate
 
-      # Fail-soft by design (как и smoke): скрипт фетчит /api/openapi с живого
-      # сервера и без него печатает «skipped (server not reachable)» + exit 0.
-      # Шаг оставлен исполняемым, потому что так же он ведёт себя и в локальной
-      # батарее без dev-сервера; реальную сверку спеки с деревом роутов делает
-      # шаг 13/18 (check:openapi-routes), он от сервера не зависит.
-      - name: 5/18 openapi generate
+      # OPENAPI-FRESH (2026-11-14): openapi/openapi.json собирается прямо из
+      # src/lib/openapi/spec.ts, без живого сервера (раньше скрипт фетчил
+      # /api/openapi и без сервера молча выходил 0 — в CI так было всегда, и
+      # закоммиченный файл отставал от спеки). Сверку спеки с деревом роутов
+      # делает шаг 12/17 (check:openapi-routes).
+      - name: 5/17 openapi generate
         run: npm run openapi:generate
 
-      - name: 6/18 encoding check
+      # Не шаг npm run check: локально тот же генератор просто перезаписывает
+      # файл, и изменение видно в git status. Здесь — сверка с закоммиченным.
+      # Проба: правка spec.ts без перегенерации → exit 1.
+      - name: openapi.json совпадает со спекой
+        run: |
+          if ! git diff --exit-code --stat -- openapi/openapi.json; then
+            echo "::error file=openapi/openapi.json::Файл устарел: запустите npm run openapi:generate и закоммитьте openapi/openapi.json."
+            exit 1
+          fi
+
+      - name: 6/17 encoding check
         run: npm run check:encoding
 
-      - name: 7/18 mojibake check
+      - name: 7/17 mojibake check
         run: npm run check:mojibake
 
-      - name: 8/18 UI-text discipline (UI_TEXT)
+      - name: 8/17 UI-text discipline (UI_TEXT)
         run: npm run check:ui-text
 
       # UI-16: класс, компилирующийся в ничто, не виден ни lint'у (AST), ни
       # typecheck'у (типы), ни encoding/mojibake (байты) — 192 таких сайта
       # прошли старый workflow незамеченными.
-      - name: 9/18 dead CSS classes
+      - name: 9/17 dead CSS classes
         run: npm run check:dead-classes
 
       # ERR-LOCALIZATION-01: любое сообщение через fail()/AppError обязано нести
       # кириллицу; исключения — точным текстом в scripts/error-message-allowlist.txt.
-      - name: 10/18 error message language
+      - name: 10/17 error message language
         run: npm run check:error-message-lang
 
       # SEC-14 / инвариант #39: process.env.* и process.env[...] вне списка
       # исключений rule 11 — скобочная нотация невидима для грепа, так четыре
       # нарушения прожили в telegram/config.ts.
-      - name: 11/18 env discipline
+      - name: 11/17 env discipline
         run: npm run check:env-discipline
 
-      - name: 12/18 context freshness
-        run: npm run check:context-freshness
-
-      - name: 13/18 OpenAPI routes coverage
+      - name: 12/17 OpenAPI routes coverage
         run: npm run check:openapi-routes
 
       # HARD-enforcing в CI: сервис-контейнер postgres поднят, SHADOW_DATABASE_URL
       # задан, а IS_CI-ветка скрипта трактует недостижимый Postgres как отказ.
       # Ловит `db push`-антипаттерн (24-операционный дрейф мая 2026).
-      - name: 14/18 schema drift
+      - name: 13/17 schema drift
         run: npm run check:schema-drift
 
       # Второй гейт пары: `migrate dev` дописывает DROP сырых SQL-объектов
       # (HNSW-индекс и др.) в новые миграции — дважды снимали руками при ревью.
-      - name: 15/18 migration drops
+      - name: 14/17 migration drops
         run: npm run check:migration-drops
 
-      - name: 16/18 include/where discipline
+      - name: 15/17 include/where discipline
         run: npm run check:include-where
 
       # WORKER-BOOT-SERVER-ONLY-01: дефолтный режим CI-safe (без БД/Redis) —
       # проверяет --conditions=react-server в обоих путях старта воркера + пробу
       # server-only. Полный boot-смоук (--full) намеренно не здесь: ему нужен стек.
-      - name: 17/18 worker boot guard
+      - name: 16/17 worker boot guard
         run: npm run check:worker-boot
 
-      # smoke — 18-й шаг батареи. Требует ЖИВОГО сервера (standalone-билд + Postgres
+      # smoke — 17-й шаг батареи. Требует ЖИВОГО сервера (standalone-билд + Postgres
       # + Redis + мигрированная БД + env): без сервера scripts/smoke.mjs fail-soft
       # печатает «skipped (server not reachable)» и выходит 0 — то есть прогон здесь
       # был бы ИМИТАЦИЕЙ проверки, а не проверкой (задача запрещает «делать вид»).
       # Честное состояние: шаг виден в прогоне и помечен skipped. Поднятие полного
       # стека в CI — отдельная задача CI-LIVE-SMOKE в BACKLOG.md.
-      - name: 18/18 smoke — исключён (нужен живой сервер)
+      - name: 17/17 smoke — исключён (нужен живой сервер)
         if: ${{ false }}
         run: npm run smoke
 

@@ -31,6 +31,7 @@ import { withSingleFlight } from "@/lib/cache/single-flight";
 import { buildBookingOverlapWhere } from "@/lib/schedule/overlap";
 import { bucketRangesByDateKey, loadTimeBlockRanges } from "@/lib/schedule/time-blocks";
 import { resolveProfileServiceDurations } from "@/lib/schedule/resolveDuration";
+import { SCHEDULE_HORIZON_DAYS } from "@/lib/schedule/publish-horizon";
 
 type RangeInput = {
   from: Date;
@@ -38,15 +39,22 @@ type RangeInput = {
   stepMin?: number;
 };
 
-export const MAX_BOOKING_WINDOW_DAYS = 60;
+/**
+ * Сколько дней от `fromKey` охватывает один запрос окошек (с пагинацией по
+ * `limit`). Горизонт расписания + сегодняшний день: «Сколько окошек вперёд» и
+ * «Максимум вперёд» настраиваются до `SCHEDULE_HORIZON_DAYS`, и прежние 60 дней
+ * отвечали 400 «Слишком большой диапазон дат» виджету, у мастера которого
+ * видимость больше 59 дней (SLOTS-RANGE-CLAMP).
+ */
+export const MAX_BOOKING_WINDOW_DAYS = SCHEDULE_HORIZON_DAYS + 1;
 export const DEFAULT_PAGE_SIZE = 5;
 export const MAX_PAGE_SIZE = 14;
 
-function clampPageSize(value: number | null | undefined): number {
+function clampPageSize(value: number | null | undefined, maxPageSize = MAX_PAGE_SIZE): number {
   if (!Number.isFinite(value)) return DEFAULT_PAGE_SIZE;
   const safe = Math.floor(value as number);
   if (safe < 1) return 1;
-  if (safe > MAX_PAGE_SIZE) return MAX_PAGE_SIZE;
+  if (safe > maxPageSize) return maxPageSize;
   return safe;
 }
 
@@ -268,6 +276,13 @@ export async function listAvailabilitySlotsPaginated(
      * что видит клиент, и время, оставляющее дыру.
      */
     packing?: boolean;
+    /**
+     * BOOKING-DATE-CALENDAR: одна страница на всё окно (`MAX_BOOKING_WINDOW_DAYS`
+     * вместо `MAX_PAGE_SIZE`) — сводка дней календаря записи считает окно одним
+     * проходом: один контекст расписания и одно чтение броней, а не семь.
+     * Дни пишутся в тот же слот-кэш, что читает выдача одного дня.
+     */
+    wholeRange?: boolean;
   }
 ): Promise<Result<AvailabilitySlotsPageResult>> {
   const startedAt = Date.now();
@@ -294,17 +309,22 @@ export async function listAvailabilitySlotsPaginated(
   }
 
   const maxEndKeyExclusive = addDaysToDateKey(requestedStartKey, MAX_BOOKING_WINDOW_DAYS);
-  const requestedEndKeyExclusive = input.toKeyExclusive ?? maxEndKeyExclusive;
 
-  if (compareDateKeys(requestedEndKeyExclusive, requestedStartKey) < 0) {
+  if (input.toKeyExclusive && compareDateKeys(input.toKeyExclusive, requestedStartKey) < 0) {
     return { ok: false, status: 400, message: "Некорректный диапазон.", code: "RANGE_INVALID" };
   }
 
-  if (compareDateKeys(requestedEndKeyExclusive, maxEndKeyExclusive) > 0) {
-    return { ok: false, status: 400, message: "Слишком большой диапазон дат.", code: "RANGE_INVALID" };
-  }
+  // SLOTS-RANGE-CLAMP: слишком далёкий конец — не ошибка запроса, а прижатие.
+  // Дальше горизонта расписания движок всё равно отдаёт закрытые дни.
+  const requestedEndKeyExclusive =
+    input.toKeyExclusive && compareDateKeys(input.toKeyExclusive, maxEndKeyExclusive) < 0
+      ? input.toKeyExclusive
+      : maxEndKeyExclusive;
 
-  const pageSize = clampPageSize(input.limit);
+  const pageSize = clampPageSize(
+    input.wholeRange ? MAX_BOOKING_WINDOW_DAYS : input.limit,
+    input.wholeRange ? MAX_BOOKING_WINDOW_DAYS : MAX_PAGE_SIZE,
+  );
   const limitedEndKeyExclusive = addDaysToDateKey(requestedStartKey, pageSize);
   const actualEndKeyExclusive =
     compareDateKeys(limitedEndKeyExclusive, requestedEndKeyExclusive) < 0

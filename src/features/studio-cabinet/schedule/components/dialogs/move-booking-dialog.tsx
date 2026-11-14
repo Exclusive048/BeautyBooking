@@ -174,6 +174,7 @@ export function MoveBookingDialog({
             moveBookingId={bookingId}
             missingHint={UI_TEXT.schedule.operatorSlots.chooseMasterFirst}
             disabled={submitting}
+            layout="split"
           />
         ) : null}
 

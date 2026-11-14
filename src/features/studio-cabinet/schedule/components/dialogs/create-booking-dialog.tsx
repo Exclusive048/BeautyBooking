@@ -51,6 +51,12 @@ type Props = {
    * «Новая запись» behaviours).
    */
   prefilledClient?: { name: string; phone: string } | null;
+  /**
+   * День салона `YYYY-MM-DD`, открытый в календаре студии: «Добавить запись»
+   * над 17-м открывает пикер на 17-м, а не на первом свободном дне. Слабее
+   * `startAtUtc` (клик по ячейке).
+   */
+  initialDateKey?: string | null;
 };
 
 export function CreateBookingDialog({
@@ -63,6 +69,7 @@ export function CreateBookingDialog({
   open,
   onClose,
   prefilledClient = null,
+  initialDateKey = null,
 }: Props) {
   const router = useRouter();
   const [clientName, setClientName] = useState(prefilledClient?.name ?? "");
@@ -234,8 +241,10 @@ export function CreateBookingDialog({
             value={slot}
             onChange={setSlot}
             prefillIso={startAtUtc}
+            initialDateKey={initialDateKey}
             missingHint={UI_TEXT.schedule.operatorSlots.chooseMasterFirst}
             disabled={submitting}
+            layout="split"
           />
         ) : null}
 

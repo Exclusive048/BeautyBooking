@@ -381,6 +381,16 @@ const manualWindowQuery: ParameterObject = {
     "Operator window for manual booking (master / studio admin): minBookingHoursAhead is not applied, only past slots are hidden; `slots` are the client's gap-free starts and `otherSlots` the remaining free ones. Honoured only for the provider's own side; ignored otherwise.",
 };
 
+// BOOKING-DATE-CALENDAR: сводка окна записи по дням для календаря выбора даты.
+const bookableDaysQuery: ParameterObject = {
+  name: "days",
+  in: "query",
+  required: false,
+  schema: { type: "string", enum: ["1"] },
+  description:
+    "Day summary instead of slots (`BookableDaysData`): every salon-local date of the booking window from `from` with `free` (at least one start the same request would return), `busy` (working day without free starts) or `off` (day off). Same window rules as the slot list; with ?manual=1 for the provider's own side a day is `free` when any free start exists, including ones outside the gap-free selection.",
+};
+
 // MOBILE-STUDIO-C (ops) — общие схемы чтений кабинета студии для приложения
 // (`/api/cabinet/studio/{dashboard,calendar,bookings,booking-options,notifications}`).
 const STUDIO_OPS_TIME = (description?: string): SchemaObject => ({ type: "string", format: "date-time", description });
@@ -2473,6 +2483,27 @@ export const openApiSpec = {
                 "Only with ?manual=1 for the provider's own side (MANUAL-SLOTS-ALL): the remaining free starts that `slots` leaves out because they would leave a gap no service fits. Manual booking shows them on request.",
             },
             meta: { $ref: "#/components/schemas/AvailabilitySlotsMeta" },
+          },
+        },
+        BookableDaysData: {
+          type: "object",
+          required: ["timezone", "firstDate", "lastDate", "days"],
+          description: "?days=1 (BOOKING-DATE-CALENDAR): the booking window by salon-local date.",
+          properties: {
+            timezone: { type: "string", description: "Salon IANA zone the dates are in." },
+            firstDate: { type: "string", format: "date", description: "First date of the booking window (inclusive)." },
+            lastDate: { type: "string", format: "date", description: "Last date of the booking window (inclusive)." },
+            days: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["date", "status"],
+                properties: {
+                  date: { type: "string", format: "date" },
+                  status: { type: "string", enum: ["free", "busy", "off"] },
+                },
+              },
+            },
           },
         },
         HotSlotRule: {
@@ -6971,9 +7002,15 @@ export const openApiSpec = {
           moveBookingIdQuery,
           manualWindowQuery,
           flushAfterQuery,
+          bookableDaysQuery,
         ],
         responses: {
-          "200": okResponse({ $ref: "#/components/schemas/AvailabilitySlotsData" }),
+          "200": okResponse({
+            oneOf: [
+              { $ref: "#/components/schemas/AvailabilitySlotsData" },
+              { $ref: "#/components/schemas/BookableDaysData" },
+            ],
+          }),
           "400": errorResponse("Validation error"),
           "404": errorResponse("Not found"),
           "409": errorResponse("Conflict"),
@@ -11008,7 +11045,9 @@ export const openApiSpec = {
           "`?studioId&masterId` — владелец/администратор студии правит расписание мастера студии, сразу " +
           "(`approval.mode = STUDIO_ADMIN`). MOBILE-POLISH: в режиме `STUDIO_ADMIN` `approval.pendingRequestId` / " +
           "`requestStatus: \"PENDING\"` — открытая заявка мастера (только показ; решение — " +
-          "`POST /api/studio/schedule/requests/{id}/approve|reject`), иначе `null`; `rejectedComment` — всегда `null`.",
+          "`POST /api/studio/schedule/requests/{id}/approve|reject`), иначе `null`; `rejectedComment` — всегда `null`. " +
+          "BOOKING-WINDOW-MERGE: `visibility.visibleSlotDays` устарело — это зеркало `bookingRules.maxDaysAhead` " +
+          "(окно записи решает и то, на сколько дней вперёд видны окошки); новым клиентам его не читать.",
         tags: ["mobile", "schedule"],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }],
         parameters: SCHEDULE_ACTOR_PARAMETERS,
@@ -11030,7 +11069,9 @@ export const openApiSpec = {
           "`visibility.isPublished` не применяется; `hotSlots` — по тарифу вызывающего (403 `FEATURE_GATE`). " +
           "Мастер в режиме `STUDIO_MASTER` (профиль в студии `?profile=`) меняет сам, сразу и без заявки, " +
           "личные правила: `slotStepMin`, `bufferBetweenBookingsMin`, `bookingRules.{minHoursAhead,maxDaysAhead," +
-          "autoConfirm}`, `visibility.{visibleSlotDays,acceptNewClients}` (`approval.lastAction` = `APPLIED`). " +
+          "autoConfirm}`, `visibility.acceptNewClients` (`approval.lastAction` = `APPLIED`). " +
+          "BOOKING-WINDOW-MERGE: устаревшее `visibility.visibleSlotDays` принимается и пишется в " +
+          "`bookingRules.maxDaysAhead` (значение, равное текущему окну, — не правка; при изменённых обоих — меньшее). " +
           "Общее для студии — `bookingRules.{freeCancelHours,lateCancelAction}`, `visibility.slotPrecision` — и " +
           "`hotSlots` задаёт студия: изменение — 403 `FORBIDDEN`, неизменённые значения проходят " +
           "(STUDIO-PROFILE-PERSONAL-RULES).",

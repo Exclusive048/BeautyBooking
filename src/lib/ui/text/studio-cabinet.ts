@@ -168,8 +168,9 @@ export const studioCabinet = {
       minHoursTitle: "Минимум за",
       minHoursHint:
         "За сколько часов до визита клиент должен записаться.",
-      maxDaysTitle: "Максимум за",
-      maxDaysHint: "На сколько дней вперёд открыта запись.",
+      // BOOKING-WINDOW-MERGE: заодно решает, на сколько дней видны окошки.
+      maxDaysTitle: "Запись открыта вперёд",
+      maxDaysHint: "На сколько дней вперёд клиенты видят окошки мастера и могут записаться.",
       autoConfirmTitle: "Автоподтверждение",
       autoConfirmHint:
         "Запись подтверждается автоматически без участия мастера.",
@@ -213,8 +214,6 @@ export const studioCabinet = {
         today_free: "Сегодня свободно",
         date_only: "Только дата",
       },
-      visibleSlotDaysTitle: "Сколько окошек вперёд",
-      visibleSlotDaysHint: "Сколько дней вперёд клиент видит свободные окошки.",
       acceptNewClientsTitle: "Принимает новых клиентов",
       acceptNewClientsHint:
         "Если выключить, новые клиенты не смогут записаться. Существующие — смогут.",
@@ -646,8 +645,8 @@ export const studioCabinet = {
         "Клиент видит их при записи. Действуют для всей студии — отдельные мастера не нужны.",
       minBookingAhead: "Минимум за",
       minBookingAheadHint: "Раньше этого окна окошко клиенту не покажем.",
-      maxBookingAhead: "Максимум вперёд",
-      maxBookingAheadHint: "Насколько далеко вперёд открыта запись.",
+      maxBookingAhead: "Запись открыта вперёд",
+      maxBookingAheadHint: "На сколько дней вперёд клиенты видят окошки и могут записаться.",
       cancellationDeadline: "Бесплатная отмена за",
       cancellationDeadlineHint: "Позже этого срока отмена считается поздней.",
       lateCancelAction: "При поздней отмене",

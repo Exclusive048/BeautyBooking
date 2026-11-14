@@ -31,6 +31,9 @@ export default defineConfig({
     // `.claude/**`: agent worktrees live under `.claude/worktrees/*` — full
     // checkouts of the repo — so without it a run in the main tree also ran
     // every agent's copy of the suite.
-    exclude: [...configDefaults.exclude, ".qa/**", ".claude/**"],
+    // `.next/**`: a local `next build` (output: standalone) leaves a copy of
+    // `src/` under `.next/standalone/src` — tests of a past build, red against
+    // the current schema. CI has no `.next`, so it only bit local runs.
+    exclude: [...configDefaults.exclude, ".qa/**", ".claude/**", ".next/**"],
   },
 });
