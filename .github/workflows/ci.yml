@@ -37,7 +37,16 @@ concurrency:
 
 jobs:
   quality:
-    name: npm run check (17 шагов) + npm run test
+    # 🔴 Имя ЗАМОРОЖЕНО (CI-REQUIRED-CHECK-NAME, 2026-11-14). Это не подпись, а
+    # идентификатор обязательной проверки в защите ветки main (Settings →
+    # Branches → main → Require status checks): GitHub сопоставляет её по ИМЕНИ
+    # джоба. Переименовали — PR навсегда висит в «Expected — Waiting for status
+    # to be reported», потому что проверку со старым именем больше никто не
+    # запускает (так и случилось, когда в имени исправили «18» на «17»).
+    # «18 шагов» — историческая метка; фактическое число шагов — в нумерации
+    # шагов ниже. Менять имя — только вместе с обязательной проверкой в
+    # настройках репозитория. Пин — scripts/ci-required-checks.test.ts.
+    name: npm run check (18 шагов) + npm run test
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
